@@ -122,6 +122,47 @@ type ITensor =
     abstract SetSlice : i0s:int64 option * i0f:int64 option * i1s:int64 option * i1f:int64 option * i2:int64 * o3:obj * o4:obj * [<System.ParamArray>] r:obj [] -> unit
     abstract SetSlice : i0s:int64 option * i0f:int64 option * i1s:int64 option * i1f:int64 option * i2s:int64 option * i2f:int64 option * o3:obj * o4:obj * [<System.ParamArray>] r:obj [] -> unit
 
+    // type-neutral unary operators
+    abstract UnaryPlus: unit -> ITensor
+    abstract UnaryMinus: unit -> ITensor
+    abstract Abs: unit -> ITensor
+    abstract Sgn: unit -> ITensor
+    abstract Log: unit -> ITensor
+    abstract Log10: unit -> ITensor
+    abstract Exp: unit -> ITensor
+    abstract Sin: unit -> ITensor
+    abstract Cos: unit -> ITensor
+    abstract Tan: unit -> ITensor
+    abstract Asin: unit -> ITensor
+    abstract Acos: unit -> ITensor
+    abstract Atan: unit -> ITensor
+    abstract Sinh: unit -> ITensor
+    abstract Cosh: unit -> ITensor
+    abstract Tanh: unit -> ITensor
+    abstract Sqrt: unit -> ITensor
+    abstract Ceiling: unit -> ITensor
+    abstract Floor: unit -> ITensor
+    abstract Round: unit -> ITensor
+    abstract Truncate: unit -> ITensor
+    abstract IsFinite: unit -> ITensor
+
+    // type-neutral binary operators
+    abstract Add: ITensor -> ITensor
+    abstract Subtract: ITensor -> ITensor
+    abstract Multiply: ITensor -> ITensor
+    abstract Divide: ITensor -> ITensor
+    abstract Modulo: ITensor -> ITensor
+    abstract Pow: ITensor -> ITensor
+    abstract Equal: ITensor -> ITensor
+    abstract NotEqual: ITensor -> ITensor
+    abstract Less: ITensor -> ITensor
+    abstract LessOrEqual: ITensor -> ITensor
+    abstract Greater: ITensor -> ITensor
+    abstract GreaterOrEqual: ITensor -> ITensor
+    abstract MaxElemwise: ITensor -> ITensor
+    abstract MinElemwise: ITensor -> ITensor
+
+
 
 /// <summary>Type-neutral interface to Tensor&lt;'T&gt; of any type 'T.</summary>
 /// <remarks>These functions are useful for working with tensors of unknown types.
