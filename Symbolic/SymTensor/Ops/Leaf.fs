@@ -83,7 +83,12 @@ module LeafOps =
                 Generic.callGeneric<IdentityTyped<_>, ITensor> "Eval" [this.Type.Type] (dev, this)
 
     type internal IdentityTyped<'T>() =
+
+
         static member Eval (op: Identity) (dev: ITensorDevice) =
+            let typeLambda<'R> (a: string) =
+                a
+
             Tensor<'T>.identity dev (SizeSpec.eval op.Size) :> ITensor
 
     // will work but introduces reflection call in Eval.
@@ -91,7 +96,9 @@ module LeafOps =
     // how often will this occur?
     // could it possibly be handled using a lambda?
     // would perhaps be a clean idea but has to be investigated...
-
+    // creating a lambda to call a generic funciton
+    // how could this look?
+        
 
     ///// Identity matrix
     //type Identity<'T> = { Size: SizeSpec } with
