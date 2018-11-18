@@ -25,3 +25,26 @@
  - What can be used as a TensorDevice?
  - shall we just use a ITensorDevice?
   => yes, try that for now...
+
+
+- put arguments into Ops or not??
+ - pro: could be named properly
+ - contra: iteration, pattern matching?
+  - for pattern matching we could do active patterns
+  - will also need changes of UExprs
+  - how to handle evaluation then?
+  - ops must give all subexprs to framework
+  - this can be done using a map
+
+- although it is nice that expressions are forced to be legal it has the drawback that now they are not transparent anymore
+- however, plus point is that we do not need to check them completely just incrementally
+- also an expression could just know its shape, hash, correctness, evalableSymSizes and Var list
+- thus we could get rid of all the caches, which would be really nice
+- could probably use F# types efficiently for extractedVars
+
+- let's see what F# compiler does
+- question is how to store the additional information without affecting comparision and equality
+- so only way is to make a base type?
+- we can make a base type, but how to store arguments again?
+
+

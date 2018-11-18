@@ -1,5 +1,7 @@
 ﻿namespace rec SymTensor
 
+(**
+
 open DeepNet.Utils
 
 
@@ -24,25 +26,68 @@ type internal PlusElems (elems: SizeSpec) =
     member this.Elems = elems
 
 
+/// A mathematical operation in an expression.
+/// This models a mathematical function or operator that takes one or more tensors
+/// and returns one tensor.
+type IOp =
+    inherit System.IComparable
+      
+    /// Should return the type of the result, given the types of the arguments.
+    abstract TypeName: argTypes: TypeName list -> TypeName
+
+    /// Should return the shape of the result, given the shape of the arguments.
+    abstract Shape: argShapes: ShapeSpec list -> ShapeSpec      
+        
+    /// Should check if the shapes of the arguments are acceptable and,
+    /// if not, raise an exception.
+    abstract CheckArgs: argShapes: ShapeSpec list -> unit      
+
+    /// Should return the op with all symbolic sizes substituted using the specified
+    /// substitution table.
+    /// Return a *new* op with substitution applied. Do not apply the mapping in-place.
+    abstract SubstSymSizes: symSizes: SymSizeEnv -> IOp
+
+    /// Should be true, if all symbolic sizes can be evaluated to numeric sizes.
+    /// This is the case if the function ShapeSpec.canEval or SizeSpec.canEval respectively
+    /// return true on all sizes used in this op.
+    abstract CanEvalAllSymSizes: bool
+
+    /// Should compute the derivative w.r.t. each argument given the derivative w.r.t. the op.
+    /// The derivative is always an NxM matrix where N is the number of elements of the function
+    /// the derivative of which is being taken and M is the number of elements of the argument
+    /// w.r.t. which the derivative is being taken. 
+    /// Thus, if dOp is an NxK matrix and an argument has M elements, the derivative matrix
+    /// you return w.r.t. that argument must have NxM elements.
+    abstract Deriv: dOp:Expr -> args:Expr list -> Expr list
+
+    /// Should evaluate the numerical value of this op given the numerical values of its arguments.
+    /// This evaluation should be done on the host using the simplest means possible and is used
+    /// as a reference implementation for verifying the correctness of optimized (e.g. CUDA) 
+    /// implementations. This method may be omitted when no verification will be done.
+    abstract EvalSimple: args:Tensor.Tensor<'T> list -> Tensor.Tensor<'T>
+
+    /// Should return the set of variables that this op instance depends on.
+    abstract ContainedVars: Set<Var>
+
 /// ops with no exprs as arguments
 [<StructuralComparison; StructuralEquality>]
 type LeafOp =
 
     // ==== scalars ============
     /// scalar of given value
-    | ScalarConst of value:Const
+    | ScalarConst of value:Const // DONE
     /// scalar of the given size
-    | SizeValue of value:SizeSpec * typ:TypeName
+    | SizeValue of value:SizeSpec * typ:TypeName // DONE
 
     // ==== tensor creation ====
     /// tensor with 1 on diagonal of given shape
-    | Identity of shape:SizeSpec * typ:TypeName
+    | Identity of shape:SizeSpec * typ:TypeName // DONE
     /// vector counting from zero to given size minus one
-    | Arange of size:SizeSpec * typ:TypeName
+    | Arange of size:SizeSpec * typ:TypeName // DONE
 
     // ==== variable access ====
     /// variable read
-    | Var of Var      
+    | Var of Var       // DONE
         
 
 /// ops with one expr as argument
@@ -50,10 +95,10 @@ type LeafOp =
 type UnaryOp =
 
     // ==== unary elementwise ==== 
-    | Negate                        
-    | Abs
-    | SignT
-    | Log
+    | Negate  // DONE                        
+    | Abs     // DONE
+    | SignT   // DONE
+    | Log     // DONE
     | Log10                           
     | Exp                           
     | Sin
@@ -275,45 +320,7 @@ type LoopSpec = {
     Channels:   Map<Channel, LoopValue>
 }
 
-/// A mathematical operation in an expression.
-/// This models a mathematical function or operator that takes one or more tensors
-/// and returns one tensor.
-type IOp =
-    inherit System.IComparable
-      
-    /// Should return the shape of the result, given the shape of the arguments.
-    abstract Shape: argShapes: ShapeSpec list -> ShapeSpec      
-        
-    /// Should check if the shapes of the arguments are acceptable and,
-    /// if not, raise an exception.
-    abstract CheckArgs: argShapes: ShapeSpec list -> unit      
 
-    /// Should return the op with all symbolic sizes substituted using the specified
-    /// substitution table.
-    /// Return a *new* op with substitution applied. Do not apply the mapping in-place.
-    abstract SubstSymSizes: symSizes: SymSizeEnv -> IOp
-
-    /// Should be true, if all symbolic sizes can be evaluated to numeric sizes.
-    /// This is the case if the function ShapeSpec.canEval or SizeSpec.canEval respectively
-    /// return true on all sizes used in this op.
-    abstract CanEvalAllSymSizes: bool
-
-    /// Should compute the derivative w.r.t. each argument given the derivative w.r.t. the op.
-    /// The derivative is always an NxM matrix where N is the number of elements of the function
-    /// the derivative of which is being taken and M is the number of elements of the argument
-    /// w.r.t. which the derivative is being taken. 
-    /// Thus, if dOp is an NxK matrix and an argument has M elements, the derivative matrix
-    /// you return w.r.t. that argument must have NxM elements.
-    abstract Deriv: dOp:Expr -> args:Expr list -> Expr list
-
-    /// Should evaluate the numerical value of this op given the numerical values of its arguments.
-    /// This evaluation should be done on the host using the simplest means possible and is used
-    /// as a reference implementation for verifying the correctness of optimized (e.g. CUDA) 
-    /// implementations. This method may be omitted when no verification will be done.
-    abstract EvalSimple: args:Tensor.Tensor<'T> list -> Tensor.Tensor<'T>
-
-    /// Should return the set of variables that this op instance depends on.
-    abstract ContainedVars: Set<Var>
 
 [<StructuralComparison; StructuralEqualityAttribute>] 
 type private ExprProxy = 
@@ -517,8 +524,8 @@ type Expr =
     /// (2, 2) -> matrix-matrix dot product resulting in a matrix
     /// (n, n) with n>2 -> batched matrix-matrix dot product resulting in a matrix
     /// (n+1, n) with n>2 -> batched matrix-vector dot product resulting in a vector.
-    static member (.*) (a: Expr, b: Expr) = Expr.dot a b
-    static member (%*) (a: Expr, b: Expr) = Expr.tensorProduct a b
+    static member ( .* ) (a: Expr, b: Expr) = Expr.dot a b
+    static member ( %* ) (a: Expr, b: Expr) = Expr.tensorProduct a b
 
     // item / slicing
     member this.GetSlice ([<System.ParamArray>] allArgs: obj []) =
@@ -2018,3 +2025,4 @@ module Expr =
     let (|ZeroExpr|_|) expr =
         if Expr.isZero expr then Some () else None
 
+**)

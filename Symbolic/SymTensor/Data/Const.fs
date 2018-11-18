@@ -1,6 +1,7 @@
 ﻿namespace SymTensor
 
 open DeepNet.Utils
+open Tensor
 
 
 /// scalar constant value
@@ -43,6 +44,15 @@ type Const =
             | Const.Double v -> v |> box
             | Const.Single v -> v |> box 
             | Const.Bool v   -> v |> box 
+
+        /// the value as an scalar ITensor stored on the specified device
+        member this.AsTensor dev : ITensor =
+            match this with
+            | Const.Int v -> Tensor.scalar dev v :> ITensor
+            | Const.Int64 v -> Tensor.scalar dev v :> ITensor
+            | Const.Double v -> Tensor.scalar dev v :> ITensor
+            | Const.Single v -> Tensor.scalar dev v :> ITensor
+            | Const.Bool v -> Tensor.scalar dev v :> ITensor
                 
         /// gets the value converting it to type 'T
         member this.GetConvertedValue<'T>() : 'T =   
