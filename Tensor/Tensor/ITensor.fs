@@ -122,7 +122,7 @@ type ITensor =
     abstract SetSlice : i0s:int64 option * i0f:int64 option * i1s:int64 option * i1f:int64 option * i2:int64 * o3:obj * o4:obj * [<System.ParamArray>] r:obj [] -> unit
     abstract SetSlice : i0s:int64 option * i0f:int64 option * i1s:int64 option * i1f:int64 option * i2s:int64 option * i2f:int64 option * o3:obj * o4:obj * [<System.ParamArray>] r:obj [] -> unit
 
-    // type-neutral unary operators
+    // type-neutral unary operations
     abstract UnaryPlus: unit -> ITensor
     abstract UnaryMinus: unit -> ITensor
     abstract Abs: unit -> ITensor
@@ -146,13 +146,14 @@ type ITensor =
     abstract Truncate: unit -> ITensor
     abstract IsFinite: unit -> ITensor
 
-    // type-neutral binary operators
+    // type-neutral binary operations
     abstract Add: ITensor -> ITensor
     abstract Subtract: ITensor -> ITensor
     abstract Multiply: ITensor -> ITensor
     abstract Divide: ITensor -> ITensor
     abstract Modulo: ITensor -> ITensor
     abstract Pow: ITensor -> ITensor
+    
     abstract Equal: ITensor -> ITensor
     abstract NotEqual: ITensor -> ITensor
     abstract Less: ITensor -> ITensor
@@ -162,7 +163,30 @@ type ITensor =
     abstract MaxElemwise: ITensor -> ITensor
     abstract MinElemwise: ITensor -> ITensor
 
+    abstract IfThenElse: ifFalse:ITensor -> cond:ITensor -> ITensor
+    abstract Gather: indices:ITensor option list -> ITensor
+    abstract Scatter: indices:ITensor option list -> trgtShp:int64 list -> ITensor
 
+    // type-neutral reduction operations
+    abstract SumAxis: ax:int -> ITensor
+    abstract SumTensor: unit -> ITensor
+    abstract ProductAxis: ax:int -> ITensor
+    abstract ProductTensor: unit -> ITensor
+    abstract MinAxis: ax:int -> ITensor
+    abstract MinTensor: unit -> ITensor
+    abstract MaxAxis: ax:int -> ITensor
+    abstract MaxTensor: unit -> ITensor
+    abstract ArgMinAxis: ax:int -> ITensor
+    abstract ArgMaxAxis: ax:int -> ITensor
+    abstract ArgMin: unit -> int64 list
+    abstract ArgMax: unit -> int64 list
+
+    abstract Dot: ITensor -> ITensor
+    abstract Invert: unit -> ITensor
+    abstract SVD: unit -> ITensor * ITensor * ITensor
+    abstract SVDWithoutUV: unit -> ITensor
+    abstract PseudoInvert: unit -> ITensor
+    abstract SymmetricEigenDecomposition: part:MatrixPart -> ITensor * ITensor
 
 /// <summary>Type-neutral interface to Tensor&lt;'T&gt; of any type 'T.</summary>
 /// <remarks>These functions are useful for working with tensors of unknown types.
