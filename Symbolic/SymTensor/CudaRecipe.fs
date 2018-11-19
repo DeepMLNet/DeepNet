@@ -58,8 +58,8 @@ module CudaRecipeTypes =
     type CudaRecipeT = {
         ChannelVars:        Map<Channel, Var option>
         ChannelAllocators:  Map<Channel, unit -> ITensor>
-        VarStrides:         VarStridesT
-        VarStorLoc:         VarLocsT
+        VarStrides:         VarStrides
+        VarStorLoc:         VarLocs
         KernelCode:         string
         CPPCode:            string
         InitCalls:          CudaCallT list

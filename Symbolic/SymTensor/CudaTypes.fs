@@ -123,7 +123,7 @@ module Types =
     type ICudaExprWorkspace =
         inherit IDisposable
         /// evaluates the workspace using the specified variable environment
-        abstract Eval: VarEnvT -> unit
+        abstract Eval: VarEnv -> unit
 
     /// Actual CUDA internal memory allocations and external device and host references
     type CudaExecEnvT = {

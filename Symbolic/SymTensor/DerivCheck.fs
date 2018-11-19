@@ -65,7 +65,7 @@ module DerivCheck =
 
     /// Recursively checks that symbolic and numeric derivatives of all ops in the given expression are close enough.
     /// The derivatives are evaluated at the location specified by the given VarEnv.
-    let inline checkExprTree (device: IDevice) (maxDeviation: 'T) (epsilon: 'T) (varEnv: VarEnvT) (expr: Expr) = 
+    let inline checkExprTree (device: IDevice) (maxDeviation: 'T) (epsilon: 'T) (varEnv: VarEnv) (expr: Expr) = 
         let rec checkSubExpr expr = 
             match expr with
             | Expr.Leaf(_) -> ()

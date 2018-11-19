@@ -800,7 +800,7 @@ module CudaExprWorkspaceTypes =
                 (this :> System.IDisposable).Dispose()
 
         /// evaluates the workspace using the specified variable environment
-        member this.Eval (varEnv: VarEnvT) =
+        member this.Eval (varEnv: VarEnv) =
             if disposed then raise (System.ObjectDisposedException("CudaExprWorkspace"))
             Cuda.checkContext ()
 

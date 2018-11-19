@@ -20,11 +20,11 @@ module HostEval =
     /// evaluation functions
     type private EvalT =       
 
-        static member EvalTypeNeutral (evalEnv: EvalEnvT, expr: Expr) : ITensor =
+        static member EvalTypeNeutral (evalEnv: EvalEnv, expr: Expr) : ITensor =
              callGeneric<EvalT, ITensor> "Eval" [expr.Type] (evalEnv, expr)
 
 
-        static member Eval<'R> (evalEnv: EvalEnvT, expr: Expr) : Tensor<'R> =
+        static member Eval<'R> (evalEnv: EvalEnv, expr: Expr) : Tensor<'R> =
             let retType = expr.Type
             if retType <> typeof<'R> then
                 failwithf "expression of type %A does not match eval function of type %A"
@@ -49,7 +49,7 @@ module HostEval =
             callGeneric<EvalT, Tensor<'R>> "DoEval" [argType; retType] (evalEnv, expr)
 
 
-        static member DoEval<'T, 'R> (evalEnv: EvalEnvT, expr: Expr) : Tensor<'R> =
+        static member DoEval<'T, 'R> (evalEnv: EvalEnv, expr: Expr) : Tensor<'R> =
             if expr.Type <> typeof<'R> then
                 failwithf "expression of type %A does not match eval function of type %A"
                     expr.Type typeof<'R>
@@ -222,7 +222,7 @@ module HostEval =
             res
 
         /// evaluates all channels of a loop
-        static member LoopEval (evalEnv: EvalEnvT, spec: LoopSpec, args: ITensor list) 
+        static member LoopEval (evalEnv: EvalEnv, spec: LoopSpec, args: ITensor list) 
                                : Map<Channel, ITensor> =
 
             // iteration index variables
@@ -264,13 +264,13 @@ module HostEval =
             
     /// Evaluates a unified expression.
     /// This is done by evaluating the generating expression.
-    let evalUExpr (evalEnv: EvalEnvT) uExpr =
+    let evalUExpr (evalEnv: EvalEnv) uExpr =
         let expr = UExpr.toExpr uExpr
         callGeneric<EvalT, ITensor> "Eval" [expr.Type] (evalEnv, expr)
 
     /// Evaluates the specified unified expressions.
     /// This is done by evaluating the generating expressions.
-    let evalUExprs (evalEnv: EvalEnvT) (uexprs: UExprT list) =
+    let evalUExprs (evalEnv: EvalEnv) (uexprs: UExprT list) =
         List.map (evalUExpr evalEnv) uexprs
 
 

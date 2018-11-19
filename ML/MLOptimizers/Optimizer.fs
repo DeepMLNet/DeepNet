@@ -14,7 +14,7 @@ module OptimizerTypes =
         /// Expression performing one optimization step.
         abstract member OptStepExpr: Expr
 
-        abstract member Use: (VarEnvT -> 'A) -> (VarEnvT -> 'OptCfg -> 'OptState -> 'A)
+        abstract member Use: (VarEnv -> 'A) -> (VarEnv -> 'OptCfg -> 'OptState -> 'A)
 
         /// Returns the configuration with the learning rate set to the specified value.
         abstract member CfgWithLearningRate: learningRate:float -> cfg:'OptCfg -> 'OptCfg

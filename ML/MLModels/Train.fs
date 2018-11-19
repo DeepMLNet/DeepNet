@@ -238,7 +238,7 @@ module Train =
             (modelInstance: ModelInstance<'T>) 
             (losses: Expr list) 
             (nextStateExpr: Expr option)
-            (varEnvBuilder: Tensor<'T> option -> 'Smpl -> VarEnvT)
+            (varEnvBuilder: Tensor<'T> option -> 'Smpl -> VarEnv)
             (optNew: Expr -> Expr -> IDevice -> IOptimizer<'T, 'OptCfg, 'OptState>)
             (optCfg: 'OptCfg) =         
    

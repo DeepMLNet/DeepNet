@@ -412,6 +412,26 @@ module internal Generic =
         callGenericInst<'U, 'R> null methodName genericTypeArgs args
 
 
+[<AutoOpen>]
+module internal Generic2 =
+    
+    type private GenericTypeDesc = {
+        GenericType:   string    
+        TypeArgs:      string list
+    }
+
+    let private cache = ConcurrentDictionary<GenericTypeDesc, obj> ()
+
+    let Generic<'G, 'I> (genericTypeArgs: System.Type list) : 'I =
+        let desc = { 
+            GenericType=typedefof<'G>.AssemblyQualifiedName
+            TypeArgs=genericTypeArgs |> List.map (fun t -> t.AssemblyQualifiedName)
+        }
+        let inst = cache.GetOrAdd(desc, fun _ -> 
+            let typ = typedefof<'G>.MakeGenericType(Array.ofList genericTypeArgs)
+            Activator.CreateInstance(typ))
+        unbox inst
+
 
 /// Utility functions
 module internal Util =

@@ -27,7 +27,7 @@ module CudaEval =
         let workspace = new CudaExprWorkspace (rcpt)
 
         // evaluator
-        let evalFn = fun (evalEnv: EvalEnvT) ->           
+        let evalFn = fun (evalEnv: EvalEnv) ->           
             // create arrays for results and add them to VarEnv
             let resArrays = rcpt.ChannelAllocators |> Map.map (fun _ alloc -> alloc ())
             let varEnv =

@@ -12,7 +12,7 @@ open SymTensor
 
 
 /// Locks and registers all variables in a VarEnv for use with CUDA.
-type VarEnvReg (varEnv: VarEnvT) =   
+type VarEnvReg (varEnv: VarEnv) =   
     let varLocks =
         varEnv
         |> Map.toList

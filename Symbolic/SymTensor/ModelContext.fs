@@ -203,8 +203,8 @@ module ModelContextTypes =
         let mutable vars : Set<Var> = Set.empty
         let mutable symSizes = []
         let mutable symSizeEnv = SymSizeEnv.empty
-        let mutable varLocs : VarLocsT = Map.empty
-        let mutable varStrides : VarStridesT = Map.empty
+        let mutable varLocs : VarLocs = Map.empty
+        let mutable varStrides : VarStrides = Map.empty
         let mutable instantiated = false
 
         let toSizeSpec (name: string) =            

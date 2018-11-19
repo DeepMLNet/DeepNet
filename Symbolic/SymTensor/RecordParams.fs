@@ -91,7 +91,7 @@ type VarRecord<'RVal, 'RExpr when 'RVal: equality> (rExpr:      'RExpr,
     member this.Expr = rExpr
 
     /// the VarEnv containing the values in the passed value record
-    member this.VarEnv (value: 'RVal) : VarEnvT =        
+    member this.VarEnv (value: 'RVal) : VarEnv =        
         match varEnvCache with
         | Some (lastValue, lastVarEnv) when lastValue = value -> lastVarEnv
         | _ ->
@@ -111,8 +111,8 @@ type VarRecord<'RVal, 'RExpr when 'RVal: equality> (rExpr:      'RExpr,
             varEnv      
         
     /// extends the given function to accept a value record
-    member this.Use (f: VarEnvT -> 'R) =
-        fun (ve: VarEnvT) (value: 'RVal) -> f (VarEnv.join ve (this.VarEnv value))
+    member this.Use (f: VarEnv -> 'R) =
+        fun (ve: VarEnv) (value: 'RVal) -> f (VarEnv.join ve (this.VarEnv value))
 
     /// publishes the locations and strides of the used variables to the given ModelInstance
     member this.PublishLocAndStride (model: ModelInstance<'T>) =        

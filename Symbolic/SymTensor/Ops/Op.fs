@@ -53,6 +53,17 @@ open Tensor.Backend
     
 type ArgsMap = Map<string, Expr2>
 
+/// Information necessary to evaluate an expression.
+/// Currently this just holds the variable values, but may contain further information in the future.
+type EvalEnv = {
+    /// Values of variables.
+    VarEnv: VarEnv
+    /// Device to store result on.
+    Dev:    ITensorDevice
+    /// Argument values.
+    Args:   Map<string, ITensor>
+}
+
 /// A mathematical operation in an expression.
 /// This models a mathematical function or operator that takes one or more tensors
 /// and returns one tensor.
@@ -97,7 +108,7 @@ type IOp2 =
     /// This evaluation should be done on the host using the simplest means possible and is used
     /// as a reference implementation for verifying the correctness of optimized (e.g. CUDA) 
     /// implementations. This method may be omitted when no verification will be done.
-    abstract Eval: dev:ITensorDevice -> args:Map<string, Tensor.ITensor> -> Tensor.ITensor
+    abstract Eval: env:EvalEnv -> Tensor.ITensor
 
     /// Should return the set of variables that this op instance depends on.
     //abstract ContainedVars: Set<Var>
@@ -139,26 +150,27 @@ type Expr2 (op: IOp2) =
     override this.GetHashCode() =
         hash this.Op
 
-    /// Wraps the given op in a Reshape op if its shape does not match ss.
-    static member reshapeIfNecessary ss (expr: Expr2) =
-        if ss = expr.Shape then expr else Expr2(OpForwards.Reshape ss expr)
+    /// Reshapes the expression into the given shape.
+    /// The element count must not change.
+    static member reshape ss (expr: Expr2) =
+        if ss = expr.Shape then expr else Expr2 (OpForwards.Reshape ss expr)
 
-    /// Wraps the given op in a Broadcast op if its shape does not match ss.
-    static member broadcastIfNecessary ss (expr: Expr2) =
-        if ss = expr.Shape then expr else Expr2(OpForwards.DoBroadcast ss expr)
+    /// Broadcasts the expression into the given shape.
+    static member broadcast ss (expr: Expr2) =
+        if ss = expr.Shape then expr else Expr2 (OpForwards.DoBroadcast ss expr)
 
     /// emits an elementwise binary operation with broadcasting of the inputs if necessary
     static member constructElementwise op (a: Expr2) (b: Expr2) =
         let psa, psb = ShapeSpec.padToSame a.Shape b.Shape
         let bsa, bsb = ShapeSpec.broadcastToSame false psa psb
-        let ba = a |> Expr2.reshapeIfNecessary psa |> Expr2.broadcastIfNecessary bsa
-        let bb = b |> Expr2.reshapeIfNecessary psb |> Expr2.broadcastIfNecessary bsb    
+        let ba = a |> Expr2.reshape psa |> Expr2.broadcast bsa
+        let bb = b |> Expr2.reshape psb |> Expr2.broadcast bsb    
         Expr2 (op ba bb)
-
 
     static member (~-) (x: Expr2) = Expr2 (OpForwards.Negate x)
 
     static member (+) (a: Expr2, b: Expr2) = Expr2.constructElementwise OpForwards.Add a b
+
 
 
 [<AllowNullLiteral>]

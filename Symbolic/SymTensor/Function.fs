@@ -10,124 +10,124 @@ open UExprTypes
 
 
 
-[<AutoOpen>]
-module VarEnvTypes = 
-    /// variable value collection
-    type VarEnvT = Map<Var, ITensor>
+//[<AutoOpen>]
+//module VarEnvTypes = 
+//    /// variable value collection
+//    //type VarEnv = Map<Var, ITensor>
 
-    /// specification of variable storage locations
-    type VarLocsT = Map<Var, ITensorDevice>
+//    /// specification of variable storage locations
+//    type VarLocs = Map<Var, ITensorDevice>
 
-    /// specification of variable strides
-    type VarStridesT = Map<Var, int64 list>
+//    /// specification of variable strides
+//    type VarStrides = Map<Var, int64 list>
 
-    /// specification of channel strides
-    type ChannelStridesT = Map<Channel, int64 list>
-
-
-/// Variable value collection.
-module VarEnv = 
-
-    /// add variable value to environment
-    let addVarSpec (vs: Var) (value: #ITensor) (varEnv: VarEnvT) : VarEnvT =
-        Map.add vs (value :> ITensor) varEnv
-
-    /// remove variable value from environment
-    let removeVarSpec (vs: Var) (varEnv: VarEnvT) : VarEnvT =
-        Map.remove vs varEnv
-
-    /// get variable value from environment
-    let getVarSpec (vs: Var) (varEnv: VarEnvT) : #ITensor =
-        match varEnv |> Map.tryFind vs with
-        | Some v -> v |> box |> unbox
-        | None -> failwithf "variable %A is not present in the specified VarEnv" vs
-
-    /// add variable value to environment
-    let add (var: Expr) (value: #ITensor) (varEnv: VarEnvT) : VarEnvT =
-        addVarSpec (Expr.extractVar var) value varEnv
-
-    /// remove variable value from environment
-    let remove (var: Expr) (varEnv: VarEnvT) : VarEnvT =
-        removeVarSpec (Expr.extractVar var) varEnv
-
-    /// get variable value from environment
-    let get (var: Expr) (varEnv: VarEnvT) : #ITensor =
-        getVarSpec (Expr.extractVar var) varEnv
-
-    /// empty variable environment
-    let (empty: VarEnvT) =
-        Map.empty
-
-    /// joins two variable environments
-    let join (a: VarEnvT) (b: VarEnvT) =
-        Map.join a b
-
-    /// infers symbol sizes from the variable environment
-    let inferSymSizes (symSizeEnv: SymSizeEnv) (varEnv: VarEnvT) : SymSizeEnv =
-        (symSizeEnv, varEnv) ||> Map.fold 
-            (fun env vSym vVal ->   
-                if Var.nDims vSym <> ITensor.nDims vVal then
-                    failwithf "dimensionality mismatch: a value of shape %A was provided for variable %A"
-                        (ITensor.shape vVal) vSym
-
-                (Var.shape vSym, ITensor.shape vVal)
-                ||> List.zip
-                |> List.fold (fun env (svSym, svVal) ->
-                    let failShape () =
-                        let vSymShp = vSym.Shape |> ShapeSpec.substSymbols env 
-                        failwithf "expected variable %A with (inferred) shape %A but got value with shape %A"
-                            vSym vSymShp vVal.Shape
-                    match svSym |> SizeSpec.substSymbols env |> SizeSpec.simplify  with
-                    | SizeSpec.Base (BaseSize.Sym sym) -> env |> SymSizeEnv.add sym (SizeSpec.fix svVal)
-                    | SizeSpec.Base (BaseSize.Fixed f) -> 
-                        if f .= svVal then env
-                        else failShape ()
-                    | SizeSpec.Broadcast ->
-                        if 1L = svVal then env
-                        else failShape ()
-                    | SizeSpec.Multinom m -> failShape ()
-                ) env)
+//    /// specification of channel strides
+//    type ChannelStridesT = Map<Channel, int64 list>
 
 
-    /// substitues the given symbol sizes into the variable environment
-    let substSymSizes symSizes (varEnv: VarEnvT) : VarEnvT =
-        varEnv 
-        |> Map.toSeq
-        |> Seq.map (fun (vs, value) -> Var.substSymSizes symSizes vs, value)
-        |> Map.ofSeq
+///// Variable value collection.
+//module VarEnv = 
 
-    /// checks that the values are valid in type and shape for the variables
-    let check (varEnv: VarEnvT) =
-        varEnv |> Map.iter (fun vs value ->
-            if TypeName.ofTypeInst value.DataType <> vs.TypeName then
-                failwithf "variable %A was expected to be of type %A but a \
-                           value with type %A was provided" vs.Name vs.TypeName.Type value.DataType
+//    /// add variable value to environment
+//    let addVarSpec (vs: Var) (value: #ITensor) (varEnv: VarEnv) : VarEnv =
+//        Map.add vs (value :> ITensor) varEnv
 
-            let ss = Var.shape vs
-            match ShapeSpec.tryEval ss with
-            | Some ns when ITensor.shape value <> ns ->
-                failwithf "variable %A was expected to be of shape %A (%A) but a \
-                           value with shape %A waTensorded" vs.Name ns ss (ITensor.shape value)
-            | None -> failwithf "variable %A contains size symbols that cannot be evaluated" vs
-            | _ -> ()
-        )
+//    /// remove variable value from environment
+//    let removeVarSpec (vs: Var) (varEnv: VarEnv) : VarEnv =
+//        Map.remove vs varEnv
+
+//    /// get variable value from environment
+//    let getVarSpec (vs: Var) (varEnv: VarEnv) : #ITensor =
+//        match varEnv |> Map.tryFind vs with
+//        | Some v -> v |> box |> unbox
+//        | None -> failwithf "variable %A is not present in the specified VarEnv" vs
+
+//    /// add variable value to environment
+//    let add (var: Expr) (value: #ITensor) (varEnv: VarEnv) : VarEnv =
+//        addVarSpec (Expr.extractVar var) value varEnv
+
+//    /// remove variable value from environment
+//    let remove (var: Expr) (varEnv: VarEnv) : VarEnv =
+//        removeVarSpec (Expr.extractVar var) varEnv
+
+//    /// get variable value from environment
+//    let get (var: Expr) (varEnv: VarEnv) : #ITensor =
+//        getVarSpec (Expr.extractVar var) varEnv
+
+//    /// empty variable environment
+//    let (empty: VarEnv) =
+//        Map.empty
+
+//    /// joins two variable environments
+//    let join (a: VarEnv) (b: VarEnv) =
+//        Map.join a b
+
+//    /// infers symbol sizes from the variable environment
+//    let inferSymSizes (symSizeEnv: SymSizeEnv) (varEnv: VarEnv) : SymSizeEnv =
+//        (symSizeEnv, varEnv) ||> Map.fold 
+//            (fun env vSym vVal ->   
+//                if Var.nDims vSym <> ITensor.nDims vVal then
+//                    failwithf "dimensionality mismatch: a value of shape %A was provided for variable %A"
+//                        (ITensor.shape vVal) vSym
+
+//                (Var.shape vSym, ITensor.shape vVal)
+//                ||> List.zip
+//                |> List.fold (fun env (svSym, svVal) ->
+//                    let failShape () =
+//                        let vSymShp = vSym.Shape |> ShapeSpec.substSymbols env 
+//                        failwithf "expected variable %A with (inferred) shape %A but got value with shape %A"
+//                            vSym vSymShp vVal.Shape
+//                    match svSym |> SizeSpec.substSymbols env |> SizeSpec.simplify  with
+//                    | SizeSpec.Base (BaseSize.Sym sym) -> env |> SymSizeEnv.add sym (SizeSpec.fix svVal)
+//                    | SizeSpec.Base (BaseSize.Fixed f) -> 
+//                        if f .= svVal then env
+//                        else failShape ()
+//                    | SizeSpec.Broadcast ->
+//                        if 1L = svVal then env
+//                        else failShape ()
+//                    | SizeSpec.Multinom m -> failShape ()
+//                ) env)
+
+
+//    /// substitues the given symbol sizes into the variable environment
+//    let substSymSizes symSizes (varEnv: VarEnv) : VarEnv =
+//        varEnv 
+//        |> Map.toSeq
+//        |> Seq.map (fun (vs, value) -> Var.substSymSizes symSizes vs, value)
+//        |> Map.ofSeq
+
+//    /// checks that the values are valid in type and shape for the variables
+//    let check (varEnv: VarEnv) =
+//        varEnv |> Map.iter (fun vs value ->
+//            if TypeName.ofTypeInst value.DataType <> vs.TypeName then
+//                failwithf "variable %A was expected to be of type %A but a \
+//                           value with type %A was provided" vs.Name vs.TypeName.Type value.DataType
+
+//            let ss = Var.shape vs
+//            match ShapeSpec.tryEval ss with
+//            | Some ns when ITensor.shape value <> ns ->
+//                failwithf "variable %A was expected to be of shape %A (%A) but a \
+//                           value with shape %A waTensorded" vs.Name ns ss (ITensor.shape value)
+//            | None -> failwithf "variable %A contains size symbols that cannot be evaluated" vs
+//            | _ -> ()
+//        )
         
-    /// gets the type names of the variable value arrays
-    let valueTypeNames (varEnv: VarEnvT) =
-        varEnv |> Map.map (fun _ vVal -> TypeName.ofObject vVal)
+//    /// gets the type names of the variable value arrays
+//    let valueTypeNames (varEnv: VarEnv) =
+//        varEnv |> Map.map (fun _ vVal -> TypeName.ofObject vVal)
 
-    /// gets the locations of the variable value arrays
-    let valueLocations (varEnv: VarEnvT) : VarLocsT =
-        varEnv |> Map.map (fun _ vVal -> ITensor.dev vVal)
+//    /// gets the locations of the variable value arrays
+//    let valueLocations (varEnv: VarEnv) : VarLocs =
+//        varEnv |> Map.map (fun _ vVal -> ITensor.dev vVal)
 
-    /// gets the strides of the variable value arrays
-    let valueStrides (varEnv: VarEnvT) : VarStridesT =
-        varEnv |> Map.map (fun _ vVal -> vVal.Layout.Stride)
+//    /// gets the strides of the variable value arrays
+//    let valueStrides (varEnv: VarEnv) : VarStrides =
+//        varEnv |> Map.map (fun _ vVal -> vVal.Layout.Stride)
 
-    /// Constructs a VarEnvT from a sequence of variable, value tuples.
-    let ofSeq (entries: (Expr * #ITensor) seq) =
-        (empty, entries)
-        ||> Seq.fold (fun ve (var, value) -> ve |> add var value)
+//    /// Constructs a VarEnv from a sequence of variable, value tuples.
+//    let ofSeq (entries: (Expr * #ITensor) seq) =
+//        (empty, entries)
+//        ||> Seq.fold (fun ve (var, value) -> ve |> add var value)
 
 
 [<AutoOpen>]
@@ -137,22 +137,22 @@ module EnvTypes =
 
     /// Information necessary to evaluate an expression.
     /// Currently this just holds the variable values, but may contain further information in the future.
-    type EvalEnvT = {
-        VarEnv:             VarEnvT
+    type EvalEnv = {
+        VarEnv:             VarEnv
     }
 
     /// Information necessary to compile an expression.
     type CompileEnvT = {
         SymSizes:           SymSizeEnv
-        VarLocs:            VarLocsT
-        VarStrides:         VarStridesT
+        VarLocs:            VarLocs
+        VarStrides:         VarStrides
         ChannelStrides:     ChannelStridesT
         ResultLoc:          ITensorDevice
         CanDelay:           bool
     }
 
     /// an evaluation function
-    type EvalFn = EvalEnvT -> ITensor list
+    type EvalFn = EvalEnv -> ITensor list
 
     /// The result of the compilation of an expression.
     type CompiledUExprsT = {
@@ -180,27 +180,27 @@ module EnvTypes =
 module EvalEnv = 
     open VarEnv
 
-    /// empty EvalEnvT
+    /// empty EvalEnv
     let empty = 
         {VarEnv = Map.empty;}
 
-    /// Create an EvalEnvT using the specified VarEnvT and infers the size symbol values
+    /// Create an EvalEnv using the specified VarEnv and infers the size symbol values
     /// from the given expressions.
     let create varEnv = 
         {VarEnv = varEnv;}
 
-    /// Enhances an existing EvalEnvT using the specified VarEnvT and infers the size symbol values
+    /// Enhances an existing EvalEnv using the specified VarEnv and infers the size symbol values
     /// from the given expressions.
     let enhance varEnv evalEnv =
         let joinedVarEnv = VarEnv.join evalEnv.VarEnv varEnv
         {VarEnv = joinedVarEnv;}
 
     /// get variable value from environment
-    let getVarSpecT vs (evalEnv: EvalEnvT)  =
+    let getVarSpecT vs (evalEnv: EvalEnv)  =
         VarEnv.getVarSpec vs evalEnv.VarEnv
 
     /// get variable value from environment
-    let get var (evalEnv: EvalEnvT) =
+    let get var (evalEnv: EvalEnv) =
         VarEnv.get var evalEnv.VarEnv
 
 
@@ -249,7 +249,7 @@ module Func =
         vars, Expr.canEvalAllSymSizes expr
 
     let private evalWrapper (compileSpec: CompileSpecT) (baseExprGens: UExprGenT list) 
-            : (VarEnvT -> ITensor list) =     
+            : (VarEnv -> ITensor list) =     
              
         let compiler, baseCompileEnv = compileSpec
 
@@ -415,7 +415,7 @@ module Func =
         checkType<'T0> "" expr0
         let expr0gen = {Generate=exprGenerate expr0; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr0}   
         let evalAll = evalWrapper factory [expr0gen]        
-        fun (varEnv: VarEnvT) ->
+        fun (varEnv: VarEnv) ->
             let res = evalAll varEnv
             res.[0] :?> Tensor<'T0>
 
@@ -425,7 +425,7 @@ module Func =
         let expr0gen = {Generate=exprGenerate expr0; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr0}   
         let expr1gen = {Generate=exprGenerate expr1; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr1}   
         let evalAll = evalWrapper factory [expr0gen; expr1gen]        
-        fun (varEnv: VarEnvT) ->
+        fun (varEnv: VarEnv) ->
             let res = evalAll varEnv
             res.[0] :?> Tensor<'T0>, res.[1] :?> Tensor<'T1>
 
@@ -437,7 +437,7 @@ module Func =
         let expr1gen = {Generate=exprGenerate expr1; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr1}   
         let expr2gen = {Generate=exprGenerate expr2; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr2}   
         let evalAll = evalWrapper factory [expr0gen; expr1gen; expr2gen]        
-        fun (varEnv: VarEnvT) ->
+        fun (varEnv: VarEnv) ->
             let res = evalAll varEnv
             res.[0] :?> Tensor<'T0>, res.[1] :?> Tensor<'T1>, res.[2] :?> Tensor<'T2>
 
@@ -451,7 +451,7 @@ module Func =
         let expr2gen = {Generate=exprGenerate expr2; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr2}   
         let expr3gen = {Generate=exprGenerate expr3; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr3}   
         let evalAll = evalWrapper factory [expr0gen; expr1gen; expr2gen; expr3gen]        
-        fun (varEnv: VarEnvT) ->
+        fun (varEnv: VarEnv) ->
             let res = evalAll varEnv
             res.[0] :?> Tensor<'T0>, res.[1] :?> Tensor<'T1>, res.[2] :?> Tensor<'T2>, res.[3] :?> Tensor<'T3>
 
@@ -467,7 +467,7 @@ module Func =
         let expr3gen = {Generate=exprGenerate expr3; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr3}   
         let expr4gen = {Generate=exprGenerate expr4; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr4}   
         let evalAll = evalWrapper factory [expr0gen; expr1gen; expr2gen; expr3gen; expr4gen]        
-        fun (varEnv: VarEnvT) ->
+        fun (varEnv: VarEnv) ->
             let res = evalAll varEnv
             res.[0] :?> Tensor<'T0>, res.[1] :?> Tensor<'T1>, res.[2] :?> Tensor<'T2>, res.[3] :?> Tensor<'T3>, res.[4] :?> Tensor<'T4>
 
@@ -478,7 +478,7 @@ module Func =
             |> List.map (fun expr -> 
                 {Generate=exprGenerate expr; UVarSpecsAndEvalable=uExprVarSpecsAndEvalable expr})
         let evalAll = evalWrapper factory exprsGen
-        fun (varEnv: VarEnvT) ->
+        fun (varEnv: VarEnv) ->
             let reses = evalAll varEnv
             reses |> List.map (fun res -> res :?> Tensor<'T>)
 
@@ -487,17 +487,17 @@ module Func =
 module FuncTypes = 
 
     type Arg0Func<'TR> = unit -> 'TR
-    let arg0<'TR> (f: VarEnvT -> 'TR) : Arg0Func<'TR> =
+    let arg0<'TR> (f: VarEnv -> 'TR) : Arg0Func<'TR> =
         fun () -> 
             VarEnv.empty |> f
 
     type Arg1Func<'T0, 'TR> = Tensor<'T0> -> 'TR
-    let arg1<'T0, 'TR> (vs0: Expr) (f: VarEnvT -> 'TR) : Arg1Func<'T0, 'TR> =
+    let arg1<'T0, 'TR> (vs0: Expr) (f: VarEnv -> 'TR) : Arg1Func<'T0, 'TR> =
         fun (val0: Tensor<'T0>) -> 
             VarEnv.empty |> VarEnv.add vs0 val0 |> f
 
     type Arg2Func<'T0, 'T1, 'TR> = Tensor<'T0> -> Tensor<'T1> -> 'TR
-    let arg2<'T0, 'T1, 'TR> (vs0: Expr) (vs1: Expr) (f: VarEnvT -> 'TR) : Arg2Func<'T0, 'T1, 'TR> =
+    let arg2<'T0, 'T1, 'TR> (vs0: Expr) (vs1: Expr) (f: VarEnv -> 'TR) : Arg2Func<'T0, 'T1, 'TR> =
         fun (val0: Tensor<'T0>) (val1: Tensor<'T1>) -> 
             VarEnv.empty |> VarEnv.add vs0 val0 |> VarEnv.add vs1 val1 |> f
 
@@ -526,12 +526,12 @@ module FuncTypes =
         fun (val0: Tensor<'T0>) (val1: Tensor<'T1>) (val2: Tensor<'T2>) (val3: Tensor<'T3>) (val4: Tensor<'T4>) (val5: Tensor<'T5>) (val6: Tensor<'T6>) -> 
             VarEnv.empty |> VarEnv.add vs0 val0 |> VarEnv.add vs1 val1 |> VarEnv.add vs2 val2 |> VarEnv.add vs3 val3 |> VarEnv.add vs4 val4 |> VarEnv.add vs5 val5 |> VarEnv.add vs6 val6 |> f  
 
-    let addArg<'T, 'TR> (vs: Expr) (f: VarEnvT -> 'TR) =
-        fun (ve: VarEnvT) (value: Tensor<'T>) ->
+    let addArg<'T, 'TR> (vs: Expr) (f: VarEnv -> 'TR) =
+        fun (ve: VarEnv) (value: Tensor<'T>) ->
             f (ve |> VarEnv.add vs value)
 
-    let addVarEnv (varEnv: VarEnvT) f =
-        fun (ve: VarEnvT) ->
+    let addVarEnv (varEnv: VarEnv) f =
+        fun (ve: VarEnv) ->
             f (VarEnv.join ve varEnv)
 
 
