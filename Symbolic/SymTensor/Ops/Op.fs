@@ -160,6 +160,10 @@ type Expr2 (op: IOp2) =
     static member broadcast ss (expr: Expr2) =
         if ss = expr.Shape then expr else Expr2 (OpForwards.DoBroadcast ss expr)
 
+    /// Inserts a broadcast axis at the given dimension.
+    static member insertBroadcastAxis dim (expr: Expr2) =
+        expr |> Expr2.reshape (expr.Shape |> ShapeSpec.insertBroadcastAxis dim)
+
     /// adds one broadcastable dimension to the left
     static member padLeft (a: Expr2) =
         a |> Expr2.reshape (ShapeSpec.padLeft a.Shape)
@@ -167,6 +171,10 @@ type Expr2 (op: IOp2) =
     /// adds one broadcastable dimension to the right
     static member padRight (a: Expr2) =
         a |> Expr2.reshape (ShapeSpec.padRight a.Shape)
+
+    /// Reshapes the expression so that a single dimension remains.
+    static member flatten (expr: Expr2) =
+        expr |> Expr2.reshape (ShapeSpec.flatten expr.Shape)
 
     /// scalar constant of given value
     static member scalar (f: obj) = 
@@ -261,6 +269,9 @@ type Expr2 (op: IOp2) =
     static member (>>==) (x: System.IComparable, y: Expr2) = (Expr2.scalar x) >>== y
     static member (<<>>) (x: System.IComparable, y: Expr2) = (Expr2.scalar x) <<>> y
 
+    static member ( .* ) (x: Expr2, y: Expr2) = OpForwards.Dot x y
+
+
 [<AllowNullLiteral>]
 type internal IOpForwards =   
 
@@ -309,6 +320,8 @@ type internal IOpForwards =
     abstract LessOrEqual: x:Expr2 -> y:Expr2 -> IOp2
     abstract Greater: x:Expr2 -> y:Expr2 -> IOp2
     abstract GreaterOrEqual: x:Expr2 -> y:Expr2 -> IOp2
+
+    abstract Dot: x:Expr2 -> y:Expr2 -> Expr2
 
 [<AutoOpen>]
 module internal OpForwardTypes = 

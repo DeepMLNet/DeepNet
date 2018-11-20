@@ -182,6 +182,7 @@ type ITensor =
     abstract ArgMax: unit -> int64 list
 
     abstract Dot: ITensor -> ITensor
+    abstract TensorProduct: ITensor -> ITensor
     abstract Invert: unit -> ITensor
     abstract SVD: unit -> ITensor * ITensor * ITensor
     abstract SVDWithoutUV: unit -> ITensor

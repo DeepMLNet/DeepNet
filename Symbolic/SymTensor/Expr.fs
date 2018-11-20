@@ -129,17 +129,17 @@ type UnaryOp =
 
     // ==== reductions ====
     /// summation of all elements
-    | Sum                           
+    | Sum                           // removed
     /// summation over given dimension
-    | SumAxis of int
+    | SumAxis of int                // DONE
     /// product of all elements
-    | Product                          
+    | Product                       // removed
     /// product over given dimension
-    | ProductAxis of int
+    | ProductAxis of int            // DONE
     /// maximum over given dimension                
-    | MaxAxis of int
+    | MaxAxis of int                // DONE
     /// minimum over given dimension
-    | MinAxis of int
+    | MinAxis of int                // DONE
 
     // ==== index reductions ====
     /// inidices of maximums over given dimension
@@ -211,8 +211,8 @@ type BinaryOp =
     | Divide            // DONE     
     | Modulo            // DONE
     | Power             // DONE
-    | MaxElemwise   
-    | MinElemwise        
+    | MaxElemwise       // DONE
+    | MinElemwise       // DONE
            
     // ==== element-wise binary comparison ====
     | Equal             // DONE
@@ -231,9 +231,9 @@ type BinaryOp =
 
     // ==== matrix/tensor operations ====
     /// matrix*matrix => matrix dot product
-    | Dot                           
+    | Dot              // DONE             
     /// tensor product 
-    | TensorProduct        
+    | TensorProduct    // DONE
         
     // ==== shape operations ====
     /// replace subtensor
@@ -1519,10 +1519,10 @@ type Expr =
             | None -> a
         a
 
-    /// reshape (assuming C-continguous order) tensor; element count does not change
+    /// reshape (assuming C-continguous order) tensor; element count does not change // DONE
     static member reshape ss a = Unary(Reshape(ss), a) |> Expr.check
 
-    /// broadcast of SizeBroadcast dimensions
+    /// broadcast of SizeBroadcast dimensions // DONE
     static member broadcast ss a = Unary(DoBroadcast(ss), a) |> Expr.check
 
     /// enables broadcasting in the given dimension, it must be of size one
@@ -1533,7 +1533,7 @@ type Expr =
     static member disableBroadcast dim a =
         a |> Expr.reshape (Expr.shapeOf a |> ShapeSpec.disableBroadcast dim)
   
-    /// inserts a broadcast axis at the given dimension
+    /// inserts a broadcast axis at the given dimension // DONE
     static member insertBroadcastAxis dim a =
         a |> Expr.reshape (Expr.shapeOf a |> ShapeSpec.insertBroadcastAxis dim)
 

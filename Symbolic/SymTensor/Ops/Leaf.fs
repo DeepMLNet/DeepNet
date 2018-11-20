@@ -22,6 +22,10 @@ module Check =
         if types |> List.exists ((<>) TypeName.ofType<bool>) then
             failwithf "All arguments are expected to be of type bool, but types are: %A." types
 
+    let axis (ax: int) (expr: Expr2) =
+        if not (0 <= ax && ax < ShapeSpec.nDim expr.Shape) then
+            failwithf "Cannot apply reduction operation over non-existant axis %d of tensor with shape %A." 
+                      ax expr.Shape
 
 module Args =
     //let leaf : ArgsMap = Map.empty
@@ -582,6 +586,123 @@ module UnaryOps =
         | :? DoBroadcast as this -> Some this.X
         | _ -> None
 
+    /// Sum over specified axis.
+    type SumAxis = {X: Expr2; Axis: int} with
+        interface IOp2 with      
+            member this.Check () = Check.axis this.Axis this.X
+            member this.TypeName = this.X.TypeName
+            member this.Shape = this.X.Shape |> ShapeSpec.withoutAxis this.Axis
+            member this.Args = Args.unary this.X
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
+            member this.SubstSymSizes env = this :> IOp2
+            member this.CanEvalAllSymSizes = true
+            member this.Deriv dOp = Args.unary -dOp // TODO
+            member this.Eval env = (Args.unaryX env.Args).SumAxis this.Axis 
+    let (|SumAxis|_|) (expr: Expr2) =
+        match expr.Op with
+        | :? SumAxis as this -> Some this.X
+        | _ -> None
+
+    /// summation over given dimension
+    let sumAxis axis x = 
+        {SumAxis.Axis=axis; X=x} |> Expr2
+
+    /// summation over given dimension, while keeping the axis with one (broadcastable) element
+    let sumKeepingAxis axis x =
+        x |> sumAxis axis |> Expr2.insertBroadcastAxis axis
+
+    /// summaiton of all elements
+    let sum x = 
+        x |> Expr2.flatten |> sumAxis 0
+
+    /// Product over specified axis.
+    type ProductAxis = {X: Expr2; Axis: int} with
+        interface IOp2 with      
+            member this.Check () = Check.axis this.Axis this.X
+            member this.TypeName = this.X.TypeName
+            member this.Shape = this.X.Shape |> ShapeSpec.withoutAxis this.Axis
+            member this.Args = Args.unary this.X
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
+            member this.SubstSymSizes env = this :> IOp2
+            member this.CanEvalAllSymSizes = true
+            member this.Deriv dOp = Args.unary -dOp // TODO
+            member this.Eval env = (Args.unaryX env.Args).ProductAxis this.Axis
+    let (|ProductAxis|_|) (expr: Expr2) =
+        match expr.Op with
+        | :? ProductAxis as this -> Some this.X
+        | _ -> None
+
+    /// product over given dimension
+    let productAxis axis x = 
+        {ProductAxis.Axis=axis; X=x} |> Expr2
+
+    /// product over given dimension, while keeping the axis with one (broadcastable) element
+    let productKeepingAxis axis x =
+        x |> productAxis axis |> Expr2.insertBroadcastAxis axis
+
+    /// product of all elements
+    let product x = 
+        x |> Expr2.flatten |> productAxis 0
+
+    /// Maximum over specified axis.
+    type MaxAxis = {X: Expr2; Axis: int} with
+        interface IOp2 with      
+            member this.Check () = Check.axis this.Axis this.X
+            member this.TypeName = this.X.TypeName
+            member this.Shape = this.X.Shape |> ShapeSpec.withoutAxis this.Axis
+            member this.Args = Args.unary this.X
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
+            member this.SubstSymSizes env = this :> IOp2
+            member this.CanEvalAllSymSizes = true
+            member this.Deriv dOp = Args.unary -dOp // TODO
+            member this.Eval env = (Args.unaryX env.Args).MaxAxis this.Axis
+    let (|MaxAxis|_|) (expr: Expr2) =
+        match expr.Op with
+        | :? MaxAxis as this -> Some this.X
+        | _ -> None
+
+    /// Maximum over given dimension.
+    let maxAxis axis x = 
+        {MaxAxis.Axis=axis; X=x} |> Expr2
+
+    /// Maximum over given dimension, while keeping the axis with one (broadcastable) element.
+    let maxKeepingAxis axis x =
+        x |> maxAxis axis |> Expr2.insertBroadcastAxis axis
+
+    /// Maximum of all elements.
+    let max x = 
+        x |> Expr2.flatten |> maxAxis 0
+
+    /// Minimum over specified axis.
+    type MinAxis = {X: Expr2; Axis: int} with
+        interface IOp2 with      
+            member this.Check () = Check.axis this.Axis this.X
+            member this.TypeName = this.X.TypeName
+            member this.Shape = this.X.Shape |> ShapeSpec.withoutAxis this.Axis
+            member this.Args = Args.unary this.X
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
+            member this.SubstSymSizes env = this :> IOp2
+            member this.CanEvalAllSymSizes = true
+            member this.Deriv dOp = Args.unary -dOp // TODO
+            member this.Eval env = (Args.unaryX env.Args).MinAxis this.Axis
+    let (|MinAxis|_|) (expr: Expr2) =
+        match expr.Op with
+        | :? MinAxis as this -> Some this.X
+        | _ -> None
+
+    /// Minimum over given dimension.
+    let minAxis axis x = 
+        {MinAxis.Axis=axis; X=x} |> Expr2
+
+    /// Minimum over given dimension, while keeping the axis with one (broadcastable) element.
+    let minKeepingAxis axis x =
+        x |> minAxis axis |> Expr2.insertBroadcastAxis axis
+
+    /// Minimum of all elements.
+    let min x = 
+        x |> Expr2.flatten |> minAxis 0
+
+
 [<AutoOpen>]
 module BinaryOps =
 
@@ -685,6 +806,40 @@ module BinaryOps =
     let (|Modulo|_|) (expr: Expr2) =
         match expr.Op with
         | :? Modulo as this -> Some (this.X, this.Y)
+        | _ -> None
+
+    /// Elementwise maximum.
+    type MaxElemwise = { X: Expr2; Y: Expr2 } with
+        interface IOp2 with       
+            member this.Check () = Check.sameType [this.X; this.Y]; Check.sameShape [this.X; this.Y]
+            member this.TypeName = this.X.TypeName
+            member this.Shape = this.X.Shape
+            member this.Args = Args.binary this.X this.Y
+            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> IOp2
+            member this.SubstSymSizes env = this :> IOp2
+            member this.CanEvalAllSymSizes = true
+            member this.Deriv dOp = Args.binary dOp dOp
+            member this.Eval env = (Args.binaryX env.Args).MaxElemwise (Args.binaryY env.Args)       
+    let (|MaxElemwise|_|) (expr: Expr2) =
+        match expr.Op with
+        | :? MaxElemwise as this -> Some (this.X, this.Y)
+        | _ -> None
+
+    /// Elementwise minimum.
+    type MinElemwise = { X: Expr2; Y: Expr2 } with
+        interface IOp2 with       
+            member this.Check () = Check.sameType [this.X; this.Y]; Check.sameShape [this.X; this.Y]
+            member this.TypeName = this.X.TypeName
+            member this.Shape = this.X.Shape
+            member this.Args = Args.binary this.X this.Y
+            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> IOp2
+            member this.SubstSymSizes env = this :> IOp2
+            member this.CanEvalAllSymSizes = true
+            member this.Deriv dOp = Args.binary dOp dOp
+            member this.Eval env = (Args.binaryX env.Args).MinElemwise (Args.binaryY env.Args)       
+    let (|MinElemwise|_|) (expr: Expr2) =
+        match expr.Op with
+        | :? MinElemwise as this -> Some (this.X, this.Y)
         | _ -> None
 
     /// Logical And.
@@ -842,4 +997,98 @@ module BinaryOps =
         match expr.Op with
         | :? GreaterOrEqual as this -> Some (this.X, this.Y)
         | _ -> None
+
+    /// Dot product.
+    type Dot = { X: Expr2; Y: Expr2 } with
+        interface IOp2 with       
+            member this.Check () = 
+                Check.sameType [this.X; this.Y]
+                let sa, sb = this.X.Shape, this.Y.Shape
+                match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
+                | 2, 2 -> 
+                    if sa.[1] .<> sb.[0] then
+                        failwithf "Incompatible shapes for dot product: %A and %A." sa sb
+                | na, nb when na = nb -> 
+                    if sa.[na-1] .<> sb.[nb-2] || 
+                        [0 .. na-3] |> List.exists (fun n -> sa.[n] .<> sb.[n]) then
+                            failwithf "Incompatible shapes for batched dot product: %A and %A." sa sb
+                | _ -> failwithf "Cannot compute dot product between tensors of shapes %A and %A." sa sb  
+            member this.TypeName = this.X.TypeName
+            member this.Shape =
+                let sa, sb = this.X.Shape, this.Y.Shape
+                match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
+                | 2, 2 -> ShapeSpec.matrix sa.[0] sb.[1]
+                | na, nb when na=nb -> sa.[0 .. na-2] @ [sb.[nb-1]]
+                | _ -> failwithf "Invalid dot product shapes: %A and %A." sa sb
+            member this.Args = Args.binary this.X this.Y
+            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> IOp2
+            member this.SubstSymSizes env = this :> IOp2
+            member this.CanEvalAllSymSizes = true
+            member this.Deriv dOp = Args.binary dOp dOp
+            member this.Eval env = (Args.binaryX env.Args).Dot (Args.binaryY env.Args)       
+    let (|Dot|_|) (expr: Expr2) =
+        match expr.Op with
+        | :? Dot as this -> Some (this.X, this.Y)
+        | _ -> None
+
+    /// Dot product.
+    /// Behavior depends on the dimensionality of the arguments.
+    /// Cases: 
+    /// (1, 1) -> vector-vector dot product resulting in a scalar
+    /// (2, 1) -> matrix-vector dot product resulting in a vector
+    /// (2, 2) -> matrix-matrix dot product resulting in a matrix
+    /// (n, n) with n>2 -> batched matrix-matrix dot product resulting in a matrix
+    /// (n+1, n) with n>2 -> batched matrix-vector dot product resulting in a vector.
+    let dot (a: Expr2) (b: Expr2) =
+        let sa, sb = a.Shape, b.Shape
+        match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
+        | 1, 1 -> 
+            // vector-vector dot product
+            sum (a * b)
+        | 2, 1 -> 
+            // matrix-vector dot product
+            let bm = b |> Expr2.reshape (ShapeSpec.padRight sb)
+            {Dot.X=a; Y=bm} |> Expr2 |> Expr2.reshape [sa.[0]]
+        | 2, 2 -> 
+            // matrix-matrix dot product
+            {Dot.X=a; Y=b} |> Expr2
+        | na, nb when na = nb -> 
+            // batched matrix-matrix dot product
+            let bsa, bsb = ShapeSpec.broadcastToSameInDims [0 .. na-3] false sa sb
+            let ba = a |> Expr2.broadcast bsa
+            let bb = b |> Expr2.broadcast bsb    
+            {Dot.X=ba; Y=bb} |> Expr2
+        | na, nb when na = nb + 1 ->
+            // batched matrix-vector dot product
+            let psb = ShapeSpec.padRight sb
+            let bsa, bsb = ShapeSpec.broadcastToSameInDims [0 .. na-3] false sa psb
+            let ba = a |> Expr2.broadcast bsa
+            let bb = b |> Expr2.reshape psb |> Expr2.broadcast bsb    
+            {Dot.X=ba; Y=bb} |> Expr2 |> Expr2.reshape bsa.[0 .. na-2]
+        | _ -> failwithf "Cannot compute dot product between tensors of shapes %A and %A." sa sb  
+
+    /// Tensor product.
+    type TensorProduct = { X: Expr2; Y: Expr2 } with
+        interface IOp2 with       
+            member this.Check () = 
+                Check.sameType [this.X; this.Y]
+                let sa, sb = this.X.Shape, this.Y.Shape
+                if ShapeSpec.nDim sa <> ShapeSpec.nDim sb then
+                    failwithf "Cannot compute tensor product between tensors of shapes %A and %A." sa sb
+            member this.TypeName = this.X.TypeName
+            member this.Shape = 
+                List.map2 (*) this.X.Shape this.Y.Shape
+            member this.Args = Args.binary this.X this.Y
+            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> IOp2
+            member this.SubstSymSizes env = this :> IOp2
+            member this.CanEvalAllSymSizes = true
+            member this.Deriv dOp = Args.binary dOp dOp
+            member this.Eval env = (Args.binaryX env.Args).TensorProduct (Args.binaryY env.Args)       
+    let (|TensorProduct|_|) (expr: Expr2) =
+        match expr.Op with
+        | :? TensorProduct as this -> Some (this.X, this.Y)
+        | _ -> None
+
+    let tensorProduct (x: Expr2) (y: Expr2) =
+        {TensorProduct.X=x; Y=y} |> Expr2
 

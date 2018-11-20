@@ -49,3 +49,5 @@ type internal OpForwards() =
         member __.LessOrEqual x y = {LessOrEqual.X = x; Y = y} :> IOp2
         member __.Greater x y = {Greater.X = x; Y = y} :> IOp2
         member __.GreaterOrEqual x y = {GreaterOrEqual.X = x; Y = y} :> IOp2
+
+        member __.Dot x y = dot x y

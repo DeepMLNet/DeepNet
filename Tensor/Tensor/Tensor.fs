@@ -3772,6 +3772,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         member a.ArgMax () = a.ArgMax ()
 
         member a.Dot b = a.Dot (b :?> Tensor<'T>) :> ITensor
+        member a.TensorProduct b = a.TensorProduct (b :?> Tensor<'T>) :> ITensor
         member a.Invert () = a.Invert () :> ITensor
         member a.SVD () = 
             let U, S, V = a.SVD ()
@@ -4556,11 +4557,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     static member ofBlocks (bs: Tensor<'T> list list list) =
         bs |> List.map (List.map (List.map Block >> SubBlocks) >> SubBlocks) |> SubBlocks |> Tensor.ofBlocks
 
-    /// <summary>Computes the tensor product between two tensors.</summary>
-    /// <param name="a">The tensor on the left side of this binary operation.</param>
-    /// <param name="b">The tensor on the right side of this binary operation.</param>
-    /// <returns>A new tensor containing the result of this operation.</returns>    
-    static member tensorProduct (a: Tensor<'T>) (b: Tensor<'T>) =
+    member a.TensorProduct (b: Tensor<'T>) =
         let a, b = Tensor.padToSame (a, b)
         let rec generate (pos: int64 list) = 
             match List.length pos with
@@ -4571,6 +4568,12 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
                 seq {for p in 0L .. a.Shape.[dim] - 1L -> generate (pos @ [p])}
                 |> Seq.toList |> SubBlocks
         generate [] |> Tensor.ofBlocks
+
+    /// <summary>Computes the tensor product between two tensors.</summary>
+    /// <param name="a">The tensor on the left side of this binary operation.</param>
+    /// <param name="b">The tensor on the right side of this binary operation.</param>
+    /// <returns>A new tensor containing the result of this operation.</returns>    
+    static member tensorProduct (a: Tensor<'T>) (b: Tensor<'T>) = a.TensorProduct b
 
     /// <summary>Concatenates tensors along an axis.</summary>
     /// <param name="ax">The concatenation axis.</param>        
