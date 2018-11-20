@@ -1,60 +1,33 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-  <Import Project="../../Common.targets" />
-
-  <PropertyGroup>
-    <PackageId>SymTensor</PackageId>
-    <title>F# Symbolic Tensor library with support for automatic differentiation</title>
-    <summary>Provides n-dimensional arrays (tensors) in host memory or on CUDA GPUs. Support many operations from NumPy.</summary>
-    <description>
-    </description>
-    <PackageTags>Tensor ndarray array symbolic automatic differentiation</PackageTags>
-    <PackageProjectUrl>http://www.deepml.net/SymTensor</PackageProjectUrl>
-    <Platforms>x64</Platforms>
-  </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="FsPickler" Version="5.2.0" />
-  </ItemGroup>
-
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup />
   <ItemGroup>
     <ProjectReference Include="../../Tensor/Tensor/Tensor.fsproj" />
   </ItemGroup>
-
   <ItemGroup>
-    <Compile Include="../../Utils/Utils.fs" Link="Common\Utils.fs" />
-    <Compile Include="../../Utils/NativeLib.fs" Link="Common\NativeLib.fs" />
-    <Compile Include="../../Tensor/Tensor/Cuda/CudaUtils.fs" Link="Common\CudaUtils.fs" />
-    <Compile Include="../../Utils/DiskMap.fs" Link="Common\DiskMap.fs" />
-    <Compile Include="Common\DiskMapOld.fs" />
-
+    <Compile Include="../../Utils/Utils.fs" />
+    <Compile Include="../../Utils/NativeLib.fs" />
+    <Compile Include="../../Utils/DiskMap.fs" />
+    <Compile Include="../../Tensor/Tensor/Cuda/CudaUtils.fs" />
+    <Compile Include="Common/DiskMapOld.fs" />
     <Compile Include="Debug.fs" />
-
-    <Compile Include="Size\Frac.fs" />
-
-    <Compile Include="Size\Size.fs" />
-
-    <Compile Include="Size\Shape.fs" />
-
-    <Compile Include="Size\Range.fs" />
-
-    <Compile Include="Size\Env.fs" />
-
-    <Compile Include="Data\TypeName.fs" />
-
-    <Compile Include="Data\Const.fs" />
-
-    <Compile Include="Data\Var.fs" />
-
-    <Compile Include="Data\VarEnv.fs" />
-    <Compile Include="Elem\Expr.fs" />
-    <Compile Include="Elem\Unified.fs" />
-    <Compile Include="Elem\Interpreter.fs" />
-    <Compile Include="Elem\Deriv.fs" />
+    <Compile Include="Size/Frac.fs" />
+    <Compile Include="Size/Size.fs" />
+    <Compile Include="Size/Shape.fs" />
+    <Compile Include="Size/Range.fs" />
+    <Compile Include="Size/Env.fs" />
+    <Compile Include="Data/TypeName.fs" />
+    <Compile Include="Data/Const.fs" />
+    <Compile Include="Data/Var.fs" />
+    <Compile Include="Data/VarEnv.fs" />
+    <Compile Include="Elem/Expr.fs" />
+    <Compile Include="Elem/Unified.fs" />
+    <Compile Include="Elem/Interpreter.fs" />
+    <Compile Include="Elem/Deriv.fs" />
     <Compile Include="Interpolator.fs" />
-    <Compile Include="Ops\Op.fs" />
-    <Compile Include="Ops\Leaf.fs" />
-    <Compile Include="Ops\Unary.fs" />
-    <Compile Include="Ops\OpForwards.fs" />
+    <Compile Include="Ops/Op.fs" />
+    <Compile Include="Ops/Leaf.fs" />
+    <Compile Include="Ops/Unary.fs" />
+    <Compile Include="Ops/OpForwards.fs" />
     <Compile Include="Expr.fs" />
     <Compile Include="ExprInfo.fs" />
     <Compile Include="Deriv.fs" />
@@ -73,7 +46,6 @@
     <Compile Include="ModelContext.fs" />
     <Compile Include="RecordParams.fs" />
     <Compile Include="DerivCheck.fs" />
-
     <Compile Include="DebugCuda.fs" />
     <Compile Include="CudaTypes.fs" />
     <Compile Include="CudaElemExpr.fs" />
@@ -83,7 +55,9 @@
     <Compile Include="CudaExec.fs" />
     <Compile Include="CudaEval.fs" />
     <Compile Include="VarEnvReg.fs" />
-
   </ItemGroup>
-
+  <ItemGroup>
+    <PackageReference Include="FsPickler" Version="5.2.0" />
+  </ItemGroup>
+  <Import Project="../../Common.targets" />
 </Project>

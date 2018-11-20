@@ -4,6 +4,7 @@ open SymTensor
 open DeepNet.Utils
 open Tensor
 open Tensor.Backend
+open System.Drawing
 
 
 ///// A mathematical operation in an expression.
@@ -159,6 +160,23 @@ type Expr2 (op: IOp2) =
     static member broadcast ss (expr: Expr2) =
         if ss = expr.Shape then expr else Expr2 (OpForwards.DoBroadcast ss expr)
 
+    /// adds one broadcastable dimension to the left
+    static member padLeft (a: Expr2) =
+        a |> Expr2.reshape (ShapeSpec.padLeft a.Shape)
+
+    /// adds one broadcastable dimension to the right
+    static member padRight (a: Expr2) =
+        a |> Expr2.reshape (ShapeSpec.padRight a.Shape)
+
+    /// scalar constant of given value
+    static member scalar (f: obj) = 
+        Expr2 (OpForwards.ScalarConst (Const.ofValue f)) 
+
+    /// scalar of given value converted to same type as given expression
+    static member scalarOfSameType (expr: Expr2) f = 
+        let v = System.Convert.ChangeType (box f, expr.TypeName.Type)
+        Expr2.scalar v
+
     /// emits an elementwise binary operation with broadcasting of the inputs if necessary
     static member constructElementwise op (a: Expr2) (b: Expr2) =
         let psa, psb = ShapeSpec.padToSame a.Shape b.Shape
@@ -167,18 +185,130 @@ type Expr2 (op: IOp2) =
         let bb = b |> Expr2.reshape psb |> Expr2.broadcast bsb    
         Expr2 (op ba bb)
 
+    // elementwise unary arithmetic
+    static member (~+) (x: Expr2) = Expr2 (OpForwards.UnaryPlus x)
     static member (~-) (x: Expr2) = Expr2 (OpForwards.Negate x)
+    static member Abs (x: Expr2) = Expr2 (OpForwards.Abs x)
+    static member SignT (x: Expr2) = Expr2 (OpForwards.SignT x)
+    static member Log (x: Expr2) = Expr2 (OpForwards.Log x)
+    static member Log10 (x: Expr2) = Expr2 (OpForwards.Log10 x)
+    static member Exp (x: Expr2) = Expr2 (OpForwards.Exp x)
+    static member Sin (x: Expr2) = Expr2 (OpForwards.Sin x)
+    static member Cos (x: Expr2) = Expr2 (OpForwards.Cos x)
+    static member Tan (x: Expr2) = Expr2 (OpForwards.Tan x)
+    static member Asin (x: Expr2) = Expr2 (OpForwards.Asin x)
+    static member Acos (x: Expr2) = Expr2 (OpForwards.Acos x)
+    static member Atan (x: Expr2) = Expr2 (OpForwards.Atan x)
+    static member Sinh (x: Expr2) = Expr2 (OpForwards.Sinh x)
+    static member Cosh (x: Expr2) = Expr2 (OpForwards.Cosh x)
+    static member Tanh (x: Expr2) = Expr2 (OpForwards.Tanh x)
+    static member Sqrt (x: Expr2) = Expr2 (OpForwards.Sqrt x)
+    static member Ceiling (x: Expr2) = Expr2 (OpForwards.Ceiling x)
+    static member Floor (x: Expr2) = Expr2 (OpForwards.Floor x)
+    static member Round (x: Expr2) = Expr2 (OpForwards.Round x)
+    static member Truncate (x: Expr2) = Expr2 (OpForwards.Truncate x)
 
-    static member (+) (a: Expr2, b: Expr2) = Expr2.constructElementwise OpForwards.Add a b
+    // element-wise unary logic
+    static member (~~~~) (x: Expr2) = Expr2 (OpForwards.Not x)
 
+    // elementwise binary arithmetic
+    static member (+) (x: Expr2, y: Expr2) = Expr2.constructElementwise OpForwards.Add x y
+    static member (-) (x: Expr2, y: Expr2) = Expr2.constructElementwise OpForwards.Subtract x y
+    static member (*) (x: Expr2, y: Expr2) = Expr2.constructElementwise OpForwards.Multiply x y
+    static member (/) (x: Expr2, y: Expr2) = Expr2.constructElementwise OpForwards.Divide x y
+    static member (%) (x: Expr2, y: Expr2) = Expr2.constructElementwise OpForwards.Modulo x y
+    static member Pow (x: Expr2, y: Expr2) = Expr2.constructElementwise OpForwards.Pow x y   
+    static member ( *** ) (x: Expr2, y: Expr2) = x ** y
 
+    // element-wise binary logic
+    static member (&&&&) (x: Expr2, y: Expr2) = Expr2.constructElementwise OpForwards.And x y
+    static member (||||) (x: Expr2, y: Expr2) = Expr2.constructElementwise OpForwards.Or x y
+
+    // element-wise binary comparison
+    static member (====) (x: Expr2, y: Expr2) = Expr2.constructElementwise OpForwards.Equal x y
+    static member (<<<<) (x: Expr2, y: Expr2) = Expr2.constructElementwise OpForwards.Less x y
+    static member (<<==) (x: Expr2, y: Expr2) = Expr2.constructElementwise OpForwards.LessOrEqual x y
+    static member (>>>>) (x: Expr2, y: Expr2) = Expr2.constructElementwise OpForwards.Greater x y
+    static member (>>==) (x: Expr2, y: Expr2) = Expr2.constructElementwise OpForwards.GreaterOrEqual x y
+    static member (<<>>) (x: Expr2, y: Expr2) = Expr2.constructElementwise OpForwards.NotEqual x y
+
+    // elementwise binary with basetype
+    static member (+) (x: Expr2, y: System.IComparable) = x + (Expr2.scalar y)
+    static member (-) (x: Expr2, y: System.IComparable) = x - (Expr2.scalar y)
+    static member (*) (x: Expr2, y: System.IComparable) = x * (Expr2.scalar y)
+    static member (/) (x: Expr2, y: System.IComparable) = x / (Expr2.scalar y)
+    static member (%) (x: Expr2, y: System.IComparable) = x % (Expr2.scalar y)
+    static member Pow (x: Expr2, y: System.IComparable) = x ** (Expr2.scalar y)
+    static member ( *** ) (x: Expr2, y: System.IComparable) = x ** (Expr2.scalar y)   
+    static member (====) (x: Expr2, y: System.IComparable) = x ==== (Expr2.scalar y)
+    static member (<<<<) (x: Expr2, y: System.IComparable) = x <<<< (Expr2.scalar y)
+    static member (<<==) (x: Expr2, y: System.IComparable) = x <<== (Expr2.scalar y)
+    static member (>>>>) (x: Expr2, y: System.IComparable) = x >>>> (Expr2.scalar y)
+    static member (>>==) (x: Expr2, y: System.IComparable) = x >>== (Expr2.scalar y)
+    static member (<<>>) (x: Expr2, y: System.IComparable) = x <<>> (Expr2.scalar y)
+
+    static member (+) (x: System.IComparable, y: Expr2) = (Expr2.scalar x) + y
+    static member (-) (x: System.IComparable, y: Expr2) = (Expr2.scalar x) - y
+    static member (*) (x: System.IComparable, y: Expr2) = (Expr2.scalar x) * y
+    static member (/) (x: System.IComparable, y: Expr2) = (Expr2.scalar x) / y
+    static member (%) (x: System.IComparable, y: Expr2) = (Expr2.scalar x) % y
+    static member Pow (x: System.IComparable, y: Expr2) = (Expr2.scalar x) ** y
+    static member ( *** ) (x: System.IComparable, y: Expr2) = (Expr2.scalar x) ** y
+    static member (====) (x: System.IComparable, y: Expr2) = (Expr2.scalar x) ==== y
+    static member (<<<<) (x: System.IComparable, y: Expr2) = (Expr2.scalar x) <<<< y
+    static member (<<==) (x: System.IComparable, y: Expr2) = (Expr2.scalar x) <<== y
+    static member (>>>>) (x: System.IComparable, y: Expr2) = (Expr2.scalar x) >>>> y
+    static member (>>==) (x: System.IComparable, y: Expr2) = (Expr2.scalar x) >>== y
+    static member (<<>>) (x: System.IComparable, y: Expr2) = (Expr2.scalar x) <<>> y
 
 [<AllowNullLiteral>]
 type internal IOpForwards =   
+
+    abstract ScalarConst: value:Const -> IOp2
     abstract Reshape: shp:ShapeSpec -> x:Expr2 -> IOp2
     abstract DoBroadcast: shp:ShapeSpec -> x:Expr2 -> IOp2
+
+    abstract UnaryPlus: x:Expr2 -> IOp2
     abstract Negate: x:Expr2 -> IOp2
+    abstract Abs: x:Expr2 -> IOp2
+    abstract SignT: x:Expr2 -> IOp2
+    abstract Log: x:Expr2 -> IOp2
+    abstract Log10: x:Expr2 -> IOp2
+    abstract Exp: x:Expr2 -> IOp2
+    abstract Sin: x:Expr2 -> IOp2
+    abstract Cos: x:Expr2 -> IOp2
+    abstract Tan: x:Expr2 -> IOp2
+    abstract Asin: x:Expr2 -> IOp2
+    abstract Acos: x:Expr2 -> IOp2
+    abstract Atan: x:Expr2 -> IOp2
+    abstract Sinh: x:Expr2 -> IOp2
+    abstract Cosh: x:Expr2 -> IOp2
+    abstract Tanh: x:Expr2 -> IOp2
+    abstract Sqrt: x:Expr2 -> IOp2
+    abstract Ceiling: x:Expr2 -> IOp2
+    abstract Floor: x:Expr2 -> IOp2
+    abstract Round: x:Expr2 -> IOp2
+    abstract Truncate: x:Expr2 -> IOp2
+
+    abstract Not: x:Expr2 -> IOp2
+
     abstract Add: x:Expr2 -> y:Expr2 -> IOp2
+    abstract Subtract: x:Expr2 -> y:Expr2 -> IOp2
+    abstract Multiply: x:Expr2 -> y:Expr2 -> IOp2
+    abstract Divide: x:Expr2 -> y:Expr2 -> IOp2
+    abstract Pow: x:Expr2 -> y:Expr2 -> IOp2
+    abstract Modulo: x:Expr2 -> y:Expr2 -> IOp2
+
+    abstract And: x:Expr2 -> y:Expr2 -> IOp2
+    abstract Or: x:Expr2 -> y:Expr2 -> IOp2
+    abstract Xor: x:Expr2 -> y:Expr2 -> IOp2
+
+    abstract Equal: x:Expr2 -> y:Expr2 -> IOp2
+    abstract NotEqual: x:Expr2 -> y:Expr2 -> IOp2
+    abstract Less: x:Expr2 -> y:Expr2 -> IOp2
+    abstract LessOrEqual: x:Expr2 -> y:Expr2 -> IOp2
+    abstract Greater: x:Expr2 -> y:Expr2 -> IOp2
+    abstract GreaterOrEqual: x:Expr2 -> y:Expr2 -> IOp2
 
 [<AutoOpen>]
 module internal OpForwardTypes = 

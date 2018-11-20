@@ -99,25 +99,25 @@ type UnaryOp =
     | Abs     // DONE
     | SignT   // DONE
     | Log     // DONE
-    | Log10                           
-    | Exp                           
-    | Sin
-    | Cos
-    | Tan
-    | Asin
-    | Acos
-    | Atan
-    | Sinh
-    | Cosh
-    | Tanh
-    | Sqrt
-    | Ceil
-    | Floor
-    | Round
-    | Truncate
+    | Log10   // DONE                       
+    | Exp     // DONE               
+    | Sin     // DONE
+    | Cos     // DONE
+    | Tan     // DONE
+    | Asin    // DONE
+    | Acos    // DONE
+    | Atan    // DONE
+    | Sinh    // DONE
+    | Cosh    // DONE
+    | Tanh    // DONE
+    | Sqrt    // DONE
+    | Ceil    // DONE
+    | Floor   // DONE
+    | Round   // DONE
+    | Truncate// DONE
 
     // ==== element-wise unary logic ====
-    | Not
+    | Not     // DONE
 
     // ==== tensor operations ====
     /// extract diagonal along given axes
@@ -205,26 +205,26 @@ type FullExprRngsSpecT = RangesSpec<Expr>
 type BinaryOp =
 
     // ==== binary elementwise ====
-    | Add                           
-    | Substract                     
-    | Multiply                      
-    | Divide                        
-    | Modulo
-    | Power            
-    | MaxElemwise
+    | Add               // DONE         
+    | Substract         // DONE            
+    | Multiply          // DONE     
+    | Divide            // DONE     
+    | Modulo            // DONE
+    | Power             // DONE
+    | MaxElemwise   
     | MinElemwise        
            
     // ==== element-wise binary comparison ====
-    | Equal
-    | Less
-    | LessEqual
-    | Greater
-    | GreaterEqual
-    | NotEqual     
+    | Equal             // DONE
+    | Less              // DONE
+    | LessEqual         // DONE
+    | Greater           // DONE
+    | GreaterEqual      // DONE
+    | NotEqual          // DONE
 
     // ==== element-wise binary logic ====
-    | And
-    | Or
+    | And               // DONE
+    | Or                // DONE
 
     // ==== element-wise conditional ====
     | IfThenElse of Expr
