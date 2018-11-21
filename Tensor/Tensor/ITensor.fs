@@ -189,6 +189,13 @@ type ITensor =
     abstract PseudoInvert: unit -> ITensor
     abstract SymmetricEigenDecomposition: part:MatrixPart -> ITensor * ITensor
 
+    // other type-neutral operations
+    abstract DiagAxis: ax1:int -> ax2:int -> ITensor
+    abstract Diag: unit -> ITensor
+    abstract DiagMatAxis: ax1:int -> ax2:int -> ITensor
+    abstract DiagMat: unit -> ITensor
+
+
 /// <summary>Type-neutral interface to Tensor&lt;'T&gt; of any type 'T.</summary>
 /// <remarks>These functions are useful for working with tensors of unknown types.
 /// For most use cases the functions provided by <see cref="Tensor`1"/> are better suited.</remarks>
@@ -459,4 +466,3 @@ module ITensor =
     let transfer (dev: ITensorDevice) (src: ITensor) =
         src.Transfer (dev)
         
-

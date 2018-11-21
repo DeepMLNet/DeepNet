@@ -633,6 +633,52 @@ module UnaryOps =
         | :? Subtensor as this -> Some this
         | _ -> None
 
+    /// Reverses the tensor in the specified dimension.
+    type ReverseAxis = {X: Expr2; Axis: int} with
+        interface IOp2 with      
+            member this.Check () = Check.axis this.Axis this.X
+            member this.TypeName = this.X.TypeName
+            member this.Shape = this.X.Shape 
+            member this.Args = Args.unary this.X
+            member this.ReplaceArgs args = {this with X = Args.unaryX args} :> IOp2
+            member this.SubstSymSizes env = this :> IOp2
+            member this.CanEvalAllSymSizes = true
+            member this.Deriv dOp = Args.unary -dOp // TODO
+            member this.Eval env = (Args.unaryX env.Args) |> ITensor.reverseAxis this.Axis
+    let (|ReverseAxis|_|) (expr: Expr2) =
+        match expr.Op with
+        | :? ReverseAxis as this -> Some this
+        | _ -> None   
+
+    /// Reverses the tensor in the specified dimension.
+    let reverseAxis axis (x: Expr2) =
+        {ReverseAxis.Axis=axis; X=x} |> Expr2
+
+    /// Extract the diagonal(s) along the given axes.
+    type GetDiag = {X: Expr2; Axes: int * int} with
+        interface IOp2 with      
+            member this.Check () = 
+                let ax1, ax2 = this.Axes
+                Check.axis ax1 this.X
+                Check.axis ax2 this.X 
+                if not (ax1 < ax2) then 
+                    failwith "First axis for extracting diagonal must come before second axis."
+                if this.X.Shape.[ax1] .<> this.X.Shape.[ax2] then
+                    failwithf "Cannot extract diagonal along axes %d and %d from non-square tensor with shape %A" 
+                              ax1 ax2 this.X.Shape
+            member this.TypeName = this.X.TypeName
+            member this.Shape = this.X.Shape |> ShapeSpec.withoutAxis (snd this.Axes)
+            member this.Args = Args.unary this.X
+            member this.ReplaceArgs args = {this with X = Args.unaryX args} :> IOp2
+            member this.SubstSymSizes env = this :> IOp2
+            member this.CanEvalAllSymSizes = true
+            member this.Deriv dOp = Args.unary -dOp // TODO
+            member this.Eval env = (Args.unaryX env.Args) |> ITensor.diagAxis this.Axis
+    let (|ReverseAxis|_|) (expr: Expr2) =
+        match expr.Op with
+        | :? ReverseAxis as this -> Some this
+        | _ -> None   
+
     /// Sum over specified axis.
     type SumAxis = {X: Expr2; Axis: int} with
         interface IOp2 with      
@@ -800,6 +846,7 @@ module UnaryOps =
         x |> minAxis axis |> Expr2.insertBroadcastAxis axis
 
 
+    
 
 [<AutoOpen>]
 module BinaryOps =

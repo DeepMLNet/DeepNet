@@ -868,11 +868,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Abs (trgt=trgt, src1=a)
 
-    member a.Abs () =
-        let trgt, a = Tensor.PrepareElemwise (a)
-        trgt.FillAbs (a)
-        trgt
-
     /// <summary>Element-wise absolute value.</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
     /// <returns>A new tensor containing the result of this operation.</returns>
@@ -883,7 +878,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <remarks>Computes the absolute value of each element of the specified tensor and returns them as a new tensor.
     /// Do not call this function directly; instead use the F# <c>abs</c> function.</remarks>
     /// <seealso cref="FillAbs"/>
-    static member Abs (a: Tensor<'T>) = a.Abs ()
+    static member Abs (a: Tensor<'T>) = 
+        let trgt, a = Tensor.PrepareElemwise (a)
+        trgt.FillAbs (a)
+        trgt
 
     /// <summary>Fills this tensor with the element-wise sign of the argument.</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -891,11 +889,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     member trgt.FillSgn (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Sgn (trgt=trgt, src1=a)
-
-    member a.Sgn () = 
-        let trgt, a = Tensor.PrepareElemwise (a)
-        trgt.FillSgn (a)
-        trgt
 
     /// <summary>Element-wise sign.</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -908,7 +901,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// The type of the returned tensor matches the type of the argument tensor.
     /// Do not call this function directly; instead use the F# <c>sgn</c> function.</remarks>
     /// <seealso cref="FillSgn"/>
-    static member Sgn (a: Tensor<'T>) = a.Sgn()
+    static member Sgn (a: Tensor<'T>) = 
+        let trgt, a = Tensor.PrepareElemwise (a)
+        trgt.FillSgn (a)
+        trgt
 
     /// <summary>Fills this tensor with the element-wise natural logarithm of the argument.</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -916,11 +912,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     member trgt.FillLog (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Log (trgt=trgt, src1=a)
-
-    member a.Log () =
-        let trgt, a = Tensor.PrepareElemwise (a)
-        trgt.FillLog (a)
-        trgt
 
     /// <summary>Element-wise natural logarithm.</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -932,7 +923,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <remarks>Computes the natural logarithm of each element of the specified tensor and returns them as a new tensor.
     /// Do not call this function directly; instead use the F# <c>log</c> function.</remarks>
     /// <seealso cref="FillLog"/><seealso cref="Log10"/><seealso cref="Exp"/>
-    static member Log (a: Tensor<'T>) = a.Log()
+    static member Log (a: Tensor<'T>) = 
+        let trgt, a = Tensor.PrepareElemwise (a)
+        trgt.FillLog (a)
+        trgt
 
     /// <summary>Fills this tensor with the element-wise common logarithm of the argument.</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -940,11 +934,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     member trgt.FillLog10 (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Log10 (trgt=trgt, src1=a)
-
-    member a.Log10() =
-        let trgt, a = Tensor.PrepareElemwise (a)
-        trgt.FillLog10 (a)
-        trgt
 
     /// <summary>Element-wise common logarithm.</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -957,7 +946,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// as a new tensor.
     /// Do not call this function directly; instead use the F# <c>log10</c> function.</remarks>
     /// <seealso cref="FillLog10"/><seealso cref="Log"/>
-    static member Log10 (a: Tensor<'T>) = a.Log10()
+    static member Log10 (a: Tensor<'T>) =
+        let trgt, a = Tensor.PrepareElemwise (a)
+        trgt.FillLog10 (a)
+        trgt
 
     /// <summary>Fills this tensor with the element-wise exponential function of the argument.</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -965,11 +957,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     member trgt.FillExp (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Exp (trgt=trgt, src1=a)
-
-    member a.Exp () =
-        let trgt, a = Tensor.PrepareElemwise (a)
-        trgt.FillExp (a)
-        trgt
 
     /// <summary>Element-wise exponential function.</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -982,7 +969,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// as a new tensor.
     /// Do not call this function directly; instead use the F# <c>exp</c> function.</remarks>
     /// <seealso cref="FillExp"/><seealso cref="Log"/>
-    static member Exp (a: Tensor<'T>) = a.Exp ()
+    static member Exp (a: Tensor<'T>) = 
+        let trgt, a = Tensor.PrepareElemwise (a)
+        trgt.FillExp (a)
+        trgt
 
     /// <summary>Fills this tensor with the element-wise sine of the argument.</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -990,11 +980,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     member trgt.FillSin (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Sin (trgt=trgt, src1=a)
-
-    member a.Sin () =
-        let trgt, a = Tensor.PrepareElemwise (a)
-        trgt.FillSin (a)
-        trgt
 
     /// <summary>Element-wise sine.</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -1007,7 +992,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// as a new tensor.
     /// Do not call this function directly; instead use the F# <c>sin</c> function.</remarks>
     /// <seealso cref="FillSin"/><seealso cref="Asin"/>
-    static member Sin (a: Tensor<'T>) = a.Sin()
+    static member Sin (a: Tensor<'T>) = 
+        let trgt, a = Tensor.PrepareElemwise (a)
+        trgt.FillSin (a)
+        trgt
 
     /// <summary>Fills this tensor with the element-wise cosine of the argument.</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -1015,11 +1003,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     member trgt.FillCos (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Cos (trgt=trgt, src1=a)
-
-    member a.Cos () = 
-        let trgt, a = Tensor.PrepareElemwise (a)
-        trgt.FillCos (a)
-        trgt
 
     /// <summary>Element-wise cosine.</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -1032,7 +1015,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// as a new tensor.
     /// Do not call this function directly; instead use the F# <c>cos</c> function.</remarks>
     /// <seealso cref="FillCos"/><seealso cref="Acos"/>
-    static member Cos (a: Tensor<'T>) = a.Cos()
+    static member Cos (a: Tensor<'T>) = 
+        let trgt, a = Tensor.PrepareElemwise (a)
+        trgt.FillCos (a)
+        trgt
 
     /// <summary>Fills this tensor with the element-wise tangent of the argument.</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -1040,11 +1026,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     member trgt.FillTan (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Tan (trgt=trgt, src1=a)
-
-    member a.Tan() =
-        let trgt, a = Tensor.PrepareElemwise (a)
-        trgt.FillTan (a)
-        trgt
 
     /// <summary>Element-wise tangent.</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -1057,7 +1038,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// as a new tensor.
     /// Do not call this function directly; instead use the F# <c>tan</c> function.</remarks>
     /// <seealso cref="FillTan"/><seealso cref="Atan"/>
-    static member Tan (a: Tensor<'T>) = a.Tan()
+    static member Tan (a: Tensor<'T>) = 
+        let trgt, a = Tensor.PrepareElemwise (a)
+        trgt.FillTan (a)
+        trgt
 
     /// <summary>Fills this tensor with the element-wise arcsine (inverse sine) of the argument.</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -1065,11 +1049,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     member trgt.FillAsin (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Asin (trgt=trgt, src1=a)
-
-    member a.Asin () =
-        let trgt, a = Tensor.PrepareElemwise (a)
-        trgt.FillAsin (a)
-        trgt
 
     /// <summary>Element-wise arcsine (inverse sine).</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -1082,7 +1061,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// as a new tensor.
     /// Do not call this function directly; instead use the F# <c>asin</c> function.</remarks>
     /// <seealso cref="FillAsin"/><seealso cref="Sin"/>
-    static member Asin (a: Tensor<'T>) = a.Asin()
+    static member Asin (a: Tensor<'T>) = 
+        let trgt, a = Tensor.PrepareElemwise (a)
+        trgt.FillAsin (a)
+        trgt
 
     /// <summary>Fills this tensor with the element-wise arccosine (inverse cosine) of the argument.</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -1090,11 +1072,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     member trgt.FillAcos (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Acos (trgt=trgt, src1=a)
-
-    member a.Acos () = 
-        let trgt, a = Tensor.PrepareElemwise (a)
-        trgt.FillAcos (a)
-        trgt
 
     /// <summary>Element-wise arccosine (inverse cosine).</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -1107,7 +1084,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// as a new tensor.
     /// Do not call this function directly; instead use the F# <c>acos</c> function.</remarks>
     /// <seealso cref="FillAcos"/><seealso cref="Cos"/>
-    static member Acos (a: Tensor<'T>) = a.Acos()
+    static member Acos (a: Tensor<'T>) = 
+        let trgt, a = Tensor.PrepareElemwise (a)
+        trgt.FillAcos (a)
+        trgt
 
     /// <summary>Fills this tensor with the element-wise arctanget (inverse tangent) of the argument.</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -1115,11 +1095,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     member trgt.FillAtan (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Atan (trgt=trgt, src1=a)
-
-    member a.Atan () =
-        let trgt, a = Tensor.PrepareElemwise (a)
-        trgt.FillAtan (a)
-        trgt
 
     /// <summary>Element-wise arctanget (inverse tangent).</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -1132,7 +1107,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// as a new tensor.
     /// Do not call this function directly; instead use the F# <c>atan</c> function.</remarks>
     /// <seealso cref="FillAcos"/><seealso cref="Tan"/>
-    static member Atan (a: Tensor<'T>) = a.Atan()
+    static member Atan (a: Tensor<'T>) =
+        let trgt, a = Tensor.PrepareElemwise (a)
+        trgt.FillAtan (a)
+        trgt
 
     /// <summary>Fills this tensor with the element-wise hyperbolic sine of the argument.</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -1140,11 +1118,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     member trgt.FillSinh (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Sinh (trgt=trgt, src1=a)
-
-    member a.Sinh () =
-        let trgt, a = Tensor.PrepareElemwise (a)
-        trgt.FillSinh (a)
-        trgt
 
     /// <summary>Element-wise hyperbolic sine.</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -1157,7 +1130,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// as a new tensor.
     /// Do not call this function directly; instead use the F# <c>sinh</c> function.</remarks>
     /// <seealso cref="FillSinh"/>
-    static member Sinh (a: Tensor<'T>) = a.Sinh()
+    static member Sinh (a: Tensor<'T>) = 
+        let trgt, a = Tensor.PrepareElemwise (a)
+        trgt.FillSinh (a)
+        trgt
 
     /// <summary>Fills this tensor with the element-wise hyperbolic cosine of the argument.</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -1165,11 +1141,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     member trgt.FillCosh (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Cosh (trgt=trgt, src1=a)
-
-    member a.Cosh () =
-        let trgt, a = Tensor.PrepareElemwise (a)
-        trgt.FillCosh (a)
-        trgt
 
     /// <summary>Element-wise hyperbolic cosine.</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -1182,7 +1153,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// as a new tensor.
     /// Do not call this function directly; instead use the F# <c>cosh</c> function.</remarks>
     /// <seealso cref="FillCosh"/>
-    static member Cosh (a: Tensor<'T>) = a.Cosh()
+    static member Cosh (a: Tensor<'T>) = 
+        let trgt, a = Tensor.PrepareElemwise (a)
+        trgt.FillCosh (a)
+        trgt
 
     /// <summary>Fills this tensor with the element-wise hyperbolic tangent of the argument.</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -1190,11 +1164,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     member trgt.FillTanh (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Tanh (trgt=trgt, src1=a)
-
-    member a.Tanh () =
-        let trgt, a = Tensor.PrepareElemwise (a)
-        trgt.FillTanh (a)
-        trgt
 
     /// <summary>Element-wise hyperbolic tangent.</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -1207,7 +1176,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// as a new tensor.
     /// Do not call this function directly; instead use the F# <c>tanh</c> function.</remarks>
     /// <seealso cref="FillTanh"/>
-    static member Tanh (a: Tensor<'T>) = a.Tanh()
+    static member Tanh (a: Tensor<'T>) = 
+        let trgt, a = Tensor.PrepareElemwise (a)
+        trgt.FillTanh (a)
+        trgt
 
     /// <summary>Fills this tensor with the element-wise square root of the argument.</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -1215,11 +1187,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     member trgt.FillSqrt (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Sqrt (trgt=trgt, src1=a)
-
-    member a.Sqrt () =
-        let trgt, a = Tensor.PrepareElemwise (a)
-        trgt.FillSqrt (a)
-        trgt
 
     /// <summary>Element-wise square root.</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -1231,7 +1198,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <remarks>Computes the square root of each element of the specified tensor and returns them as a new tensor.
     /// Do not call this function directly; instead use the F# <c>sqrt</c> function.</remarks>
     /// <seealso cref="FillSqrt"/>
-    static member Sqrt (a: Tensor<'T>) = a.Sqrt()
+    static member Sqrt (a: Tensor<'T>) = 
+        let trgt, a = Tensor.PrepareElemwise (a)
+        trgt.FillSqrt (a)
+        trgt
 
     /// <summary>Fills this tensor with the element-wise ceiling (round towards positive infinity) of the argument.</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -1239,11 +1209,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     member trgt.FillCeiling (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Ceiling (trgt=trgt, src1=a)
-
-    member a.Ceiling () =
-        let trgt, a = Tensor.PrepareElemwise (a)
-        trgt.FillCeiling (a)
-        trgt
 
     /// <summary>Element-wise ceiling (round towards positive infinity).</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -1256,7 +1221,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// returns them as a new tensor.
     /// Do not call this function directly; instead use the F# <c>ceil</c> function.</remarks>
     /// <seealso cref="FillCeiling"/>
-    static member Ceiling (a: Tensor<'T>) = a.Ceiling()
+    static member Ceiling (a: Tensor<'T>) = 
+        let trgt, a = Tensor.PrepareElemwise (a)
+        trgt.FillCeiling (a)
+        trgt
 
     /// <summary>Fills this tensor with the element-wise floor (round towards negative infinity) of the argument.</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -1264,11 +1232,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     member trgt.FillFloor (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Floor (trgt=trgt, src1=a)
-
-    member a.Floor () =
-        let trgt, a = Tensor.PrepareElemwise (a)
-        trgt.FillFloor (a)
-        trgt
 
     /// <summary>Element-wise floor (round towards negative infinity).</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -1281,7 +1244,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// returns them as a new tensor.
     /// Do not call this function directly; instead use the F# <c>floor</c> function.</remarks>
     /// <seealso cref="FillFloor"/>
-    static member Floor (a: Tensor<'T>) = a.Floor()
+    static member Floor (a: Tensor<'T>) = 
+        let trgt, a = Tensor.PrepareElemwise (a)
+        trgt.FillFloor (a)
+        trgt
 
     /// <summary>Fills this tensor with the element-wise rounding of the argument.</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -1289,11 +1255,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     member trgt.FillRound (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Round (trgt=trgt, src1=a)
-
-    member a.Round () =
-        let trgt, a = Tensor.PrepareElemwise (a)
-        trgt.FillRound (a)
-        trgt
 
     /// <summary>Element-wise rounding.</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -1305,7 +1266,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <remarks>Computes the rounding of each element of the specified tensor and returns them as a new tensor.
     /// Do not call this function directly; instead use the F# <c>round</c> function.</remarks>
     /// <seealso cref="FillRound"/>
-    static member Round (a: Tensor<'T>) = a.Round()
+    static member Round (a: Tensor<'T>) = 
+        let trgt, a = Tensor.PrepareElemwise (a)
+        trgt.FillRound (a)
+        trgt
 
     /// <summary>Fills this tensor with the element-wise truncation (rounding towards zero) of the argument.</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -1313,11 +1277,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     member trgt.FillTruncate (a: Tensor<'T>) = 
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         trgt.Backend.Truncate (trgt=trgt, src1=a)
-
-    member a.Truncate () =
-        let trgt, a = Tensor.PrepareElemwise (a)
-        trgt.FillTruncate (a)
-        trgt
 
     /// <summary>Element-wise truncation (rounding towards zero).</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -1330,7 +1289,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// them as a new tensor.
     /// Do not call this function directly; instead use the F# <c>truncate</c> function.</remarks>
     /// <seealso cref="FillTruncate"/>
-    static member Truncate (a: Tensor<'T>) = a.Truncate()
+    static member Truncate (a: Tensor<'T>) = 
+        let trgt, a = Tensor.PrepareElemwise (a)
+        trgt.FillTruncate (a)
+        trgt
 
     /// <summary>Fills this tensor with the element-wise finity check (not -Inf, Inf or NaN) of the argument.</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -1339,11 +1301,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         let trgt = trgt.AsBool
         let a = Tensor.PrepareElemwiseSources (trgt, a)
         a.Backend.IsFinite (trgt=trgt, src1=a)
-
-    member a.IsFinite() : Tensor<bool> =
-        let trgt, a = Tensor.PrepareElemwise (a)
-        trgt.FillIsFinite (a)
-        trgt
 
     /// <summary>Element-wise finity check (not -Inf, Inf or NaN).</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -1355,7 +1312,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <remarks>Checks each element of the specified tensor for finity (not -Inf, Inf or NaN) and returns
     /// the results as a new tensor of type <c>bool</c>.</remarks>
     /// <seealso cref="FillIsFinite``1"/><seealso crf="allFinite``1"/>
-    static member isFinite (a: Tensor<'T>) = a.IsFinite()
+    static member isFinite (a: Tensor<'T>) : Tensor<bool> = 
+        let trgt, a = Tensor.PrepareElemwise (a)
+        trgt.FillIsFinite (a)
+        trgt
 
     /// <summary>Fills this tensor with the element-wise logical negation of the argument.</summary>
     /// <param name="a">The tensor to apply this operation to.</param>
@@ -1388,11 +1348,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         trgt.Backend.Add (trgt=trgt, src1=a, src2=b)
    
-    member a.Add (b: Tensor<'T>) =
-        let trgt, a, b = Tensor.PrepareElemwise (a, b)
-        trgt.FillAdd a b
-        trgt
-
     /// <summary>Element-wise addition.</summary>
     /// <param name="a">The tensor on the left side of this binary operation.</param>
     /// <param name="b">The tensor on the right side of this binary operation.</param>
@@ -1409,7 +1364,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// Broadcasting rules apply if <paramref name="a"/> and <paramref name="b"/> have different shapes.</para>
     /// </remarks>
     /// <seealso cref="FillAdd"/>
-    static member (+) (a: Tensor<'T>, b: Tensor<'T>) = a.Add b
+    static member (+) (a: Tensor<'T>, b: Tensor<'T>) = 
+        let trgt, a, b = Tensor.PrepareElemwise (a, b)
+        trgt.FillAdd a b
+        trgt
 
     /// <summary>Element-wise addition with scalar.</summary>
     /// <param name="a">The tensor on the left side of this binary operation.</param>
@@ -1433,11 +1391,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         trgt.Backend.Subtract (trgt=trgt, src1=a, src2=b)
 
-    member a.Subtract (b: Tensor<'T>) =
-        let trgt, a, b = Tensor.PrepareElemwise (a, b)
-        trgt.FillSubtract a b
-        trgt
-
     /// <summary>Element-wise substraction.</summary>
     /// <param name="a">The tensor on the left side of this binary operation.</param>
     /// <param name="b">The tensor on the right side of this binary operation.</param>
@@ -1454,7 +1407,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// Broadcasting rules apply if <paramref name="a"/> and <paramref name="b"/> have different shapes.</para>
     /// </remarks>
     /// <seealso cref="FillSubtract"/>
-    static member (-) (a: Tensor<'T>, b: Tensor<'T>) = a.Subtract b
+    static member (-) (a: Tensor<'T>, b: Tensor<'T>) = 
+        let trgt, a, b = Tensor.PrepareElemwise (a, b)
+        trgt.FillSubtract a b
+        trgt
 
     /// <summary>Element-wise substraction with scalar.</summary>
     /// <param name="a">The tensor on the left side of this binary operation.</param>
@@ -1478,11 +1434,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         trgt.Backend.Multiply (trgt=trgt, src1=a, src2=b)
 
-    member a.Multiply (b: Tensor<'T>) =
-        let trgt, a, b = Tensor.PrepareElemwise (a, b)
-        trgt.FillMultiply a b
-        trgt
-
     /// <summary>Element-wise multiplication.</summary>
     /// <param name="a">The tensor on the left side of this binary operation.</param>
     /// <param name="b">The tensor on the right side of this binary operation.</param>
@@ -1499,7 +1450,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// Broadcasting rules apply if <paramref name="a"/> and <paramref name="b"/> have different shapes.</para>
     /// </remarks>
     /// <seealso cref="FillMultiply"/>
-    static member (*) (a: Tensor<'T>, b: Tensor<'T>) = a.Multiply b
+    static member (*) (a: Tensor<'T>, b: Tensor<'T>) = 
+        let trgt, a, b = Tensor.PrepareElemwise (a, b)
+        trgt.FillMultiply a b
+        trgt
 
     /// <summary>Element-wise multiplication with scalar.</summary>
     /// <param name="a">The tensor on the left side of this binary operation.</param>
@@ -1523,11 +1477,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         trgt.Backend.Divide (trgt=trgt, src1=a, src2=b)
 
-    member a.Divide (b: Tensor<'T>) =
-        let trgt, a, b = Tensor.PrepareElemwise (a, b)
-        trgt.FillDivide a b
-        trgt
-
     /// <summary>Element-wise division.</summary>
     /// <param name="a">The tensor on the left side of this binary operation.</param>
     /// <param name="b">The tensor on the right side of this binary operation.</param>
@@ -1544,7 +1493,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// Broadcasting rules apply if <paramref name="a"/> and <paramref name="b"/> have different shapes.</para>
     /// </remarks>
     /// <seealso cref="FillDivide"/>
-    static member (/) (a: Tensor<'T>, b: Tensor<'T>) = a.Divide b
+    static member (/) (a: Tensor<'T>, b: Tensor<'T>) = 
+        let trgt, a, b = Tensor.PrepareElemwise (a, b)
+        trgt.FillDivide a b
+        trgt
 
     /// <summary>Element-wise division with scalar.</summary>
     /// <param name="a">The tensor on the left side of this binary operation.</param>
@@ -1568,11 +1520,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         trgt.Backend.Modulo (trgt=trgt, src1=a, src2=b)
 
-    member a.Modulo (b: Tensor<'T>) =
-        let trgt, a, b = Tensor.PrepareElemwise (a, b)
-        trgt.FillModulo a b
-        trgt
-
     /// <summary>Element-wise remainder of division.</summary>
     /// <param name="a">The tensor on the left side of this binary operation.</param>
     /// <param name="b">The tensor on the right side of this binary operation.</param>
@@ -1589,7 +1536,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// Broadcasting rules apply if <paramref name="a"/> and <paramref name="b"/> have different shapes.</para>
     /// </remarks>
     /// <seealso cref="FillModulo"/>
-    static member (%) (a: Tensor<'T>, b: Tensor<'T>) = a.Modulo b
+    static member (%) (a: Tensor<'T>, b: Tensor<'T>) = 
+        let trgt, a, b = Tensor.PrepareElemwise (a, b)
+        trgt.FillModulo a b
+        trgt
 
     /// <summary>Element-wise remainder of division with scalar.</summary>
     /// <param name="a">The tensor on the left side of this binary operation.</param>
@@ -1613,11 +1563,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         trgt.Backend.Power (trgt=trgt, src1=a, src2=b)
 
-    member a.Pow (b: Tensor<'T>) =
-        let trgt, a, b = Tensor.PrepareElemwise (a, b)
-        trgt.FillPower a b
-        trgt
-
     /// <summary>Element-wise exponentiation.</summary>
     /// <param name="a">The tensor on the left side of this binary operation.</param>
     /// <param name="b">The tensor on the right side of this binary operation.</param>
@@ -1635,7 +1580,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// Broadcasting rules apply if <paramref name="a"/> and <paramref name="b"/> have different shapes.</para>
     /// </remarks>
     /// <seealso cref="FillPower"/>
-    static member Pow (a: Tensor<'T>, b: Tensor<'T>) = a.Pow b
+    static member Pow (a: Tensor<'T>, b: Tensor<'T>) =
+        let trgt, a, b = Tensor.PrepareElemwise (a, b)
+        trgt.FillPower a b
+        trgt
 
     /// <summary>Element-wise exponentiation with scalar.</summary>
     /// <param name="a">The tensor on the left side of this binary operation.</param>
@@ -1792,11 +1740,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)           
         a.Backend.Equal (trgt=trgt, src1=a, src2=b)
 
-    member a.Equal (b: Tensor<'T>) : Tensor<bool> =
-        let trgt, a, b = Tensor.PrepareElemwise (a, b)
-        trgt.FillEqual a b
-        trgt
-
     /// <summary>Element-wise equality test.</summary>
     /// <param name="a">The tensor on the left side of this binary operation.</param>
     /// <param name="b">The tensor on the right side of this binary operation.</param>
@@ -1813,7 +1756,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// Broadcasting rules apply if <paramref name="a"/> and <paramref name="b"/> have different shapes.</para>
     /// </remarks>
     /// <seealso cref="FillEqual``1"/>
-    static member (====) (a: Tensor<'T>, b: Tensor<'T>) : Tensor<bool> = a.Equal b
+    static member (====) (a: Tensor<'T>, b: Tensor<'T>) : Tensor<bool> = 
+        let trgt, a, b = Tensor.PrepareElemwise (a, b)
+        trgt.FillEqual a b
+        trgt
 
     /// <summary>Element-wise equality test with scalar.</summary>
     /// <param name="a">The tensor on the left side of this binary operation.</param>
@@ -1838,11 +1784,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)           
         a.Backend.NotEqual (trgt=trgt, src1=a, src2=b)
 
-    member a.NotEqual (b: Tensor<'T>) : Tensor<bool> =
-        let trgt, a, b = Tensor.PrepareElemwise (a, b)
-        trgt.FillNotEqual a b
-        trgt
-
     /// <summary>Element-wise not-equality test.</summary>
     /// <param name="a">The tensor on the left side of this binary operation.</param>
     /// <param name="b">The tensor on the right side of this binary operation.</param>
@@ -1859,7 +1800,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// Broadcasting rules apply if <paramref name="a"/> and <paramref name="b"/> have different shapes.</para>
     /// </remarks>
     /// <seealso cref="FillNotEqual``1"/>
-    static member (<<>>) (a: Tensor<'T>, b: Tensor<'T>) : Tensor<bool> = a.NotEqual b
+    static member (<<>>) (a: Tensor<'T>, b: Tensor<'T>) : Tensor<bool> = 
+        let trgt, a, b = Tensor.PrepareElemwise (a, b)
+        trgt.FillNotEqual a b
+        trgt
 
     /// <summary>Element-wise not-equality test with scalar.</summary>
     /// <param name="a">The tensor on the left side of this binary operation.</param>
@@ -1884,11 +1828,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)           
         a.Backend.Less (trgt=trgt, src1=a, src2=b)
 
-    member a.Less (b: Tensor<'T>) : Tensor<bool> =
-        let trgt, a, b = Tensor.PrepareElemwise (a, b)
-        trgt.FillLess a b
-        trgt
-
     /// <summary>Element-wise less-than test.</summary>
     /// <param name="a">The tensor on the left side of this binary operation.</param>
     /// <param name="b">The tensor on the right side of this binary operation.</param>
@@ -1905,7 +1844,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// Broadcasting rules apply if <paramref name="a"/> and <paramref name="b"/> have different shapes.</para>
     /// </remarks>
     /// <seealso cref="FillLess``1"/>
-    static member (<<<<) (a: Tensor<'T>, b: Tensor<'T>) : Tensor<bool> = a.Less b
+    static member (<<<<) (a: Tensor<'T>, b: Tensor<'T>) : Tensor<bool> = 
+        let trgt, a, b = Tensor.PrepareElemwise (a, b)
+        trgt.FillLess a b
+        trgt
 
     /// <summary>Element-wise less-than test with scalar.</summary>
     /// <param name="a">The tensor on the left side of this binary operation.</param>
@@ -1929,11 +1871,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)           
         a.Backend.LessOrEqual (trgt=trgt, src1=a, src2=b)
 
-    member a.LessOrEqual (b: Tensor<'T>) : Tensor<bool> =
-        let trgt, a, b = Tensor.PrepareElemwise (a, b)
-        trgt.FillLessOrEqual a b
-        trgt
-
     /// <summary>Element-wise less-than-or-equal test.</summary>
     /// <param name="a">The tensor on the left side of this binary operation.</param>
     /// <param name="b">The tensor on the right side of this binary operation.</param>
@@ -1950,7 +1887,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// Broadcasting rules apply if <paramref name="a"/> and <paramref name="b"/> have different shapes.</para>
     /// </remarks>
     /// <seealso cref="FillLessOrEqual``1"/>
-    static member (<<==) (a: Tensor<'T>, b: Tensor<'T>) : Tensor<bool> = a.LessOrEqual b
+    static member (<<==) (a: Tensor<'T>, b: Tensor<'T>) : Tensor<bool> =
+        let trgt, a, b = Tensor.PrepareElemwise (a, b)
+        trgt.FillLessOrEqual a b
+        trgt
 
     /// <summary>Element-wise less-than-or-equal test with scalar.</summary>
     /// <param name="a">The tensor on the left side of this binary operation.</param>
@@ -1975,11 +1915,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)           
         a.Backend.Greater (trgt=trgt, src1=a, src2=b)
 
-    member a.Greater (b: Tensor<'T>) : Tensor<bool> =
-        let trgt, a, b = Tensor.PrepareElemwise (a, b)
-        trgt.FillGreater a b
-        trgt
-
     /// <summary>Element-wise greater-than test.</summary>
     /// <param name="a">The tensor on the left side of this binary operation.</param>
     /// <param name="b">The tensor on the right side of this binary operation.</param>
@@ -1996,7 +1931,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// Broadcasting rules apply if <paramref name="a"/> and <paramref name="b"/> have different shapes.</para>
     /// </remarks>
     /// <seealso cref="FillGreater``1"/>
-    static member (>>>>) (a: Tensor<'T>, b: Tensor<'T>) : Tensor<bool> = a.Greater b
+    static member (>>>>) (a: Tensor<'T>, b: Tensor<'T>) : Tensor<bool> = 
+        let trgt, a, b = Tensor.PrepareElemwise (a, b)
+        trgt.FillGreater a b
+        trgt
 
     /// <summary>Element-wise greater-than test with scalar.</summary>
     /// <param name="a">The tensor on the left side of this binary operation.</param>
@@ -2021,11 +1959,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)           
         a.Backend.GreaterOrEqual (trgt=trgt, src1=a, src2=b)
 
-    member a.GreaterOrEqual (b: Tensor<'T>) : Tensor<bool> =
-        let trgt, a, b = Tensor.PrepareElemwise (a, b)
-        trgt.FillGreaterOrEqual a b
-        trgt
-
     /// <summary>Element-wise greater-than-or-equal test.</summary>
     /// <param name="a">The tensor on the left side of this binary operation.</param>
     /// <param name="b">The tensor on the right side of this binary operation.</param>
@@ -2042,7 +1975,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// Broadcasting rules apply if <paramref name="a"/> and <paramref name="b"/> have different shapes.</para> 
     /// </remarks>
     /// <seealso cref="FillGreaterOrEqual``1"/>
-    static member (>>==) (a: Tensor<'T>, b: Tensor<'T>) : Tensor<bool> = a.GreaterOrEqual b
+    static member (>>==) (a: Tensor<'T>, b: Tensor<'T>) : Tensor<bool> = 
+        let trgt, a, b = Tensor.PrepareElemwise (a, b)
+        trgt.FillGreaterOrEqual a b
+        trgt
 
     /// <summary>Element-wise greater-than-or-equal test with scalar.</summary>
     /// <param name="a">The tensor on the left side of this binary operation.</param>
@@ -2066,11 +2002,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         trgt.Backend.MaxElemwise (trgt=trgt, src1=a, src2=b)
 
-    member a.MaxElemwise (b: Tensor<'T>) =
-        let trgt, a, b = Tensor.PrepareElemwise (a, b)
-        trgt.FillMaxElemwise a b
-        trgt
-
     /// <summary>Element-wise maximum.</summary>
     /// <param name="a">The tensor on the left side of this binary operation.</param>
     /// <param name="b">The tensor on the right side of this binary operation.</param>
@@ -2087,7 +2018,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// Broadcasting rules apply if <paramref name="a"/> and <paramref name="b"/> have different shapes.</para>
     /// </remarks>
     /// <seealso cref="FillMaxElemwise"/>
-    static member maxElemwise (a: Tensor<'T>) (b: Tensor<'T>) = a.MaxElemwise b
+    static member maxElemwise (a: Tensor<'T>) (b: Tensor<'T>) = 
+        let trgt, a, b = Tensor.PrepareElemwise (a, b)
+        trgt.FillMaxElemwise a b
+        trgt
 
     /// <summary>Fills this tensor with the element-wise minimum of the arguments.</summary>
     /// <param name="a">The tensor on the left side of this binary operation.</param>
@@ -2096,11 +2030,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     member trgt.FillMinElemwise (a: Tensor<'T>) (b: Tensor<'T>) =
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         trgt.Backend.MinElemwise (trgt=trgt, src1=a, src2=b)
-
-    member a.MinElemwise (b: Tensor<'T>) =
-        let trgt, a, b = Tensor.PrepareElemwise (a, b)
-        trgt.FillMinElemwise a b
-        trgt
 
     /// <summary>Element-wise minimum.</summary>
     /// <param name="a">The tensor on the left side of this binary operation.</param>
@@ -2118,7 +2047,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// Broadcasting rules apply if <paramref name="a"/> and <paramref name="b"/> have different shapes.</para>
     /// </remarks>
     /// <seealso cref="FillMinElemwise"/>
-    static member minElemwise (a: Tensor<'T>) (b: Tensor<'T>) = a.MinElemwise b
+    static member minElemwise (a: Tensor<'T>) (b: Tensor<'T>) = 
+        let trgt, a, b = Tensor.PrepareElemwise (a, b)
+        trgt.FillMinElemwise a b
+        trgt
 
     /// <summary>Fills this tensor with an element-wise choice between two sources depending on a condition.</summary>
     /// <param name="cond">The condition tensor.</param>
@@ -2128,11 +2060,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     member trgt.FillIfThenElse (cond: Tensor<bool>) (ifTrue: Tensor<'T>) (ifFalse: Tensor<'T>) = 
         let cond, ifTrue, ifFalse = Tensor.PrepareElemwiseSources (trgt, cond, ifTrue, ifFalse)
         trgt.Backend.IfThenElse (trgt=trgt, cond=cond, ifTrue=ifTrue, ifFalse=ifFalse)
-
-    member ifTrue.IfThenElse (ifFalse: Tensor<'T>) (cond: Tensor<bool>) =
-        let trgt, cond, ifTrue, ifFalse = Tensor.PrepareElemwise(cond, ifTrue, ifFalse)
-        trgt.FillIfThenElse cond ifTrue ifFalse
-        trgt
 
     /// <summary>Element-wise choice between two sources depending on a condition.</summary>
     /// <param name="cond">The condition tensor.</param>
@@ -2156,7 +2083,9 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// </remarks>
     /// <seealso cref="FillIfThenElse"/>
     static member ifThenElse (cond: Tensor<bool>) (ifTrue: Tensor<'T>) (ifFalse: Tensor<'T>) = 
-        ifTrue.IfThenElse ifFalse cond
+        let trgt, cond, ifTrue, ifFalse = Tensor.PrepareElemwise(cond, ifTrue, ifFalse)
+        trgt.FillIfThenElse cond ifTrue ifFalse
+        trgt
 
     /// <summary>Selects elements from a tensor according to specified indices.</summary>
     /// <param name="indices">A list of tensors, one per dimension of <paramref name="src"/>, containing the indicies
@@ -2172,25 +2101,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
             invalidArg "indices" "Index dimensions beyond the number of target dimensions must not be None."
         let indices = indices |> List.map (Option.map (fun t -> t |> Tensor<_>.broadcastTo trgt.Shape :> ITensorFrontend<_>))
         trgt.Backend.Gather (trgt=trgt, srcIdxs=indices, src=src)
-
-    member src.Gather (indices: Tensor<int64> option list) =
-        // broadcast specified indices to same shape
-        let specIndices = indices |> List.choose id
-        if List.isEmpty specIndices then
-            invalidArg "indicies" "At least one index tensor must not be None."
-        let bcSpecIndices = Tensor<_>.broadcastToSame specIndices
-        let rec rebuild idxs repIdxs =
-            match idxs, repIdxs with
-            | Some idx :: rIdxs, repIdx :: rRepIdxs -> Some repIdx :: rebuild rIdxs rRepIdxs
-            | None :: rIdxs, _ -> None :: rebuild rIdxs repIdxs
-            | [], [] -> []
-            | _ -> failwith "unbalanced idxs"
-        let bcIndices = rebuild indices bcSpecIndices
-
-        // apply gather
-        let trgt = Tensor<'T> (bcSpecIndices.Head.Shape, src.Dev)
-        trgt.FillGather bcIndices src
-        trgt        
 
     /// <summary>Selects elements from a tensor according to specified indices.</summary>
     /// <param name="indices">A list of tensors, one per dimension of <paramref name="src"/>, containing the indicies
@@ -2219,7 +2129,24 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// All index tensors are broadcasted to the same size.</para>
     /// </remarks>
     /// <seealso cref="FillGather"/><seealso cref="scatter"/>
-    static member gather (indices: Tensor<int64> option list) (src: Tensor<'T>) = src.Gather indices
+    static member gather (indices: Tensor<int64> option list) (src: Tensor<'T>) = 
+        // broadcast specified indices to same shape
+        let specIndices = indices |> List.choose id
+        if List.isEmpty specIndices then
+            invalidArg "indicies" "At least one index tensor must not be None."
+        let bcSpecIndices = Tensor<_>.broadcastToSame specIndices
+        let rec rebuild idxs repIdxs =
+            match idxs, repIdxs with
+            | Some idx :: rIdxs, repIdx :: rRepIdxs -> Some repIdx :: rebuild rIdxs rRepIdxs
+            | None :: rIdxs, _ -> None :: rebuild rIdxs repIdxs
+            | [], [] -> []
+            | _ -> failwith "unbalanced idxs"
+        let bcIndices = rebuild indices bcSpecIndices
+
+        // apply gather
+        let trgt = Tensor<'T> (bcSpecIndices.Head.Shape, src.Dev)
+        trgt.FillGather bcIndices src
+        trgt        
 
     /// <summary>Disperses elements from a source tensor to this tensor according to the specified indices.</summary>
     /// <param name="indices">A list of tensors, one per dimension of this tensor, containing the target indicies
@@ -2235,12 +2162,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
             invalidArg "indices" "Index dimensions beyond the number of source dimensions must not be None."
         let indices = indices |> List.map (Option.map (fun t -> t |> Tensor<_>.broadcastTo src.Shape :> ITensorFrontend<_>))
         trgt.Backend.FillConst (trgt=trgt, value=zero<'T>)
-        trgt.Backend.Scatter (trgt=trgt, trgtIdxs=indices, src=src)
-
-    member src.Scatter (indices: Tensor<int64> option list) (trgtShp: int64 list) =
-        let trgt = Tensor<'T> (trgtShp, src.Dev)
-        trgt.FillScatter indices src
-        trgt        
+        trgt.Backend.Scatter (trgt=trgt, trgtIdxs=indices, src=src)  
 
     /// <summary>Disperses elements from a source tensor to a new tensor according to the specified indices.</summary>
     /// <param name="indices">A list of tensors, one per dimension of this tensor, containing the target indicies
@@ -2276,7 +2198,9 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// </remarks>
     /// <seealso cref="FillScatter"/><seealso cref="gather"/>
     static member scatter (indices: Tensor<int64> option list) (trgtShp: int64 list) (src: Tensor<'T>) =
-        src.Scatter indices trgtShp
+        let trgt = Tensor<'T> (trgtShp, src.Dev)
+        trgt.FillScatter indices src
+        trgt    
 
     /// <summary>Counts the elements being true along the specified axis and writes the result into this tensor.</summary>
     /// <param name="ax">The axis the count along.</param>
@@ -2351,11 +2275,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         let src, _ = Tensor.PrepareAxisReduceSources (trgt, ax, src, None)
         trgt.Backend.SumLastAxis (trgt=trgt, src1=src)
 
-    member src.SumAxis (ax: int) =
-        let trgt, src = Tensor.PrepareAxisReduceTarget (ax, src)
-        trgt.FillSumAxis ax src
-        trgt
-
     /// <summary>Sums the elements along the specified axis.</summary>
     /// <param name="ax">The axis to sum along.</param>
     /// <param name="src">The tensor containing the source values.</param>    
@@ -2367,16 +2286,17 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// </code></example>
     /// <remarks>Elements are summed along the specified axis. An empty sum equals zero.</remarks>
     /// <seealso cref="FillSumAxis"/><seealso cref="sum"/>
-    static member sumAxis (ax: int) (src: Tensor<'T>) = src.SumAxis ax
-
-    member src.SumTensor () =
-        src |> Tensor<_>.flatten |> Tensor<_>.sumAxis 0
+    static member sumAxis (ax: int) (src: Tensor<'T>) =
+        let trgt, src = Tensor.PrepareAxisReduceTarget (ax, src)
+        trgt.FillSumAxis ax src
+        trgt        
 
     /// <summary>Sums all elements returning a Tensor.</summary>
     /// <param name="src">The tensor containing the source values.</param>    
     /// <returns>A new scalar tensor containing the result of this operation.</returns>
     /// <seealso cref="sum"/>
-    static member sumTensor (src: Tensor<'T>) = src.SumTensor ()
+    static member sumTensor (src: Tensor<'T>) = 
+        src |> Tensor<_>.flatten |> Tensor<_>.sumAxis 0
 
     /// <summary>Sums all elements.</summary>
     /// <param name="src">The tensor containing the source values.</param>    
@@ -2399,11 +2319,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         let src, _ = Tensor.PrepareAxisReduceSources (trgt, ax, src, None)
         trgt.Backend.ProductLastAxis (trgt=trgt, src1=src)
 
-    member src.ProductAxis (ax: int) =
-        let trgt, src = Tensor.PrepareAxisReduceTarget (ax, src)
-        trgt.FillProductAxis ax src
-        trgt
-
     /// <summary>Calculates the product of the elements along the specified axis.</summary>
     /// <param name="ax">The axis to calculate the product along.</param>
     /// <param name="src">The tensor containing the source values.</param>    
@@ -2415,16 +2330,17 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// </code></example>
     /// <remarks>The product is calculated along the specified axis. An empty product equals one.</remarks>
     /// <seealso cref="FillProductAxis"/><seealso cref="product"/>
-    static member productAxis (ax: int) (src: Tensor<'T>) = src.ProductAxis ax
-
-    member src.ProductTensor () =
-        src |> Tensor<_>.flatten |> Tensor<_>.productAxis 0
+    static member productAxis (ax: int) (src: Tensor<'T>) = 
+        let trgt, src = Tensor.PrepareAxisReduceTarget (ax, src)
+        trgt.FillProductAxis ax src
+        trgt
 
     /// <summary>Calculates the product all elements returning a Tensor.</summary>
     /// <param name="src">The tensor containing the source values.</param>    
     /// <returns>A new scalar tensor containing the result of this operation.</returns>
     /// <seealso cref="product"/>
-    static member productTensor (src: Tensor<'T>) = src.ProductTensor ()
+    static member productTensor (src: Tensor<'T>) =
+        src |> Tensor<_>.flatten |> Tensor<_>.productAxis 0
 
     /// <summary>Calculates the product of all elements.</summary>
     /// <param name="src">The tensor containing the source values.</param>    
@@ -2447,11 +2363,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         let src, _ = Tensor.PrepareAxisReduceSources (trgt, ax, src, None)
         trgt.Backend.MinLastAxis (trgt=trgt, src1=src)
 
-    member src.MinAxis (ax: int) =
-        let trgt, src = Tensor.PrepareAxisReduceTarget (ax, src)
-        trgt.FillMinAxis ax src
-        trgt
-
     /// <summary>Calculates the minimum value of the elements along the specified axis.</summary>
     /// <param name="ax">The axis to calculate the minimum along.</param>
     /// <param name="src">The tensor containing the source values.</param>    
@@ -2464,16 +2375,17 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <remarks>The minimum is calculated along the specified axis. An empty minimum gives the largest possible value 
     /// of the used data type.</remarks>
     /// <seealso cref="FillMinAxis"/><seealso cref="min"/>
-    static member minAxis (ax: int) (src: Tensor<'T>) = src.MinAxis ax
-
-    member src.MinTensor () =
-        src |> Tensor<_>.flatten |> Tensor<_>.minAxis 0
+    static member minAxis (ax: int) (src: Tensor<'T>) = 
+        let trgt, src = Tensor.PrepareAxisReduceTarget (ax, src)
+        trgt.FillMinAxis ax src
+        trgt
 
     /// <summary>Calculates the minimum all elements returning a Tensor.</summary>
     /// <param name="src">The tensor containing the source values.</param>    
     /// <returns>A new scalar tensor containing the result of this operation.</returns>
     /// <seealso cref="min"/>
-    static member minTensor (src: Tensor<'T>) = src.MinTensor ()
+    static member minTensor (src: Tensor<'T>) = 
+        src |> Tensor<_>.flatten |> Tensor<_>.minAxis 0
 
     /// <summary>Calculates the minimum of all elements.</summary>
     /// <param name="src">The tensor containing the source values.</param>    
@@ -2497,11 +2409,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         let src, _ = Tensor.PrepareAxisReduceSources (trgt, ax, src, None)
         trgt.Backend.MaxLastAxis (trgt=trgt, src1=src)
 
-    member src.MaxAxis (ax: int) =
-        let trgt, src = Tensor.PrepareAxisReduceTarget (ax, src)
-        trgt.FillMaxAxis ax src
-        trgt
-
     /// <summary>Calculates the maximum value of the elements along the specified axis.</summary>
     /// <param name="ax">The axis to calculate the maximum along.</param>
     /// <param name="src">The tensor containing the source values.</param>    
@@ -2514,16 +2421,17 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <remarks>The maximum is calculated along the specified axis. An empty maximum gives the smallest possible value 
     /// of the used data type.</remarks>
     /// <seealso cref="FillMaxAxis"/><seealso cref="max"/>
-    static member maxAxis (ax: int) (src: Tensor<'T>) = src.MaxAxis ax
-
-    member src.MaxTensor () =
-        src |> Tensor<_>.flatten |> Tensor<_>.maxAxis 0
+    static member maxAxis (ax: int) (src: Tensor<'T>) = 
+        let trgt, src = Tensor.PrepareAxisReduceTarget (ax, src)
+        trgt.FillMaxAxis ax src
+        trgt
 
     /// <summary>Calculates the maximum all elements returning a Tensor.</summary>
     /// <param name="src">The tensor containing the source values.</param>    
     /// <returns>A new scalar tensor containing the result of this operation.</returns>
     /// <seealso cref="max"/> 
-    static member maxTensor (src: Tensor<'T>) = src.MaxTensor ()
+    static member maxTensor (src: Tensor<'T>) = 
+        src |> Tensor<_>.flatten |> Tensor<_>.maxAxis 0
 
     /// <summary>Calculates the maximum of all elements.</summary>
     /// <param name="src">The tensor containing the source values.</param>    
@@ -2548,11 +2456,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         let src, _ = Tensor.PrepareAxisReduceSources (trgt, ax, src, None)
         src.Backend.ArgMinLastAxis (trgt=trgt, src1=src)
 
-    member src.ArgMinAxis (ax: int) : Tensor<int64> =
-        let trgt, src = Tensor.PrepareAxisReduceTarget (ax, src)
-        trgt.FillArgMinAxis ax src
-        trgt
-
     /// <summary>Finds the index of the minimum value along the specified axis.</summary>
     /// <param name="ax">The axis to calculate the minimum along.</param>
     /// <param name="src">The tensor containing the source values.</param>    
@@ -2565,7 +2468,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <remarks>The index of the minimum is calculated along the specified axis. 
     /// An empty tensor gives <see cref="Tensor.NotFound"/>.</remarks>
     /// <seealso cref="FillArgMinAxis``1"/><seealso cref="argMin"/>
-    static member argMinAxis (ax: int) (src: Tensor<'T>) : Tensor<int64> = src.ArgMinAxis ax
+    static member argMinAxis (ax: int) (src: Tensor<'T>) : Tensor<int64> = 
+        let trgt, src = Tensor.PrepareAxisReduceTarget (ax, src)
+        trgt.FillArgMinAxis ax src
+        trgt
 
     /// <summary>Finds the index of the maximum value along the specified axis and writes it into this tensor.</summary>
     /// <param name="ax">The axis to calculate the maximum along.</param>
@@ -2575,11 +2481,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         let trgt = trgt.AsInt64
         let src, _ = Tensor.PrepareAxisReduceSources (trgt, ax, src, None)
         src.Backend.ArgMaxLastAxis (trgt=trgt, src1=src)
-
-    member src.ArgMaxAxis (ax: int) : Tensor<int64> =
-        let trgt, src = Tensor.PrepareAxisReduceTarget (ax, src)
-        trgt.FillArgMaxAxis ax src
-        trgt
 
     /// <summary>Finds the index of the maximum value along the specified axis.</summary>
     /// <param name="ax">The axis to calculate the maximum along.</param>
@@ -2593,14 +2494,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <remarks>The index of the maximum is calculated along the specified axis. 
     /// An empty tensor gives <see cref="Tensor.NotFound"/>.</remarks>
     /// <seealso cref="FillArgMaxAxis``1"/><seealso cref="argMax"/>
-    static member argMaxAxis (ax: int) (src: Tensor<'T>) : Tensor<int64> = src.ArgMaxAxis ax
-
-    member a.ArgMin () =
-        a 
-        |> Tensor<_>.flatten 
-        |> Tensor<_>.argMinAxis 0 
-        |> Tensor.value 
-        |> TensorLayout.linearToIdx a.Layout
+    static member argMaxAxis (ax: int) (src: Tensor<'T>) : Tensor<int64> = 
+        let trgt, src = Tensor.PrepareAxisReduceTarget (ax, src)
+        trgt.FillArgMaxAxis ax src
+        trgt
 
     /// <summary>Finds the indicies of the minimum value of the tensor.</summary>
     /// <param name="a">The tensor containing the source values.</param>    
@@ -2613,12 +2510,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <remarks>The minimum value within the specified tensor is found and its indicies are returned. 
     /// The function fails for an empty tensor.</remarks>
     /// <seealso cref="argMinAxis"/>
-    static member argMin (a: Tensor<'T>) = a.ArgMin ()
-
-    member a.ArgMax () =
+    static member argMin (a: Tensor<'T>) = 
         a 
         |> Tensor<_>.flatten 
-        |> Tensor<_>.argMaxAxis 0 
+        |> Tensor<_>.argMinAxis 0 
         |> Tensor.value 
         |> TensorLayout.linearToIdx a.Layout
 
@@ -2633,7 +2528,12 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <remarks>The maximum value within the specified tensor is found and its indicies are returned. 
     /// The function fails for an empty tensor.</remarks>
     /// <seealso cref="argMaxAxis"/>
-    static member argMax (a: Tensor<'T>) = a.ArgMax ()
+    static member argMax (a: Tensor<'T>) = 
+        a 
+        |> Tensor<_>.flatten 
+        |> Tensor<_>.argMaxAxis 0 
+        |> Tensor.value 
+        |> TensorLayout.linearToIdx a.Layout
         
     /// <summary>Finds the first occurence of the specfied value along the specified axis and write its index into this tensor.</summary>
     /// <param name="value">The value to find.</param>
@@ -2834,33 +2734,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
             invalidOp "Cannot compute dot product between tensors of shapes %A and %A 
                        into tensor of shape %A." a.Shape b.Shape trgt.Shape
 
-    member a.Dot (b: Tensor<'T>) : Tensor<'T> = 
-        Tensor.CheckSameStorage [a; b]
-        match a.NDims, b.NDims with
-        | 1, 1 when a.Shape = b.Shape -> 
-            let trgt = Tensor<'T> ([], a.Dev)
-            trgt.FillDot a b
-            trgt
-        | 2, 1 when a.Shape.[1] = b.Shape.[0] -> 
-            let trgt = Tensor<'T> ([a.Shape.[0]], a.Dev)
-            trgt.FillDot a b
-            trgt
-        | 2, 2 when a.Shape.[1] = b.Shape.[0] -> 
-            let trgt = Tensor<'T> ([a.Shape.[0]; b.Shape.[1]], a.Dev)
-            trgt.FillDot a b
-            trgt
-        | na, nb when na > 2 && na = nb && a.Shape.[na-1] = b.Shape.[na-2] ->
-            let a, b = Tensor.broadcastToSameInDims ([0 .. na-3], a, b)
-            let trgt = Tensor<'T> (a.Shape.[0 .. na-3] @ [a.Shape.[na-2]; b.Shape.[na-1]], a.Dev)
-            trgt.FillDot a b
-            trgt
-        | na, nb when na > 2 && na = nb+1 && a.Shape.[na-1] = b.Shape.[nb-1] ->
-            let bPad = Tensor.padRight b
-            let resPad = a .* bPad
-            resPad.[Fill, 0L]
-        | _ -> 
-            invalidOp "Cannot compute dot product between tensors of shapes %A and %A." a.Shape b.Shape 
-
     /// <summary>Computes the (batched) matrix product, (batched) matrix-vector product or scalar product.</summary>
     /// <param name="a">The tensor on the left side of this binary operation.</param>
     /// <param name="b">The tensor on the right side of this binary operation.</param>
@@ -2901,7 +2774,32 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// a tensor of shape <c>[b_1; ...; b_n; i; k]</c>. Broadcasting rules apply for the batch dimensions.</para>
     /// </remarks>
     /// <seealso cref="FillDot"/>
-    static member (.*) (a: Tensor<'T>, b: Tensor<'T>) : Tensor<'T> = a.Dot b
+    static member (.*) (a: Tensor<'T>, b: Tensor<'T>) : Tensor<'T> =
+        Tensor.CheckSameStorage [a; b]
+        match a.NDims, b.NDims with
+        | 1, 1 when a.Shape = b.Shape -> 
+            let trgt = Tensor<'T> ([], a.Dev)
+            trgt.FillDot a b
+            trgt
+        | 2, 1 when a.Shape.[1] = b.Shape.[0] -> 
+            let trgt = Tensor<'T> ([a.Shape.[0]], a.Dev)
+            trgt.FillDot a b
+            trgt
+        | 2, 2 when a.Shape.[1] = b.Shape.[0] -> 
+            let trgt = Tensor<'T> ([a.Shape.[0]; b.Shape.[1]], a.Dev)
+            trgt.FillDot a b
+            trgt
+        | na, nb when na > 2 && na = nb && a.Shape.[na-1] = b.Shape.[na-2] ->
+            let a, b = Tensor.broadcastToSameInDims ([0 .. na-3], a, b)
+            let trgt = Tensor<'T> (a.Shape.[0 .. na-3] @ [a.Shape.[na-2]; b.Shape.[na-1]], a.Dev)
+            trgt.FillDot a b
+            trgt
+        | na, nb when na > 2 && na = nb+1 && a.Shape.[na-1] = b.Shape.[nb-1] ->
+            let bPad = Tensor.padRight b
+            let resPad = a .* bPad
+            resPad.[Fill, 0L]
+        | _ -> 
+            invalidOp "Cannot compute dot product between tensors of shapes %A and %A." a.Shape b.Shape 
 
     /// <summary>Computes the (batched) matrix product, (batched) matrix-vector product or scalar product.</summary>
     /// <param name="a">The tensor on the left side of this binary operation.</param>
@@ -2920,11 +2818,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
             invalidArg "a" "Need at least a matrix to invert but got shape %A." a.Shape
         let a = a |> Tensor.broadcastTo trgt.Shape
         trgt.Backend.BatchedInvert (trgt, a)
-
-    member a.Invert () = 
-        let trgt = Tensor<'T> (a.Shape, a.Dev)
-        trgt.FillInvert a
-        trgt
 
     /// <summary>(Batch) inverts a matrix.</summary>
     /// <param name="a">The input matrix or tensor to this operation.</param>
@@ -2945,7 +2838,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// </remarks>
     /// <exception cref="Tensor.SingularMatrixException">Raised when the matrix is not invertible.</exception>
     /// <seealso cref="FillInvert"/><seealso cref="pseudoInvert"/>         
-    static member invert (a: Tensor<'T>) = a.Invert()
+    static member invert (a: Tensor<'T>) = 
+        let trgt = Tensor<'T> (a.Shape, a.Dev)
+        trgt.FillInvert a
+        trgt
 
     /// Computes the sizes of an SVD decomposition.
     static member internal SVDSizes (a: ITensorFrontend<'T>) =
@@ -2983,14 +2879,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
                                                                  trgtV :> ITensorFrontend<_>)
         trgtS.Backend.BatchedSVD (trgtS, trgtUV, a)                
 
-    member a.SVD () =
-        let batchShp, M, N, K = Tensor.SVDSizes a
-        let U = Tensor<'T> (batchShp @ [M;M], a.Dev, order=ColumnMajor)
-        let S = Tensor<'T> (batchShp @ [K], a.Dev, order=ColumnMajor)
-        let V = Tensor<'T> (batchShp @ [N;N], a.Dev, order=RowMajor)
-        S.FillSVD(a, trgtUV=(U, V))
-        U, S, V
-
     /// <summary>Computes the (batched) singular value decomposition (SVD) of the specified matrix.</summary>
     /// <param name="a">The input matrix or tensor to this operation.</param>
     /// <returns>A tuple consisting of <c>(U, S, V)</c> where <c>S</c> is a vector consisting of the singular values and
@@ -3002,19 +2890,23 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// of the last two dimensions.</para>
     /// </remarks>    
     /// <seealso cref="FillSVD"/><seealso cref="SVDWithoutUV"/>
-    static member SVD (a: Tensor<'T>) = a.SVD ()
-
-    member a.SVDWithoutUV () =
+    static member SVD (a: Tensor<'T>) = 
         let batchShp, M, N, K = Tensor.SVDSizes a
+        let U = Tensor<'T> (batchShp @ [M;M], a.Dev, order=ColumnMajor)
         let S = Tensor<'T> (batchShp @ [K], a.Dev, order=ColumnMajor)
-        S.FillSVD(a)
-        S
+        let V = Tensor<'T> (batchShp @ [N;N], a.Dev, order=RowMajor)
+        S.FillSVD(a, trgtUV=(U, V))
+        U, S, V
 
     /// <summary>Computes the (batched) singular values of the specified matrix.</summary>
     /// <param name="a">The input matrix or tensor to this operation.</param>
     /// <returns>A vector consisting of the singular values.</returns>
     /// <seealso cref="SVD"/>
-    static member SVDWithoutUV (a: Tensor<'T>) = a.SVDWithoutUV ()        
+    static member SVDWithoutUV (a: Tensor<'T>) = 
+        let batchShp, M, N, K = Tensor.SVDSizes a
+        let S = Tensor<'T> (batchShp @ [K], a.Dev, order=ColumnMajor)
+        S.FillSVD(a)
+        S    
 
     /// <summary>Fills this tensor with the (batched) Moore-Penrose pseudo-inverse of the specified matrix.</summary>
     /// <param name="a">The input matrix or tensor to this operation.</param>
@@ -3034,11 +2926,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         s.FillIfThenElse (s >>== rCond) (one / s) (zero)
         trgt.FillDot (v) (Tensor.padRight s * u.T)
 
-    member a.PseudoInvert (?rCond: 'T) = 
-        let trgt = Tensor<'T> (a.Shape, a.Dev)
-        trgt.FillPseudoInvert (a, ?rCond=rCond)
-        trgt
-
     /// <summary>Computes the (batched) Moore-Penrose pseudo-inverse of the specified matrix.</summary>
     /// <param name="a">The input matrix or tensor to this operation.</param>
     /// <param name="rCond">The cut-off value for the singular values. (default: 1e-15)</param>
@@ -3050,7 +2937,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// The result is a tensor of shape <c>[b_1; ...; b_n; j; i]</c>.</para>
     /// </remarks>
     /// <seealso cref="FillPseudoInvert"/><seealso cref="invert"/>   
-    static member pseudoInvert (a: Tensor<'T>, ?rCond: 'T) = a.PseudoInvert(?rCond=rCond)
+    static member pseudoInvert (a: Tensor<'T>, ?rCond: 'T) = 
+        let trgt = Tensor<'T> (a.Shape, a.Dev)
+        trgt.FillPseudoInvert (a, ?rCond=rCond)
+        trgt
 
     /// <summary>Computes the (real) eigendecomposition of a symmetric matrix and writes it into the specified 
     /// target tensors.</summary>
@@ -3072,14 +2962,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
                                      a.Shape.[0] trgtEigVals.Shape
         trgtEigVals.Backend.SymmetricEigenDecomposition (part, trgtEigVals, trgtEigVecs, a)
 
-    member a.SymmetricEigenDecomposition (part: MatrixPart) =
-        if a.NDims <> 2 then
-            invalidArg "a" "require a square matrix for symmetric eigen-decomposition"
-        let trgtEigVals = Tensor<'T> ([a.Shape.[0]], a.Dev)
-        let trgtEigVecs = Tensor<'T> (a.Shape, a.Dev, order=ColumnMajor)
-        Tensor.FillSymmetricEigenDecomposition part trgtEigVals trgtEigVecs a
-        trgtEigVals, trgtEigVecs
-
     /// <summary>Computes the (real) eigendecomposition of a symmetric matrix.</summary>
     /// <param name="part">Specifies which part of the matrix should be used.</param>
     /// <param name="a">The input matrix to this operation.</param>
@@ -3092,7 +2974,12 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// </remarks>
     /// <seealso cref="FillSymmetricEigenDecomposition"/>
     static member symmetricEigenDecomposition (part: MatrixPart) (a: Tensor<'T>) =
-        a.SymmetricEigenDecomposition part
+        if a.NDims <> 2 then
+            invalidArg "a" "Symmetric eigen-decomposition requires a square matrix."
+        let trgtEigVals = Tensor<'T> ([a.Shape.[0]], a.Dev)
+        let trgtEigVecs = Tensor<'T> (a.Shape, a.Dev, order=ColumnMajor)
+        Tensor.FillSymmetricEigenDecomposition part trgtEigVals trgtEigVecs a
+        trgtEigVals, trgtEigVecs
         
     // Helper functions for getting slices.
     member inline internal this.GetRng (rngArgs: obj[]) =
@@ -3711,77 +3598,82 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         member this.GetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option, i2s: int64 option, i2f: int64 option, o3: obj, [<System.ParamArray>] r: obj[]) = this.IGetRngWithRest [|i0s; i0f; i1s; i1f; i2s; i2f; o3|] r
         member this.SetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option, i2s: int64 option, i2f: int64 option, o3: obj, o4: obj, [<System.ParamArray>] r: obj[]) = this.ISetRngWithRest [|i0s; i0f; i1s; i1f; i2s; i2f; o3; o4|] r
 
-        member this.UnaryPlus () = this.UnaryPlus () :> ITensor
-        member this.UnaryMinus () = this.UnaryMinus () :> ITensor
-        member this.Abs () = this.Abs () :> ITensor
-        member this.Sgn () = this.Sgn () :> ITensor
-        member this.Log () = this.Log () :> ITensor
-        member this.Log10 () = this.Log10 () :> ITensor
-        member this.Exp () = this.Exp () :> ITensor
-        member this.Sin () = this.Sin () :> ITensor
-        member this.Cos () = this.Cos () :> ITensor
-        member this.Tan () = this.Tan () :> ITensor
-        member this.Asin () = this.Asin () :> ITensor
-        member this.Acos () = this.Acos () :> ITensor
-        member this.Atan () = this.Atan () :> ITensor
-        member this.Sinh () = this.Sinh () :> ITensor
-        member this.Cosh () = this.Cosh () :> ITensor
-        member this.Tanh () = this.Tanh () :> ITensor
-        member this.Sqrt () = this.Sqrt () :> ITensor
-        member this.Ceiling () = this.Ceiling () :> ITensor
-        member this.Floor () = this.Floor () :> ITensor
-        member this.Round () = this.Round () :> ITensor
-        member this.Truncate () = this.Truncate () :> ITensor
-        member this.IsFinite () = this.IsFinite () :> ITensor
+        member a.UnaryPlus () = +a :> ITensor
+        member a.UnaryMinus () = -a :> ITensor
+        member a.Abs () = Tensor<'T>.Abs a :> ITensor
+        member a.Sgn () = Tensor<'T>.Sgn a :> ITensor
+        member a.Log () = Tensor<'T>.Log a :> ITensor
+        member a.Log10 () = Tensor<'T>.Log10 a :> ITensor
+        member a.Exp () = Tensor<'T>.Exp a :> ITensor
+        member a.Sin () = Tensor<'T>.Sin a :> ITensor
+        member a.Cos () = Tensor<'T>.Cos a :> ITensor
+        member a.Tan () = Tensor<'T>.Tan a :> ITensor
+        member a.Asin () = Tensor<'T>.Asin a :> ITensor
+        member a.Acos () = Tensor<'T>.Acos a :> ITensor
+        member a.Atan () = Tensor<'T>.Atan a :> ITensor
+        member a.Sinh () = Tensor<'T>.Sinh a :> ITensor
+        member a.Cosh () = Tensor<'T>.Cosh a :> ITensor
+        member a.Tanh () = Tensor<'T>.Tanh a :> ITensor
+        member a.Sqrt () = Tensor<'T>.Sqrt a :> ITensor
+        member a.Ceiling () = Tensor<'T>.Ceiling a :> ITensor
+        member a.Floor () = Tensor<'T>.Floor a :> ITensor
+        member a.Round () = Tensor<'T>.Round a :> ITensor
+        member a.Truncate () = Tensor<'T>.Truncate a :> ITensor
+        member a.IsFinite () = Tensor<'T>.isFinite a :> ITensor
 
-        member a.Add b = a.Add (b :?> Tensor<'T>) :> ITensor
-        member a.Subtract b = a.Subtract (b :?> Tensor<'T>) :> ITensor
-        member a.Multiply b = a.Multiply (b :?> Tensor<'T>) :> ITensor
-        member a.Divide b = a.Divide (b :?> Tensor<'T>) :> ITensor
-        member a.Modulo b = a.Modulo (b :?> Tensor<'T>) :> ITensor        
-        member a.Pow b = a.Pow (b :?> Tensor<'T>) :> ITensor
+        member a.Add b = a + (b :?> Tensor<'T>) :> ITensor
+        member a.Subtract b = a - (b :?> Tensor<'T>) :> ITensor
+        member a.Multiply b = a * (b :?> Tensor<'T>) :> ITensor
+        member a.Divide b = a / (b :?> Tensor<'T>) :> ITensor
+        member a.Modulo b = a % (b :?> Tensor<'T>) :> ITensor        
+        member a.Pow b = a ** (b :?> Tensor<'T>) :> ITensor
 
-        member a.Equal b = a.Equal (b :?> Tensor<'T>) :> ITensor
-        member a.NotEqual b = a.NotEqual (b :?> Tensor<'T>) :> ITensor
-        member a.Less b = a.Less (b :?> Tensor<'T>) :> ITensor
-        member a.LessOrEqual b = a.LessOrEqual (b :?> Tensor<'T>) :> ITensor
-        member a.Greater b = a.Greater (b :?> Tensor<'T>) :> ITensor
-        member a.GreaterOrEqual b = a.GreaterOrEqual (b :?> Tensor<'T>) :> ITensor
-        member a.MaxElemwise b = a.MaxElemwise (b :?> Tensor<'T>) :> ITensor
-        member a.MinElemwise b = a.MinElemwise (b :?> Tensor<'T>) :> ITensor
+        member a.Equal b = a ==== (b :?> Tensor<'T>) :> ITensor
+        member a.NotEqual b = a <<>> (b :?> Tensor<'T>) :> ITensor
+        member a.Less b = a <<<< (b :?> Tensor<'T>) :> ITensor
+        member a.LessOrEqual b = a <<== (b :?> Tensor<'T>) :> ITensor
+        member a.Greater b = a >>>> (b :?> Tensor<'T>) :> ITensor
+        member a.GreaterOrEqual b = a >>== (b :?> Tensor<'T>) :> ITensor
+        member a.MaxElemwise b = Tensor<'T>.maxElemwise a (b :?> Tensor<'T>) :> ITensor
+        member a.MinElemwise b = Tensor<'T>.minElemwise a (b :?> Tensor<'T>) :> ITensor
 
-        member a.IfThenElse ifFalse cond = 
-            a.IfThenElse (ifFalse :?> Tensor<'T>) (cond :?> Tensor<bool>) :> ITensor
+        member ifTrue.IfThenElse ifFalse cond = 
+            Tensor<'T>.ifThenElse (cond :?> Tensor<bool>) ifTrue (ifFalse :?> Tensor<'T>) :> ITensor
         member a.Gather indices =
-            a.Gather (indices |> List.map (Option.map (fun i -> i :?> Tensor<int64>))) :> ITensor
+            Tensor<'T>.gather (indices |> List.map (Option.map (fun i -> i :?> Tensor<int64>))) a :> ITensor
         member a.Scatter indices trgtShp =
-            a.Scatter (indices |> List.map (Option.map (fun i -> i :?> Tensor<int64>))) trgtShp :> ITensor
+            Tensor<'T>.scatter (indices |> List.map (Option.map (fun i -> i :?> Tensor<int64>))) trgtShp a :> ITensor
 
-        member a.SumAxis ax = a.SumAxis ax :> ITensor
-        member a.SumTensor () = a.SumTensor () :> ITensor
-        member a.ProductAxis ax = a.ProductAxis ax :> ITensor
-        member a.ProductTensor () = a.ProductTensor () :> ITensor
+        member a.SumAxis ax = Tensor<'T>.sumAxis ax a :> ITensor
+        member a.SumTensor () = Tensor<'T>.sumTensor a :> ITensor
+        member a.ProductAxis ax = Tensor<'T>.productAxis ax a :> ITensor
+        member a.ProductTensor () = Tensor<'T>.productTensor a :> ITensor
 
-        member a.MinAxis ax = a.MinAxis ax :> ITensor
-        member a.MinTensor () = a.MinTensor () :> ITensor
-        member a.MaxAxis ax = a.MaxAxis ax :> ITensor
-        member a.MaxTensor () = a.MaxTensor () :> ITensor
-        member a.ArgMinAxis ax = a.ArgMinAxis ax :> ITensor 
-        member a.ArgMaxAxis ax = a.ArgMaxAxis ax :> ITensor
-        member a.ArgMin () = a.ArgMin ()
-        member a.ArgMax () = a.ArgMax ()
+        member a.MinAxis ax = Tensor<'T>.minAxis ax a :> ITensor
+        member a.MinTensor () = Tensor<'T>.minTensor a :> ITensor
+        member a.MaxAxis ax = Tensor<'T>.maxAxis ax a :> ITensor
+        member a.MaxTensor () = Tensor<'T>.maxTensor a :> ITensor
+        member a.ArgMinAxis ax = Tensor<'T>.argMinAxis ax a :> ITensor 
+        member a.ArgMaxAxis ax = Tensor<'T>.argMaxAxis ax a :> ITensor
+        member a.ArgMin () = Tensor<'T>.argMin a
+        member a.ArgMax () = Tensor<'T>.argMax a
 
-        member a.Dot b = a.Dot (b :?> Tensor<'T>) :> ITensor
-        member a.TensorProduct b = a.TensorProduct (b :?> Tensor<'T>) :> ITensor
-        member a.Invert () = a.Invert () :> ITensor
+        member a.Dot b = a .* (b :?> Tensor<'T>) :> ITensor
+        member a.TensorProduct b = Tensor<'T>.tensorProduct  a (b :?> Tensor<'T>) :> ITensor
+        member a.Invert () = Tensor<'T>.invert a :> ITensor
         member a.SVD () = 
-            let U, S, V = a.SVD ()
+            let U, S, V = Tensor<'T>.SVD a
             U :> ITensor, S :> ITensor, V :> ITensor
-        member a.SVDWithoutUV () = a.SVDWithoutUV () :> ITensor
-        member a.PseudoInvert () = a.PseudoInvert () :> ITensor
+        member a.SVDWithoutUV () = Tensor<'T>.SVDWithoutUV a :> ITensor
+        member a.PseudoInvert () = Tensor<'T>.pseudoInvert a :> ITensor
         member a.SymmetricEigenDecomposition part = 
-            let eigVals, eigVecs = a.SymmetricEigenDecomposition part
+            let eigVals, eigVecs = Tensor<'T>.symmetricEigenDecomposition part a
             eigVals :> ITensor, eigVecs :> ITensor
+
+        member a.DiagAxis ax1 ax2 = Tensor<'T>.diagAxis ax1 ax2 a :> ITensor
+        member a.Diag () = Tensor<'T>.diag a :> ITensor
+        member a.DiagMatAxis ax1 ax2 = Tensor<'T>.diagMatAxis ax1 ax2 a :> ITensor
+        member a.DiagMat () = Tensor<'T>.diagMat a :> ITensor
 
     /// <summary>Tests for equality to another object.</summary>
     /// <param name="other">The other object.</param>
@@ -4288,7 +4180,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// </remarks>    
     /// <seealso cref="diag"/><seealso cref="diagMatAxis"/>
     static member diagAxis ax1 ax2 (a: Tensor<'T>) =
-        a |> Tensor.relayout (a.Layout |> TensorLayout.diagAxis ax1 ax2)
+        a.Relayout (a.Layout |> TensorLayout.diagAxis ax1 ax2)    
 
     /// <summary>Returns a view of the diagonal of the matrix.</summary>
     /// <param name="a">A square matrix.</param>    
@@ -4307,7 +4199,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <seealso cref="diagAxis"/><seealso cref="diagMat"/>
     static member diag (a: Tensor<'T>) =
         if a.NDims < 2 then
-            invalidArg "a" "Need at least a two dimensional array for diagonal but got shape %A." a.Shape
+            invalidArg "a" "Need at least a two dimensional tensor for diagonal but got shape %A." a.Shape
         Tensor.diagAxis (a.NDims-2) (a.NDims-1) a
 
     /// <summary>Creates a tensor with the specified diagonal along the given axes.</summary>
@@ -4329,11 +4221,11 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <seealso cref="diagMat"/><seealso cref="diagAxis"/>
     static member diagMatAxis ax1 ax2 (a: Tensor<'T>) =
         if ax1 = ax2 then 
-            invalidArg "ax1" "axes to use for diagonal must be different"
+            invalidArg "ax1" "Axes to use for diagonal must be different"
         let ax1, ax2 = if ax1 < ax2 then ax1, ax2 else ax2, ax1
         a.CheckAxis ax1
         if not (0 <= ax2 && ax2 <= a.NDims) then
-            invalidArg "ax2" "Cannot insert axis at position %d into array of shape %A." ax2 a.Shape
+            invalidArg "ax2" "Cannot insert axis at position %d into tensor of shape %A." ax2 a.Shape
         let dShp = a.Shape |> List.insert ax2 a.Shape.[ax1]
         let d = Tensor.zeros a.Dev dShp
         let dDiag = Tensor.diagAxis ax1 ax2 d

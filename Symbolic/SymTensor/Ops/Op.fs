@@ -361,6 +361,7 @@ type internal IOpForwards =
     abstract Reshape: shp:ShapeSpec -> x:Expr2 -> IOp2
     abstract DoBroadcast: shp:ShapeSpec -> x:Expr2 -> IOp2
     abstract PermuteAxes: perm:int list -> x:Expr2 -> IOp2
+    abstract ReverseAxis: axis:int -> x:Expr2 -> IOp2
     abstract Subtensor: range:SimpleRangesSpec -> x:Expr2 -> IOp2
 
     abstract UnaryPlus: x:Expr2 -> IOp2
