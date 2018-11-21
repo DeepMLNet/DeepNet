@@ -121,9 +121,9 @@ type UnaryOp =
 
     // ==== tensor operations ====
     /// extract diagonal along given axes
-    | Diag of int * int
+    | Diag of int * int             // DONE
     /// build diagonal matrix along given axes
-    | DiagMat of int * int
+    | DiagMat of int * int          // DONE
     /// matrix inverse
     | Invert
 

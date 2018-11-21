@@ -655,29 +655,78 @@ module UnaryOps =
         {ReverseAxis.Axis=axis; X=x} |> Expr2
 
     /// Extract the diagonal(s) along the given axes.
-    type GetDiag = {X: Expr2; Axes: int * int} with
+    type Diag = {X: Expr2; Axis1: int; Axis2: int} with
         interface IOp2 with      
             member this.Check () = 
-                let ax1, ax2 = this.Axes
-                Check.axis ax1 this.X
-                Check.axis ax2 this.X 
-                if not (ax1 < ax2) then 
+                Check.axis this.Axis1 this.X
+                Check.axis this.Axis2 this.X 
+                if not (this.Axis1 < this.Axis2) then 
                     failwith "First axis for extracting diagonal must come before second axis."
-                if this.X.Shape.[ax1] .<> this.X.Shape.[ax2] then
+                if this.X.Shape.[this.Axis1] .<> this.X.Shape.[this.Axis2] then
                     failwithf "Cannot extract diagonal along axes %d and %d from non-square tensor with shape %A" 
-                              ax1 ax2 this.X.Shape
+                              this.Axis1 this.Axis2 this.X.Shape
             member this.TypeName = this.X.TypeName
-            member this.Shape = this.X.Shape |> ShapeSpec.withoutAxis (snd this.Axes)
+            member this.Shape = this.X.Shape |> ShapeSpec.withoutAxis this.Axis2
             member this.Args = Args.unary this.X
             member this.ReplaceArgs args = {this with X = Args.unaryX args} :> IOp2
             member this.SubstSymSizes env = this :> IOp2
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary -dOp // TODO
-            member this.Eval env = (Args.unaryX env.Args) |> ITensor.diagAxis this.Axis
-    let (|ReverseAxis|_|) (expr: Expr2) =
+            member this.Eval env = (Args.unaryX env.Args).DiagAxis this.Axis1 this.Axis2
+    let (|Diag|_|) (expr: Expr2) =
         match expr.Op with
-        | :? ReverseAxis as this -> Some this
+        | :? Diag as this -> Some this
         | _ -> None   
+
+    /// Extracts the diagonal along the given axes.
+    let diagAxis ax1 ax2 (x: Expr2) = 
+        let ax1, ax2 = if ax1 < ax2 then ax1, ax2 else ax2, ax1
+        {Diag.Axis1=ax1; Axis2=ax2; Diag.X=x} |> Expr2
+                             
+    /// Extracts the diagonal of a matrix.
+    /// If the expression has more than two dimensions, the diagonals
+    /// are extracted along the last two dimensions.
+    let diag (x: Expr2) = 
+        if x.NDims < 2 then 
+            failwithf "Need at least a matrix to extract diagonal but got shape: %A" x.Shape
+        x |> diagAxis (x.NDims-2) (x.NDims-1)
+
+    /// Build a matrix with the specified diagonal.
+    type DiagMat = {X: Expr2; Axis1: int; Axis2: int} with
+        interface IOp2 with      
+            member this.Check () = 
+                Check.axis this.Axis1 this.X
+                if not (0 <= this.Axis2 && this.Axis2 <= this.X.NDims) then
+                    failwithf "Cannot build diagonal matrix over non-existant axis %d of tensor with shape %A." 
+                              this.Axis2 this.X.Shape
+                if not (this.Axis1 < this.Axis2) then 
+                    failwith "First axis for building diagonal matrix must come before second axis."
+            member this.TypeName = this.X.TypeName
+            member this.Shape = this.X.Shape |> List.insert this.Axis2 this.X.Shape.[this.Axis1]
+            member this.Args = Args.unary this.X
+            member this.ReplaceArgs args = {this with X = Args.unaryX args} :> IOp2
+            member this.SubstSymSizes env = this :> IOp2
+            member this.CanEvalAllSymSizes = true
+            member this.Deriv dOp = Args.unary -dOp // TODO
+            member this.Eval env = (Args.unaryX env.Args).DiagMatAxis this.Axis1 this.Axis2
+    let (|DiagMat|_|) (expr: Expr2) =
+        match expr.Op with
+        | :? DiagMat as this -> Some this
+        | _ -> None   
+
+    /// Creates a diagonal matrix by duplicating the given dimension.
+    let diagMatAxis ax1 ax2 (x: Expr2) = 
+        let ax1, ax2 = if ax1 < ax2 then ax1, ax2 else ax2, ax1
+        {DiagMat.Axis1=ax1; Axis2=ax2; X=x} |> Expr2
+
+    /// Creates a matrix with the given vector on its diagonal. 
+    /// All other elements are zeros.
+    /// If the input has more than one dimension, the operation is
+    /// performed batch-wise on the last dimension.
+    let diagMat (x: Expr2) =
+        if x.NDims < 1 then 
+            failwithf "Need at least a vector to build diagonal matrix but got shape: %A" x.Shape
+        x |> diagMatAxis (x.NDims-1) x.NDims
 
     /// Sum over specified axis.
     type SumAxis = {X: Expr2; Axis: int} with
@@ -707,6 +756,19 @@ module UnaryOps =
     /// summaiton of all elements
     let sum x = 
         x |> Expr2.flatten |> sumAxis 0
+
+    /// Computes the traces along the given axes.
+    let traceAxis ax1 ax2 x =
+        let tax = if ax1 < ax2 then ax1 else ax1 + 1
+        x |> diagAxis ax1 ax2 |> sumAxis tax
+
+    /// Computes the trace of a matrix.
+    /// If the input has more than two dimensions, the traces
+    /// along the last two dimensions are returned.
+    let trace (x: Expr2) =
+        if x.NDims < 2 then
+            failwithf "Need at least a matrix for trace but got shape: %A" x.Shape      
+        x |> traceAxis (x.NDims-2) (x.NDims-1) 
 
     /// Product over specified axis.
     type ProductAxis = {X: Expr2; Axis: int} with
