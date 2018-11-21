@@ -4,52 +4,6 @@ open SymTensor
 open DeepNet.Utils
 open Tensor
 open Tensor.Backend
-open System.Drawing
-
-
-///// A mathematical operation in an expression.
-///// This models a mathematical function or operator that takes one or more tensors
-///// and returns one tensor.
-//type IOp =
-//    inherit System.IComparable
-      
-//    /// Should return the type of the result, given the types of the arguments.
-//    abstract TypeName: argTypes: TypeName list -> TypeName
-
-//    /// Should return the shape of the result, given the shape of the arguments.
-//    abstract Shape: argShapes: ShapeSpec list -> ShapeSpec      
-        
-//    /// Should check if the shapes of the arguments are acceptable and,
-//    /// if not, raise an exception.
-//    abstract CheckArgs: argShapes: ShapeSpec list -> unit      
-
-//    /// Should return the op with all symbolic sizes substituted using the specified
-//    /// substitution table.
-//    /// Return a *new* op with substitution applied. Do not apply the mapping in-place.
-//    abstract SubstSymSizes: symSizes: SymSizeEnv -> IOp
-
-//    /// Should be true, if all symbolic sizes can be evaluated to numeric sizes.
-//    /// This is the case if the function ShapeSpec.canEval or SizeSpec.canEval respectively
-//    /// return true on all sizes used in this op.
-//    abstract CanEvalAllSymSizes: bool
-
-//    /// Should compute the derivative w.r.t. each argument given the derivative w.r.t. the op.
-//    /// The derivative is always an NxM matrix where N is the number of elements of the function
-//    /// the derivative of which is being taken and M is the number of elements of the argument
-//    /// w.r.t. which the derivative is being taken. 
-//    /// Thus, if dOp is an NxK matrix and an argument has M elements, the derivative matrix
-//    /// you return w.r.t. that argument must have NxM elements.
-//    abstract Deriv: dOp:Expr -> args:Expr list -> Expr list
-
-//    /// Should evaluate the numerical value of this op given the numerical values of its arguments.
-//    /// This evaluation should be done on the host using the simplest means possible and is used
-//    /// as a reference implementation for verifying the correctness of optimized (e.g. CUDA) 
-//    /// implementations. This method may be omitted when no verification will be done.
-//    abstract EvalSimple: args:Tensor.Tensor<'T> list -> Tensor.Tensor<'T>
-
-//    /// Should return the set of variables that this op instance depends on.
-//    abstract ContainedVars: Set<Var>
-
 
     
 type ArgsMap = Map<string, Expr2>
@@ -64,6 +18,12 @@ type EvalEnv = {
     /// Argument values.
     Args:   Map<string, ITensor>
 }
+
+
+/// start plus the specified number of (symbolic elements)
+type internal PlusElems (elems: SizeSpec) =
+    new (intElems: int64) = PlusElems (SizeSpec.fix intElems)
+    member this.Elems = elems
 
 /// A mathematical operation in an expression.
 /// This models a mathematical function or operator that takes one or more tensors
@@ -111,10 +71,6 @@ type IOp2 =
     /// implementations. This method may be omitted when no verification will be done.
     abstract Eval: env:EvalEnv -> Tensor.ITensor
 
-    /// Should return the set of variables that this op instance depends on.
-    //abstract ContainedVars: Set<Var>
-
-//type Expr = Expr of IOp * (Expr list)
 
 type Expr2 (op: IOp2) =
     
@@ -128,6 +84,9 @@ type Expr2 (op: IOp2) =
 
     member this.Shape = op.Shape
     static member shape (expr: Expr2) = expr.Shape
+
+    member this.NDims = List.length this.Shape
+    static member nDims (expr: Expr2) = expr.NDims
 
     interface System.IEquatable<Expr2> with
         member this.Equals other = 
@@ -150,6 +109,11 @@ type Expr2 (op: IOp2) =
 
     override this.GetHashCode() =
         hash this.Op
+
+    /// Checks that given axis is valid for specified expression
+    static member internal checkAxis ax (expr: Expr2) =
+        if not (0 <= ax && ax < expr.NDims) then
+            failwithf "Specified axis %d is invalid for expression of shape %A." ax expr.Shape
 
     /// Reshapes the expression into the given shape.
     /// The element count must not change.
@@ -184,6 +148,124 @@ type Expr2 (op: IOp2) =
     static member scalarOfSameType (expr: Expr2) f = 
         let v = System.Convert.ChangeType (box f, expr.TypeName.Type)
         Expr2.scalar v
+
+    /// Permutes the axes as specified.
+    /// Each entry in the specified permutation specifies the *new* position of 
+    /// the corresponding axis, i.e. to which position the axis should move.
+    static member permuteAxes permutation (expr: Expr2) =
+        expr |> OpForwards.PermuteAxes permutation |> Expr2
+
+    /// Swaps two dimensions of a tensor.
+    static member swapDim ax1 ax2 (expr: Expr2) = 
+        expr |> Expr2.checkAxis ax1
+        expr |> Expr2.checkAxis ax2
+        if ax1 = ax2 then expr
+        else
+            let perm = 
+                [0 .. expr.NDims - 1]
+                |> List.map (function
+                             | d when d=ax1 -> ax2
+                             | d when d=ax2 -> ax1
+                             | d -> d)
+            expr |> Expr2.permuteAxes perm
+
+    /// Transpose matrix.
+    /// If the input has more than two dimensions, the last two axes are transposed.
+    static member transpose (expr: Expr2) =
+        if expr.NDims < 2 then invalidArg "expr" "Need at least a matrix to transpose."
+        expr |> Expr2.swapDim (expr.NDims - 2) (expr.NDims - 1)
+
+    /// Transpose matrix.
+    /// If the input has more than two dimensions, the last two axes are transposed.
+    member this.T = Expr2.transpose this
+
+    interface IDynElem
+
+    // item / slicing
+    member this.GetSlice ([<System.ParamArray>] allArgs: obj []) =
+
+        /// converts ints to SizeSpecTs
+        let intToSizeSpec (arg: obj) =
+            match arg with
+            | :? int64 as f -> SizeSpec.fix f :> obj
+            | :? (int64 option) as fo -> 
+                match fo with
+                | Some f -> Some (SizeSpec.fix f) :> obj
+                | None -> None :> obj
+            | _ -> arg
+
+        /// converts argument list to range specification
+        let rec parseArgs (args: obj list) : RangesSpec =
+            match args with
+            // direct range specification
+            | [:? RangesSpec as rngs] -> rngs
+
+            // slices
+            | (:? (SizeSpec option) as so)  :: (:? (SizeSpec option) as fo)    :: rest ->
+                RangeSpec.SymStartSymEnd (so, fo) :: parseArgs rest
+            | (:? (SizeSpec option) as so)  :: null                            :: rest ->
+                RangeSpec.SymStartSymEnd (so, None) :: parseArgs rest
+            | null                          :: (:? (SizeSpec option) as fo)    :: rest ->
+                RangeSpec.SymStartSymEnd (None, fo) :: parseArgs rest
+            | (:? (Expr2 option) as so)     :: (:? (PlusElems option) as fo)   :: rest ->
+                if so.Value.TypeName <> TypeName.ofType<int64> then
+                    failwith "Need expression of type int64 for range start."
+                RangeSpec.DynStartSymSize (so.Value, fo.Value.Elems) :: parseArgs rest
+            | null                           :: null                           :: rest ->
+                RangeSpec.SymStartSymEnd (None, None) :: parseArgs rest
+
+            // items
+            | (:? SizeSpec as s)     :: rest -> RangeSpec.SymElem s :: parseArgs rest
+            | (:? int64 as s)        :: rest when s = Tensor.TensorVal.NewAxis -> RangeSpec.NewAxis :: parseArgs rest
+            | (:? int64 as s)        :: rest when s = Tensor.TensorVal.Fill ->    RangeSpec.AllFill :: parseArgs rest
+            | (:? Expr2 as e)        :: rest -> if e.TypeName <> TypeName.ofType<int64> then
+                                                    failwith "Need expression of type int64 for element index."               
+                                                RangeSpec.DynElem e :: parseArgs rest
+            | []                              -> []
+            | _                               -> failwithf "Invalid item/slice specification: %A" allArgs
+
+        /// converts a full range specification into a simple range specification
+        let rec splitFRS (rngs: RangesSpec) (shps: ShapeSpec) (simpleRs: SimpleRangesSpec) (newShape: ShapeSpec) =
+            match rngs, shps with
+            | RangeSpec.SymElem e :: rngs, _::shps -> splitFRS rngs shps (SimpleRangeSpec.SymStartSymEnd (e, Some e)::simpleRs) newShape
+            | RangeSpec.DynElem e :: rngs, _::shps -> splitFRS rngs shps (SimpleRangeSpec.DynStartSymSize (e, SizeSpec.one)::simpleRs) newShape
+            | RangeSpec.SymStartSymEnd (so, fo) :: rngs, size::shps -> 
+                let size = (fo |? (size-1L)) - (so |? SizeSpec.zero) + 1L
+                splitFRS rngs shps (SimpleRangeSpec.SymStartSymEnd (so |? SizeSpec.zero, fo)::simpleRs) (size::newShape)
+            | RangeSpec.DynStartSymSize (s, size) :: rngs, _::shps ->
+                splitFRS rngs shps (SimpleRangeSpec.DynStartSymSize (s, size)::simpleRs) (size::newShape)
+            | RangeSpec.NewAxis :: rngs, _ ->
+                splitFRS rngs shps simpleRs (SizeSpec.broadcastable::newShape)
+            | RangeSpec.AllFill :: rrngs, _ ->
+                if List.length rngs <= List.length shps then splitFRS (RangeSpec.All::rngs) shps simpleRs newShape
+                else splitFRS rrngs shps simpleRs newShape
+            | [], [] -> List.rev simpleRs, List.rev newShape
+            | _ -> failwith "Item/slice processing error."
+
+        // build full range specificaton
+        let argList = allArgs |> Array.toList |> List.map intToSizeSpec
+
+        let srs, reshp = 
+            match argList with
+            | [:? SimpleRangesSpec as srs] -> 
+                // simplified range specification was specified, use directly
+                srs, (Expr2 (OpForwards.Subtensor srs this)).Shape
+            | [:? RangesSpec as frs] ->
+                // split into simplified range specification and reshape operation
+                splitFRS frs this.Shape [] []
+            | _ ->
+                // parse, then split into simplified range specification and reshape operation
+                splitFRS (argList |> parseArgs) this.Shape [] []
+
+        // emit expression
+        let sub = OpForwards.Subtensor srs this |> Expr2
+        let reshaped = OpForwards.Reshape reshp sub |> Expr2
+        reshaped
+
+    member this.Item 
+        with get ([<System.ParamArray>] allArgs: obj []) = 
+            this.GetSlice (allArgs)
+
 
     /// emits an elementwise binary operation with broadcasting of the inputs if necessary
     static member constructElementwise op (a: Expr2) (b: Expr2) =
@@ -278,6 +360,8 @@ type internal IOpForwards =
     abstract ScalarConst: value:Const -> IOp2
     abstract Reshape: shp:ShapeSpec -> x:Expr2 -> IOp2
     abstract DoBroadcast: shp:ShapeSpec -> x:Expr2 -> IOp2
+    abstract PermuteAxes: perm:int list -> x:Expr2 -> IOp2
+    abstract Subtensor: range:SimpleRangesSpec -> x:Expr2 -> IOp2
 
     abstract UnaryPlus: x:Expr2 -> IOp2
     abstract Negate: x:Expr2 -> IOp2

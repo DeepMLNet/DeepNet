@@ -1,5 +1,6 @@
 ﻿namespace SymTensor
 
+open System
 open DeepNet.Utils
 
 
@@ -84,14 +85,18 @@ module BaseRangesSpec =
             shpElems = rngElems
 
 
+/// Dynamic element specification.
+type IDynElem =
+    inherit IComparable
+
 /// symbolic/dynamic range specification for one dimension
-[<RequireQualifiedAccess>]
-type RangeSpec<'Dyn> = 
+[<RequireQualifiedAccess; StructuralComparison; StructuralEquality>]
+type RangeSpec = 
     // ranges with symbolic size (length)
     | SymElem            of SizeSpec                           
-    | DynElem            of 'Dyn                                
+    | DynElem            of IDynElem
     | SymStartSymEnd     of (SizeSpec option) * (SizeSpec option)
-    | DynStartSymSize    of 'Dyn * SizeSpec                    
+    | DynStartSymSize    of IDynElem * SizeSpec                    
     | NewAxis                                                   
     | AllFill                                                   
     //| RngSymStartDynEnd     of SizeSpecT * ExprT<int>              // size: dynamic
@@ -99,16 +104,16 @@ type RangeSpec<'Dyn> =
     //| RngDynStartSymEnd     of ExprT<int> * SizeSpecT              // size: dynamic
     //| RngDynStartToEnd      of ExprT<int>                          // size: dynamic
 
-    static member All = RangeSpec<'Dyn>.SymStartSymEnd (None, None)
+    static member All = RangeSpec.SymStartSymEnd (None, None)
 
 // symbolic/dynamic subtensor specification
-type RangesSpec<'Dyn> = RangeSpec<'Dyn> list
+type RangesSpec = RangeSpec list
 
 /// Simple range specification for one dimension.
-[<RequireQualifiedAccess; StructuredFormatDisplay("{Pretty}")>]
-type SimpleRangeSpec<'Dyn> =
+[<RequireQualifiedAccess; StructuralComparison; StructuralEquality; StructuredFormatDisplay("{Pretty}")>]
+type SimpleRangeSpec =
     | SymStartSymEnd     of SizeSpec * (SizeSpec option)
-    | DynStartSymSize    of 'Dyn * SizeSpec                    
+    | DynStartSymSize    of IDynElem * SizeSpec                    
 
     member this.Pretty =
         match this with
@@ -116,10 +121,10 @@ type SimpleRangeSpec<'Dyn> =
         | SimpleRangeSpec.SymStartSymEnd (first, None) -> sprintf "%A.." first
         | SimpleRangeSpec.DynStartSymSize (first, size) -> sprintf "D%A..D%A+%A-1" first first size
     
-    static member All = SimpleRangeSpec<'Dyn>.SymStartSymEnd (SizeSpec.zero, None)
+    static member All = SimpleRangeSpec.SymStartSymEnd (SizeSpec.zero, None)
      
     /// evaluate a SimpleRangeSpec to a Tensor.Rng
-    static member eval dynEvaluator (rs: SimpleRangeSpec<'Dyn>) =
+    static member eval (dynEvaluator: IDynElem -> int64) (rs: SimpleRangeSpec) =
         match rs with
         | SimpleRangeSpec.SymStartSymEnd (s, fo) -> 
             Tensor.Rng.Rng (Some (SizeSpec.eval s), Option.map SizeSpec.eval fo)
@@ -127,19 +132,19 @@ type SimpleRangeSpec<'Dyn> =
             let sv = dynEvaluator s
             Tensor.Rng.Rng (Some sv, Some (sv + SizeSpec.eval elems))
 
-    static member canEvalSymbols (rs: SimpleRangeSpec<'Dyn>) =
+    static member canEvalSymbols (rs: SimpleRangeSpec) =
         match rs with
         | SimpleRangeSpec.SymStartSymEnd (s, fo) ->
             SizeSpec.canEval s && Option.forall SizeSpec.canEval fo
         | SimpleRangeSpec.DynStartSymSize (_, elems) ->
             SizeSpec.canEval elems
 
-    static member isDynamic (rs: SimpleRangeSpec<'Dyn>) =
+    static member isDynamic (rs: SimpleRangeSpec) =
         match rs with
         | SimpleRangeSpec.DynStartSymSize _ -> true
         | _ -> false
 
-    static member toBaseRangeSpec (size: SizeSpec) (rs: SimpleRangeSpec<'Dyn>) =
+    static member toBaseRangeSpec (size: SizeSpec) (rs: SimpleRangeSpec) =
         match rs with
         | SimpleRangeSpec.SymStartSymEnd (first, Some last) -> first, last
         | SimpleRangeSpec.SymStartSymEnd (first, None) -> first, size - 1L
@@ -153,7 +158,7 @@ module SimpleRangeSpec =
 
 
 /// Simple range specification for multiple dimensions.
-type SimpleRangesSpec<'Dyn> = SimpleRangeSpec<'Dyn> list
+type SimpleRangesSpec = SimpleRangeSpec list
 
 /// Functions for working with SimpleRangesSpec.
 module SimpleRangesSpec =

@@ -26,7 +26,7 @@ module SymSizeEnv =
         List.map (subst env) shape
 
     /// substitutes all symbols into the simplified range specification
-    let substRange env (srs: SimpleRangesSpec<_>) = 
+    let substRange env (srs: SimpleRangesSpec) = 
         srs
         |> List.map (function
                      | SimpleRangeSpec.SymStartSymEnd (s, fo) -> 

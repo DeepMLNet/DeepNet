@@ -143,17 +143,17 @@ type UnaryOp =
 
     // ==== index reductions ====
     /// inidices of maximums over given dimension
-    | ArgMaxAxis of int
+    | ArgMaxAxis of int             // DONE
     /// inidices of minimums over given dimension
-    | ArgMinAxis of int
+    | ArgMinAxis of int             // DONE
 
     // ==== shape operations ====
     /// reshape tensor; element count does not change
-    | Reshape of ShapeSpec         
+    | Reshape of ShapeSpec          // DONE
     /// broadcast tensor; element count may change
-    | DoBroadcast of ShapeSpec       
+    | DoBroadcast of ShapeSpec      // DONE
     /// permutes the axes of the tensor
-    | PermuteAxes of perm:int list
+    | PermuteAxes of perm:int list  // DONE
     /// subtensor 
     | Subtensor of ExprRngsSpec
     /// reverses the tensor in the given dimension 

@@ -4,9 +4,11 @@ open SymTensor
 
 type internal OpForwards() =
     interface IOpForwards with
-        member __.ScalarConst value = {ScalarConst.Value = value} :> IOp2
-        member __.DoBroadcast shp x = {DoBroadcast.Shape = shp; X=x} :> IOp2
-        member __.Reshape shp x = {Reshape.Shape = shp; X=x} :> IOp2
+        member __.ScalarConst value = {ScalarConst.Value=value} :> IOp2
+        member __.Reshape shp x = {Reshape.Shape=shp; X=x} :> IOp2
+        member __.DoBroadcast shp x = {DoBroadcast.Shape=shp; X=x} :> IOp2
+        member __.PermuteAxes perm x = {PermuteAxes.Permutation=perm; X=x} :> IOp2
+        member __.Subtensor range x = {Subtensor.Range=range; X=x} :> IOp2
 
         member __.UnaryPlus x = {UnaryPlus.X = x} :> IOp2
         member __.Negate x = {Negate.X = x} :> IOp2

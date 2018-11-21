@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup />
+  <PropertyGroup>
+    <Platforms>AnyCPU;x64</Platforms>
+  </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../Tensor/Tensor/Tensor.fsproj" />
   </ItemGroup>

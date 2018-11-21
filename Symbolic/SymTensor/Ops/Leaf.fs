@@ -586,6 +586,53 @@ module UnaryOps =
         | :? DoBroadcast as this -> Some this.X
         | _ -> None
 
+    /// Permute the axes.
+    type PermuteAxes = {X: Expr2; Permutation: int list} with
+        interface IOp2 with      
+            member this.Check () = 
+                if ShapeSpec.nDim this.X.Shape <> List.length this.Permutation then
+                    failwithf "Permutation %A must have same rank as shape %A." this.Permutation this.X.Shape
+                if not (Permutation.is this.Permutation) then
+                    failwithf "%A is not a valid permutation of an %d-dimensional tensor." 
+                              this.Permutation (ShapeSpec.nDim this.X.Shape)
+            member this.TypeName = this.X.TypeName
+            member this.Shape = this.X.Shape |> ShapeSpec.permuteAxes this.Permutation
+            member this.Args = Args.unary this.X
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
+            member this.SubstSymSizes env = this :> IOp2
+            member this.CanEvalAllSymSizes = true
+            member this.Deriv dOp = Args.unary -dOp // TODO
+            member this.Eval env = (Args.unaryX env.Args) |> ITensor.permuteAxes this.Permutation
+    let (|PermuteAxes|_|) (expr: Expr2) =
+        match expr.Op with
+        | :? PermuteAxes as this -> Some this
+        | _ -> None
+
+    /// Read a slice from a tensor.
+    type Subtensor = {X: Expr2; Range: SimpleRangesSpec} with
+        interface IOp2 with      
+            member this.Check () = () // TODO?
+            member this.TypeName = this.X.TypeName
+            member this.Shape = 
+                (this.Range, this.X.Shape)
+                ||> List.map2 (fun sr shp ->
+                    match sr with
+                    | SimpleRangeSpec.SymStartSymEnd (s, fo)    -> (fo |? (shp - SizeSpec.one)) + 1L - s
+                    | SimpleRangeSpec.DynStartSymSize (_, size) -> size)            
+            member this.Args = Args.unary this.X // TODO: expose dynamic range expressions
+            member this.ReplaceArgs args = {this with X = Args.unaryX args } :> IOp2
+            member this.SubstSymSizes env = {this with Range = SymSizeEnv.substRange env this.Range} :> IOp2
+            member this.CanEvalAllSymSizes = SimpleRangesSpec.canEvalSymbols this.Range
+            member this.Deriv dOp = Args.unary -dOp // TODO
+            member this.Eval env = 
+                // TODO: use argument values to evaluate SRS
+                let rng = this.Range |> SimpleRangesSpec.eval (fun _ -> failwith "TODO")
+                (Args.unaryX env.Args).[rng]
+    let (|Subtensor|_|) (expr: Expr2) =
+        match expr.Op with
+        | :? Subtensor as this -> Some this
+        | _ -> None
+
     /// Sum over specified axis.
     type SumAxis = {X: Expr2; Axis: int} with
         interface IOp2 with      
@@ -701,6 +748,57 @@ module UnaryOps =
     /// Minimum of all elements.
     let min x = 
         x |> Expr2.flatten |> minAxis 0
+
+    /// Maximum over specified axis.
+    type ArgMaxAxis = {X: Expr2; Axis: int} with
+        interface IOp2 with      
+            member this.Check () = Check.axis this.Axis this.X
+            member this.TypeName = TypeName.ofType<int64>
+            member this.Shape = this.X.Shape |> ShapeSpec.withoutAxis this.Axis
+            member this.Args = Args.unary this.X
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
+            member this.SubstSymSizes env = this :> IOp2
+            member this.CanEvalAllSymSizes = true
+            member this.Deriv dOp = Args.unary -dOp // TODO
+            member this.Eval env = (Args.unaryX env.Args).ArgMaxAxis this.Axis
+    let (|ArgMaxAxis|_|) (expr: Expr2) =
+        match expr.Op with
+        | :? ArgMaxAxis as this -> Some this.X
+        | _ -> None
+
+    /// Index of maximum over given dimension.
+    let argMaxAxis axis x = 
+        {ArgMaxAxis.Axis=axis; X=x} |> Expr2
+
+    /// Index of maximum over given dimension, while keeping the axis with one (broadcastable) element.
+    let argMaxKeepingAxis axis x =
+        x |> argMaxAxis axis |> Expr2.insertBroadcastAxis axis
+
+    /// Minimum over specified axis.
+    type ArgMinAxis = {X: Expr2; Axis: int} with
+        interface IOp2 with      
+            member this.Check () = Check.axis this.Axis this.X
+            member this.TypeName = TypeName.ofType<int64>
+            member this.Shape = this.X.Shape |> ShapeSpec.withoutAxis this.Axis
+            member this.Args = Args.unary this.X
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
+            member this.SubstSymSizes env = this :> IOp2
+            member this.CanEvalAllSymSizes = true
+            member this.Deriv dOp = Args.unary -dOp // TODO
+            member this.Eval env = (Args.unaryX env.Args).ArgMinAxis this.Axis
+    let (|ArgMinAxis|_|) (expr: Expr2) =
+        match expr.Op with
+        | :? ArgMinAxis as this -> Some this.X
+        | _ -> None
+
+    /// Index of minimum over given dimension.
+    let argMinAxis axis x = 
+        {MinAxis.Axis=axis; X=x} |> Expr2
+
+    /// Index of minimum over given dimension, while keeping the axis with one (broadcastable) element.
+    let argMinKeepingAxis axis x =
+        x |> minAxis axis |> Expr2.insertBroadcastAxis axis
+
 
 
 [<AutoOpen>]
