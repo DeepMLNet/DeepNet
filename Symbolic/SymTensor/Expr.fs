@@ -155,7 +155,7 @@ type UnaryOp =
     /// permutes the axes of the tensor
     | PermuteAxes of perm:int list  // DONE
     /// subtensor 
-    | Subtensor of ExprRngsSpec     // DONE paritally
+    | Subtensor of ExprRngsSpec     // DONE 
     /// reverses the tensor in the given dimension 
     | ReverseAxis of dim:int        // DONE
     /// select elements according to the specified index arrays

@@ -10,6 +10,8 @@ type internal OpForwards() =
         member __.DoBroadcast shp x = {DoBroadcast.Shape=shp; X=x} :> IOp2
         member __.PermuteAxes perm x = {PermuteAxes.Permutation=perm; X=x} :> IOp2
         member __.Subtensor range x = {Subtensor.Range=range; X=x} :> IOp2
+        member __.IsSubtensor expr = isSubtensor expr
+        member __.SetSubtensor range x y = {SetSubtensor.Range=range; X=x; Y=y} :> IOp2
 
         member __.UnaryPlus x = {UnaryPlus.X = x} :> IOp2
         member __.Negate x = {Negate.X = x} :> IOp2

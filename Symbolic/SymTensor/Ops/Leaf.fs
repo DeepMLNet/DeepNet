@@ -27,6 +27,15 @@ module Check =
             failwithf "Cannot apply reduction operation over non-existant axis %d of tensor with shape %A." 
                       ax expr.Shape
 
+    let range (range: SimpleRangesSpec) (x: Expr2) =
+        if range.Length <> x.NDims then
+            failwithf "Invalid range specification for expression of shape %A." x.Shape                
+        range |> List.iter (function 
+            | SimpleRangeSpec.SymStartSymEnd _ -> ()
+            | SimpleRangeSpec.DynStartSymSize (s, _) -> 
+                if (s :?> Expr2).DataType <> typeof<int64> then
+                    failwithf "Dynamic range start must be of type int64.")
+
 module Args =
     //let leaf : ArgsMap = Map.empty
 
@@ -583,7 +592,7 @@ module UnaryOps =
             member this.Eval env = (Args.unaryX env.Args) |> ITensor.reshape (ShapeSpec.eval this.Shape)       
     let (|Reshape|_|) (expr: Expr2) =
         match expr.Op with
-        | :? Reshape as this -> Some this.X
+        | :? Reshape as this -> Some this
         | _ -> None
 
     /// Broadcast.
@@ -612,7 +621,7 @@ module UnaryOps =
             member this.Eval env = (Args.unaryX env.Args) |> ITensor.broadcastTo (ShapeSpec.eval this.Shape)      
     let (|DoBroadcast|_|) (expr: Expr2) =
         match expr.Op with
-        | :? DoBroadcast as this -> Some this.X
+        | :? DoBroadcast as this -> Some this
         | _ -> None
 
     /// Permute the axes.
@@ -639,10 +648,12 @@ module UnaryOps =
 
     let private dynPrefix = "D"
 
+
     /// Read a slice from a tensor.
     type Subtensor = {X: Expr2; Range: SimpleRangesSpec} with
         interface IOp2 with      
-            member this.Check () = () // TODO?
+            member this.Check () = 
+                Check.range this.Range this.X
             member this.TypeName = this.X.TypeName
             member this.Shape = 
                 (this.Range, this.X.Shape)
@@ -677,6 +688,53 @@ module UnaryOps =
     let (|Subtensor|_|) (expr: Expr2) =
         match expr.Op with
         | :? Subtensor as this -> Some this
+        | _ -> None
+
+    /// Replace a slice of a tensor with another tensor.
+    type SetSubtensor = {X: Expr2; Y: Expr2; Range: SimpleRangesSpec} with
+        interface IOp2 with      
+            member this.Check () = 
+                Check.sameType [this.X; this.Y]
+                Check.range this.Range this.X
+                if this.X.NDims <> this.Y.NDims then
+                    failwith "Source and target of SetSubtensor must be of same dimensionality."
+            member this.TypeName = this.X.TypeName
+            member this.Shape = this.X.Shape           
+            member this.Args = 
+                let xyArgs = Args.binary this.X this.Y
+                let dynArgs = 
+                    SimpleRangesSpec.dynElems dynPrefix this.Range
+                    |> Map.map (fun _ v -> v :?> Expr2)
+                Map.join xyArgs dynArgs
+            member this.ReplaceArgs args = 
+                let dynArgs = args |> Map.map (fun _ v -> v :> IDynElem)
+                let range = this.Range |> SimpleRangesSpec.replaceDynElems dynPrefix dynArgs               
+                {this with X=Args.binaryX args; Y=Args.binaryY args; Range=range} :> IOp2
+            member this.SubstSymSizes env = {this with Range = SymSizeEnv.substRange env this.Range} :> IOp2
+            member this.CanEvalAllSymSizes = SimpleRangesSpec.canEvalSymbols this.Range
+            member this.Deriv dOp = Args.unary -dOp // TODO
+            member this.Eval env = 
+                // TODO: dynamic range is always copied to host
+                let dynVals = 
+                    env.Args 
+                    |> Map.filter (fun k _ -> k.StartsWith dynPrefix)
+                    |> Map.map (fun _ v -> Tensor.value (v :?> Tensor<int64>) |> SizeSpec.fix)
+                let range = 
+                    this.Range 
+                    |> SimpleRangesSpec.resolveDynElems dynPrefix dynVals 
+                    |> SimpleRangesSpec.eval
+                let trgt = Args.binaryX env.Args |> ITensor.copy
+                trgt.[range] <- Args.binaryY env.Args
+                trgt
+    let (|SetSubtensor|_|) (expr: Expr2) =
+        match expr.Op with
+        | :? SetSubtensor as this -> Some this
+        | _ -> None
+
+    let internal isSubtensor (expr: Expr2) =
+        match expr with
+        | Reshape {X=Subtensor {Range=range; X=trgtExpr} as subtensorExpr} ->
+            Some (range, subtensorExpr, trgtExpr)
         | _ -> None
 
     /// Reverses the tensor in the specified dimension.

@@ -292,6 +292,14 @@ type Expr2 (op: IOp2) =
         with get ([<System.ParamArray>] allArgs: obj []) = 
             this.GetSlice (allArgs)
 
+    /// Expression a with the specified subtensor replaced with b.
+    static member setSubtensor (trgt: Expr2) (src: Expr2) =
+        match OpForwards.IsSubtensor trgt with
+        | Some (range, subtensorExpr, trgtExpr) ->
+            let srcReshaped = OpForwards.Reshape subtensorExpr.Shape src |> Expr2
+            OpForwards.SetSubtensor range trgtExpr srcReshaped |> Expr2
+        | None ->
+            invalidArg "trgt" "The first argument of setSubtensor must be an item or slice of an expression, i.e. a.[...]."                 
 
     /// emits an elementwise binary operation with broadcasting of the inputs if necessary
     static member constructElementwise op (a: Expr2) (b: Expr2) =
@@ -389,6 +397,8 @@ type internal IOpForwards =
     abstract DoBroadcast: shp:ShapeSpec -> x:Expr2 -> IOp2
     abstract PermuteAxes: perm:int list -> x:Expr2 -> IOp2
     abstract Subtensor: range:SimpleRangesSpec -> x:Expr2 -> IOp2
+    abstract IsSubtensor: expr:Expr2 -> (SimpleRangesSpec * Expr2 * Expr2) option
+    abstract SetSubtensor: range:SimpleRangesSpec -> x:Expr2 -> y:Expr2 -> IOp2
 
     abstract UnaryPlus: x:Expr2 -> IOp2
     abstract Negate: x:Expr2 -> IOp2
