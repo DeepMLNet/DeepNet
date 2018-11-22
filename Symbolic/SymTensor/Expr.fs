@@ -125,7 +125,7 @@ type UnaryOp =
     /// build diagonal matrix along given axes
     | DiagMat of int * int          // DONE
     /// matrix inverse
-    | Invert
+    | Invert                        // DONE
 
     // ==== reductions ====
     /// summation of all elements
@@ -159,9 +159,9 @@ type UnaryOp =
     /// reverses the tensor in the given dimension 
     | ReverseAxis of dim:int        // DONE
     /// select elements according to the specified index arrays
-    | Gather of indices:Expr option list
+    | Gather of indices:Expr option list  // DONE
     /// disperses elements according to the specified index arrays
-    | Scatter of indices:Expr option list * shp:ShapeSpec
+    | Scatter of indices:Expr option list * shp:ShapeSpec // DONE
 
     // ==== variable storage ====
     /// variable write

@@ -518,6 +518,35 @@ module UnaryOps =
         | :? Truncate as this -> Some this.X
         | _ -> None
 
+    /// (Batched) matrix inverse.
+    type Invert = { X: Expr2 } with
+        interface IOp2 with      
+            member this.Check () = 
+                if this.X.NDims < 2 then
+                    failwithf "Need at least a matrix to invert but got shape %A" this.X.Shape
+                if this.X.Shape.[this.X.NDims-2] .<> this.X.Shape.[this.X.NDims-1] then
+                    failwithf "Cannot invert non-square matrix %A along last two axes." this.X.Shape
+            member this.TypeName = this.X.TypeName
+            member this.Shape = this.X.Shape
+            member this.Args = Args.unary this.X
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
+            member this.SubstSymSizes env = this :> IOp2
+            member this.CanEvalAllSymSizes = true
+            member this.Deriv dOp = Args.unary -dOp // TODO
+            member this.Eval env = (Args.unaryX env.Args).Invert ()
+    let (|Invert|_|) (expr: Expr2) =
+        match expr.Op with
+        | :? Invert as this -> Some this.X
+        | _ -> None
+
+    /// Computes the inverse of a matrix.
+    /// If the input has more than two dimensions, the inverses
+    /// along the last two dimensions are returned.
+    /// The inverse of a singular matrix is undefinied.
+    /// No error is raised in that case.
+    let invert (x: Expr2) =
+        {Invert.X=x} |> Expr2
+
     /// Logical not.
     type Not = { X: Expr2 } with
         interface IOp2 with      
@@ -907,8 +936,113 @@ module UnaryOps =
     let argMinKeepingAxis axis x =
         x |> minAxis axis |> Expr2.insertBroadcastAxis axis
 
+    let private listToMap (list: 'a option list) =
+        list 
+        |> List.indexed 
+        |> List.choose (function 
+                        | i, Some v -> Some (sprintf "I%d" i, v)
+                        | _, None -> None)
+        |> Map.ofList
 
-    
+    let private mapToList length (map: Map<string, 'a>) =
+        [0 .. length-1]
+        |> List.map (fun i -> map |> Map.tryFind (sprintf "I%d" i))
+
+    /// Select elements according to the specified index tensors
+    type Gather = {X: Expr2; Indices: Expr2 option list} with
+        interface IOp2 with      
+            member this.Check () = 
+                if this.X.NDims <> this.Indices.Length then
+                    failwithf "Gather source has shape %A but %d index tensors were specified." 
+                              this.X.Shape this.Indices.Length
+                let trgtShape =
+                    match this.Indices |> List.tryPick id with
+                    | Some idx -> idx.Shape
+                    | None -> failwith "Gather needs at least one specified (not None) index expression."  
+                for dim, idx in List.indexed this.Indices do
+                    match idx with
+                    | Some idx when idx.DataType <> typeof<int64> ->
+                        failwithf "All index tensors for gather must be of type int64, but got type %A." idx.DataType
+                    | Some idx when idx.Shape <> trgtShape ->
+                        failwithf "All gather indices must have equal shape, but got shapes %A."
+                                  (this.Indices |> List.map (Option.map Expr2.shape))
+                    | None when dim >= ShapeSpec.nDim trgtShape ->
+                        failwithf "Gather index dimensions beyond the number of target dimensions \
+                                   must not be None."
+                    | _ -> ()
+            member this.TypeName = this.X.TypeName
+            member this.Shape = this.Indices |> List.pick id |> Expr2.shape
+            member this.Args = 
+                let idxArgs = this.Indices |> listToMap                
+                let xArgs = Args.unary this.X
+                Map.join idxArgs xArgs
+            member this.ReplaceArgs args =                
+                {this with X=Args.unaryX args; Indices=mapToList this.Indices.Length args} :> IOp2
+            member this.SubstSymSizes env = this :> IOp2
+            member this.CanEvalAllSymSizes = true
+            member this.Deriv dOp = Args.unary -dOp // TODO
+            member this.Eval env = 
+                let vIndices = env.Args |> mapToList this.Indices.Length
+                (Args.unaryX env.Args).Gather vIndices 
+    let (|Gather|_|) (expr: Expr2) =
+        match expr.Op with
+        | :? Gather as this -> Some this
+        | _ -> None    
+
+    /// Select elements according to the specified index tensors.
+    let gather (indices: Expr2 option list) (x: Expr2) =
+        let someIndices = indices |> List.choose id
+        if List.isEmpty someIndices then
+            failwith "Gather needs at least one specified index tensor."
+        let bcSomeIndices = Expr2.broadcastToSameMany someIndices
+        let rec rebuild idxs repIdxs =
+            match idxs, repIdxs with
+            | Some idx :: rIdxs, repIdx :: rRepIdxs ->
+                Some repIdx :: rebuild rIdxs rRepIdxs
+            | None :: rIdxs, _ -> None :: rebuild rIdxs repIdxs
+            | [], [] -> []
+            | _ -> failwith "unbalanced idxs"
+        let bcIndices = rebuild indices bcSomeIndices
+        {Gather.Indices=bcIndices; X=x} |> Expr2
+
+    /// Disperses elements according to the specified index tensors.
+    type Scatter = {X: Expr2; Indices: Expr2 option list; Shape: ShapeSpec} with
+        interface IOp2 with      
+            member this.Check () = 
+                for dim, idx in List.indexed this.Indices do
+                    match idx with
+                    | Some idx when idx.DataType <> typeof<int64> ->
+                        failwithf "All index tensors for scatter must be of type int64, but got type %A." idx.DataType
+                    | Some idx when idx.Shape <> this.X.Shape ->
+                        failwithf "All scatter indices must have shape of source %A, but got %A." 
+                                  this.X.Shape (this.Indices |> List.map (Option.map Expr2.shape))
+                    | None when dim >= this.X.NDims ->
+                        failwithf "Scatter index dimensions beyond the number of source dimensions \
+                                   must not be None."
+                    | _ -> ()
+            member this.TypeName = this.X.TypeName
+            member this.Shape = this.Shape
+            member this.Args = 
+                let idxArgs = this.Indices |> listToMap                
+                let xArgs = Args.unary this.X
+                Map.join idxArgs xArgs
+            member this.ReplaceArgs args =                
+                {this with X=Args.unaryX args; Indices=mapToList this.Indices.Length args} :> IOp2
+            member this.SubstSymSizes env = this :> IOp2
+            member this.CanEvalAllSymSizes = true
+            member this.Deriv dOp = Args.unary -dOp // TODO
+            member this.Eval env = 
+                let vIndices = env.Args |> mapToList this.Indices.Length
+                (Args.unaryX env.Args).Scatter vIndices (ShapeSpec.eval this.Shape)
+    let (|Scatter|_|) (expr: Expr2) =
+        match expr.Op with
+        | :? Scatter as this -> Some this
+        | _ -> None   
+
+    /// Disperses elements according to the specified index tensors.
+    let scatter (indices: Expr2 option list) (trgtShp: ShapeSpec) (x: Expr2) =
+        let indices = indices |> List.map (Option.map (Expr2.broadcastToShape x.Shape))
+        {Scatter.Indices=indices; Shape=trgtShp; X=x} |> Expr2
 
 [<AutoOpen>]
 module BinaryOps =

@@ -82,6 +82,8 @@ type Expr2 (op: IOp2) =
     member this.TypeName = op.TypeName   
     static member typeName (expr: Expr2) = expr.TypeName
 
+    member this.DataType = this.TypeName.Type
+
     member this.Shape = op.Shape
     static member shape (expr: Expr2) = expr.Shape
 
@@ -140,6 +142,26 @@ type Expr2 (op: IOp2) =
     static member flatten (expr: Expr2) =
         expr |> Expr2.reshape (ShapeSpec.flatten expr.Shape)
 
+    /// pads from the left and broadcasts the argument to the given shape if possible
+    static member broadcastToShape shp (a: Expr2) =
+        let psa = a.Shape |> ShapeSpec.padTo (ShapeSpec.nDim shp)
+        let bsa = psa |> ShapeSpec.broadcastToShape shp
+        a |> Expr2.reshape psa |> Expr2.broadcast bsa        
+
+    /// pads and broadcasts all arguments to same shape if possible
+    static member broadcastToSameMany (es: Expr2 list) =
+        let ss = es |> List.map Expr2.shape
+        let ps = ShapeSpec.padToSameMany ss
+        let bs = ShapeSpec.broadcastToSameMany false ps
+        List.zip3 es ps bs
+        |> List.map (fun (e, p, b) -> e |> Expr2.reshape p |> Expr2.broadcast b)
+
+    /// pads and broadcasts `a` and `b` to same shape if possible
+    static member broadcastToSame (a: Expr2) (b: Expr2) =
+        match Expr2.broadcastToSameMany [a; b] with
+        | [bcA; bcB] -> bcA, bcB
+        | _ -> failwith "impossible"
+
     /// scalar constant of given value
     static member scalar (f: obj) = 
         Expr2 (OpForwards.ScalarConst (Const.ofValue f)) 
@@ -148,6 +170,10 @@ type Expr2 (op: IOp2) =
     static member scalarOfSameType (expr: Expr2) f = 
         let v = System.Convert.ChangeType (box f, expr.TypeName.Type)
         Expr2.scalar v
+
+    /// Scalar with value of given size and type int64.
+    static member size (size: SizeSpec) = 
+        OpForwards.SizeValue size |> Expr2
 
     /// Permutes the axes as specified.
     /// Each entry in the specified permutation specifies the *new* position of 
@@ -358,6 +384,7 @@ type Expr2 (op: IOp2) =
 type internal IOpForwards =   
 
     abstract ScalarConst: value:Const -> IOp2
+    abstract SizeValue: size:SizeSpec -> IOp2
     abstract Reshape: shp:ShapeSpec -> x:Expr2 -> IOp2
     abstract DoBroadcast: shp:ShapeSpec -> x:Expr2 -> IOp2
     abstract PermuteAxes: perm:int list -> x:Expr2 -> IOp2
