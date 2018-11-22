@@ -637,6 +637,8 @@ module UnaryOps =
         | :? PermuteAxes as this -> Some this
         | _ -> None
 
+    let private dynPrefix = "D"
+
     /// Read a slice from a tensor.
     type Subtensor = {X: Expr2; Range: SimpleRangesSpec} with
         interface IOp2 with      
@@ -648,15 +650,30 @@ module UnaryOps =
                     match sr with
                     | SimpleRangeSpec.SymStartSymEnd (s, fo)    -> (fo |? (shp - SizeSpec.one)) + 1L - s
                     | SimpleRangeSpec.DynStartSymSize (_, size) -> size)            
-            member this.Args = Args.unary this.X // TODO: expose dynamic range expressions
-            member this.ReplaceArgs args = {this with X = Args.unaryX args } :> IOp2
+            member this.Args = 
+                let xArgs = Args.unary this.X 
+                let dynArgs = 
+                    SimpleRangesSpec.dynElems dynPrefix this.Range
+                    |> Map.map (fun _ v -> v :?> Expr2)
+                Map.join xArgs dynArgs
+            member this.ReplaceArgs args = 
+                let dynArgs = args |> Map.map (fun _ v -> v :> IDynElem)
+                let range = this.Range |> SimpleRangesSpec.replaceDynElems dynPrefix dynArgs               
+                {this with X=Args.unaryX args; Range=range} :> IOp2
             member this.SubstSymSizes env = {this with Range = SymSizeEnv.substRange env this.Range} :> IOp2
             member this.CanEvalAllSymSizes = SimpleRangesSpec.canEvalSymbols this.Range
             member this.Deriv dOp = Args.unary -dOp // TODO
             member this.Eval env = 
-                // TODO: use argument values to evaluate SRS
-                let rng = this.Range |> SimpleRangesSpec.eval (fun _ -> failwith "TODO")
-                (Args.unaryX env.Args).[rng]
+                // TODO: dynamic range is always copied to host
+                let dynVals = 
+                    env.Args 
+                    |> Map.filter (fun k _ -> k.StartsWith dynPrefix)
+                    |> Map.map (fun _ v -> Tensor.value (v :?> Tensor<int64>) |> SizeSpec.fix)
+                let range = 
+                    this.Range 
+                    |> SimpleRangesSpec.resolveDynElems dynPrefix dynVals 
+                    |> SimpleRangesSpec.eval
+                (Args.unaryX env.Args).[range]
     let (|Subtensor|_|) (expr: Expr2) =
         match expr.Op with
         | :? Subtensor as this -> Some this

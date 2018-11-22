@@ -123,14 +123,22 @@ type SimpleRangeSpec =
     
     static member All = SimpleRangeSpec.SymStartSymEnd (SizeSpec.zero, None)
      
+    ///// evaluate a SimpleRangeSpec to a Tensor.Rng
+    //static member eval (dynEvaluator: IDynElem -> int64) (rs: SimpleRangeSpec) =
+    //    match rs with
+    //    | SimpleRangeSpec.SymStartSymEnd (s, fo) -> 
+    //        Tensor.Rng.Rng (Some (SizeSpec.eval s), Option.map SizeSpec.eval fo)
+    //    | SimpleRangeSpec.DynStartSymSize (s, elems) -> 
+    //        let sv = dynEvaluator s
+    //        Tensor.Rng.Rng (Some sv, Some (sv + SizeSpec.eval elems))
+
     /// evaluate a SimpleRangeSpec to a Tensor.Rng
-    static member eval (dynEvaluator: IDynElem -> int64) (rs: SimpleRangeSpec) =
+    static member eval (rs: SimpleRangeSpec) =
         match rs with
         | SimpleRangeSpec.SymStartSymEnd (s, fo) -> 
             Tensor.Rng.Rng (Some (SizeSpec.eval s), Option.map SizeSpec.eval fo)
         | SimpleRangeSpec.DynStartSymSize (s, elems) -> 
-            let sv = dynEvaluator s
-            Tensor.Rng.Rng (Some sv, Some (sv + SizeSpec.eval elems))
+            failwith "Dynamic elements must be resolved before evaluating a SimpleRangeSpec."
 
     static member canEvalSymbols (rs: SimpleRangeSpec) =
         match rs with
@@ -163,9 +171,13 @@ type SimpleRangesSpec = SimpleRangeSpec list
 /// Functions for working with SimpleRangesSpec.
 module SimpleRangesSpec =
 
+    ///// evaluate a RangesSpecT to a RangeT list
+    //let eval dynEvaluator rs =
+    //    rs |> List.map (SimpleRangeSpec.eval dynEvaluator)
+
     /// evaluate a RangesSpecT to a RangeT list
-    let eval dynEvaluator rs =
-        rs |> List.map (SimpleRangeSpec.eval dynEvaluator)
+    let eval rs =
+        rs |> List.map SimpleRangeSpec.eval
 
     let isDynamic rs =
         rs |> List.exists SimpleRangeSpec.isDynamic
@@ -179,4 +191,30 @@ module SimpleRangesSpec =
     let toBaseRangesSpec (shape: ShapeSpec) rs =
         (shape, rs) ||> List.map2 SimpleRangeSpec.toBaseRangeSpec
 
+    /// Returns a map of all dynamic elements within the specified range.
+    let dynElems (prefix: string) (srs: SimpleRangesSpec) =
+        srs 
+        |> List.indexed
+        |> List.choose (function
+                        | _, SimpleRangeSpec.SymStartSymEnd _  -> None
+                        | i, SimpleRangeSpec.DynStartSymSize (s, _) -> Some (sprintf "%s%d" prefix i, s))
+        |> Map.ofList
 
+    /// Replaces all dynamic elements within the specified range using the specified replacement map.
+    let replaceDynElems (prefix: string) (map: Map<string, IDynElem>) (srs: SimpleRangesSpec) : SimpleRangesSpec =
+        srs
+        |> List.indexed
+        |> List.map (function
+                     | _, (SimpleRangeSpec.SymStartSymEnd _ as r) -> r
+                     | i, SimpleRangeSpec.DynStartSymSize (s, elems) -> 
+                        SimpleRangeSpec.DynStartSymSize (map.[sprintf "%s%d" prefix i], elems))
+
+    /// Replaces all dynamic elements within the specified range using the specified replacement map.
+    let resolveDynElems (prefix: string) (map: Map<string, SizeSpec>) (srs: SimpleRangesSpec) : SimpleRangesSpec =
+        srs
+        |> List.indexed
+        |> List.map (function
+                     | _, (SimpleRangeSpec.SymStartSymEnd _ as r) -> r
+                     | i, SimpleRangeSpec.DynStartSymSize (s, elems) -> 
+                        let s = map.[sprintf "%s%d" prefix i]
+                        SimpleRangeSpec.SymStartSymEnd (s, Some (s + elems)))
