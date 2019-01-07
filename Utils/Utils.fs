@@ -546,6 +546,18 @@ module internal String =
                 | _ -> s + "..."
             )
 
+/// Integer extensions            
+module internal Int32 =
+
+    /// Parses an integer.
+    let tryParse (s: string) : Int32 option =
+        let mutable result: Int32 = 0
+        if Int32.TryParse(s, ref result) then
+            Some result
+        else
+            None
+
+
 /// Exception helpers
 [<AutoOpen>]
 module internal Exception =

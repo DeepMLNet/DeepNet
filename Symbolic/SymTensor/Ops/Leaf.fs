@@ -46,6 +46,18 @@ module Args =
     let binaryX (am: Map<string, _>) = am.["X"]
     let binaryY (am: Map<string, _>) = am.["Y"]
 
+    let nary xs : ArgsMap =
+        xs |> List.indexed |> List.map (fun (i,v) -> i.ToString(), v) |> Map.ofList
+    let naryXs (am: Map<string, _>) =
+        let xs = 
+            am 
+            |> Map.toList 
+            |> List.choose (fun (s,v) -> 
+                s |> Int32.tryParse |> Option.map (fun i -> i,v))
+            |> List.sortBy fst 
+        if [0 .. xs.Length-1] <> List.map fst xs then
+            failwithf "Cannot convert argument map to argument list: %A" am
+        xs |> List.map snd
 
 //[<AutoOpen>]
 //module private DerivUtils =
@@ -1725,3 +1737,81 @@ module BinaryOps =
             let ifFalseBc = ifFalse |> Expr2.reshape ifFalsePShp |> Expr2.broadcast ifFalseBcShp
             {IfThenElse.Cond=condBc; IfTrue=ifTrueBc; IfFalse=ifFalseBc} |> Expr2
         | _ -> failwith "impossible"
+
+
+[<AutoOpen>]
+module NaryOps = 
+
+    /// Discards the results of all arguments.
+    type Discard = {Xs: Expr2 list} with
+        interface IOp2 with       
+            member this.Check () = ()
+            member this.TypeName = TypeName.ofType<int32>
+            member this.Shape = ShapeSpec.emptyVector
+            member this.Args = Args.nary this.Xs
+            member this.ReplaceArgs args = {this with Xs=Args.naryXs args} :> IOp2
+            member this.SubstSymSizes env = this :> IOp2
+            member this.CanEvalAllSymSizes = true
+            member this.Deriv dOp = Args.binary dOp dOp // TODO
+            member this.Eval env = HostTensor.zeros<int32> [0L] :> ITensor
+    let (|Discard|_|) (expr: Expr2) =
+        match expr.Op with
+        | :? Discard as this -> Some (this.Xs)
+        | _ -> None
+
+    /// Discards the results of all arguments.
+    let discard (xs: Expr2 list) =
+        {Discard.Xs=xs} |> Expr2
+
+    /// Build tensor using numeric ranges.
+    type BuildTensor = {Shape: ShapeSpec; Ranges: BaseRangesSpec list; Xs: Expr2 list} with
+        interface IOp2 with       
+            member this.Check () = 
+                Check.sameType this.Xs
+                if this.Ranges.Length <> this.Xs.Length then
+                    failwithf "BuildTensor ranges must match arguments, but got %d ranges and %d arguments."
+                               this.Ranges.Length this.Xs.Length
+                match ShapeSpec.tryEval this.Shape with
+                | Some shp ->
+                    for rng, arg in List.zip this.Ranges this.Xs do
+                        if rng.Length <> shp.Length then
+                            failwithf "BuildTensor range %A has wrong dimensionality for shape %A." rng shp
+                        for (start, stop), size, argSize in List.zip3 rng shp arg.Shape do
+                            if argSize <> stop - start + 1L then
+                                failwithf "BuildTensor range %A is invalid for argument of shape %A." rng arg.Shape
+                            match SizeSpec.tryEval start, SizeSpec.tryEval stop with
+                            | Some start, Some stop when not (0L <= start && start < size && 0L <= stop && 
+                                                                stop < size && start <= stop) ->
+                                failwithf "BuildTensor range %A is invalid for shape %A." rng shp
+                            | _, _ -> ()
+                | None -> ()       
+            member this.TypeName = this.Xs.Head.TypeName
+            member this.Shape = this.Shape
+            member this.Args = Args.nary this.Xs
+            member this.ReplaceArgs args = {this with Xs=Args.naryXs args} :> IOp2
+            member this.SubstSymSizes env = 
+                let sSize = SizeSpec.substSymbols env
+                {this with Shape=ShapeSpec.substSymbols env this.Shape
+                           Ranges=this.Ranges |> List.map (List.map (fun (f,l) -> sSize f, sSize l))} :> IOp2
+            member this.CanEvalAllSymSizes = 
+                ShapeSpec.canEval this.Shape &&
+                List.forall BaseRangesSpec.canEval this.Ranges
+            member this.Deriv dOp = Args.binary dOp dOp // TODO
+            member this.Eval env = 
+                let trgt = HostTensor.zeros<'R> (ShapeSpec.eval this.Shape)
+                let vs = Args.naryXs env.Args
+                for rng, e in List.zip this.Ranges vs do                            
+                    let aryRng = rng |> List.map (fun (first, last) -> 
+                        Rng.Rng (Some (SizeSpec.eval first), Some (SizeSpec.eval last)))
+                    trgt.[aryRng] <- e 
+                trgt :> ITensor
+    let (|BuildTensor|_|) (expr: Expr2) =
+        match expr.Op with
+        | :? BuildTensor as this -> Some this
+        | _ -> None
+
+    /// Build tensor from numeric ranges.
+    let internal buildTensor shape ranges xs =
+        {BuildTensor.Shape=shape; Ranges=ranges; Xs=xs} |> Expr2
+
+    

@@ -244,7 +244,7 @@ type BinaryOp =
 type NaryOp =
 
     /// evaluate all subexpressions but discard them
-    | Discard        
+    | Discard        // DONE
     /// build tensor using numeric ranges
     | BuildTensor of shp:ShapeSpec * rngs:BaseRangesSpec list
     /// elementwise calculated tensor
