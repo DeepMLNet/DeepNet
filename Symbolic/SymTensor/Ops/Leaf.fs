@@ -1538,3 +1538,43 @@ module BinaryOps =
     let tensorProduct (x: Expr2) (y: Expr2) =
         {TensorProduct.X=x; Y=y} |> Expr2
 
+
+    /// Element-wise if-then-else.
+    type IfThenElse = {Cond: Expr2; IfTrue: Expr2; IfFalse: Expr2} with
+        interface IOp2 with       
+            member this.Check () = 
+                Check.sameType [this.IfTrue; this.IfFalse]
+                Check.bool [this.Cond]
+                Check.sameShape [this.Cond; this.IfTrue; this.IfFalse]
+            member this.TypeName = this.IfTrue.TypeName
+            member this.Shape = this.IfTrue.Shape
+            member this.Args = 
+                Map ["Cond", this.Cond
+                     "IfTrue", this.IfTrue
+                     "IfFalse", this.IfFalse]
+            member this.ReplaceArgs args = 
+                {this with Cond=args.["Cond"]
+                           IfTrue=args.["IfTrue"]
+                           IfFalse=args.["IfFalse"]} :> IOp2
+            member this.SubstSymSizes env = this :> IOp2
+            member this.CanEvalAllSymSizes = true
+            member this.Deriv dOp = Args.binary dOp dOp
+            member this.Eval env = 
+                env.Args.["IfTrue"].IfThenElse env.Args.["IfFalse"] env.Args.["Cond"]
+    let (|IfThenElse|_|) (expr: Expr2) =
+        match expr.Op with
+        | :? IfThenElse as this -> Some this
+        | _ -> None
+
+    /// Elementwise uses elements from ifTrue if cond is true, otherwise elements from ifFalse.
+    let ifThenElse (cond: Expr2) (ifTrue: Expr2) (ifFalse: Expr2) =
+        let shps = [cond.Shape; ifTrue.Shape; ifFalse.Shape]
+        let pShps = ShapeSpec.padToSameMany shps
+        let bcShps = ShapeSpec.broadcastToSameMany false pShps           
+        match pShps, bcShps with
+        | [condPShp; ifTruePShp; ifFalsePShp], [condBcShp; ifTrueBcShp; ifFalseBcShp] -> 
+            let condBc = cond |> Expr2.reshape condPShp |> Expr2.broadcast condBcShp
+            let ifTrueBc = ifTrue |> Expr2.reshape ifTruePShp |> Expr2.broadcast ifTrueBcShp
+            let ifFalseBc = ifFalse |> Expr2.reshape ifFalsePShp |> Expr2.broadcast ifFalseBcShp
+            {IfThenElse.Cond=condBc; IfTrue=ifTrueBc; IfFalse=ifFalseBc} |> Expr2
+        | _ -> failwith "impossible"

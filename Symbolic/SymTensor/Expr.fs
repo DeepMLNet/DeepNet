@@ -227,7 +227,7 @@ type BinaryOp =
     | Or                // DONE
 
     // ==== element-wise conditional ====
-    | IfThenElse of Expr
+    | IfThenElse of Expr  // DONE
 
     // ==== matrix/tensor operations ====
     /// matrix*matrix => matrix dot product
