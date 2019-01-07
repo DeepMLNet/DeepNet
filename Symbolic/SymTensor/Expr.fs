@@ -169,9 +169,9 @@ type UnaryOp =
 
     // ==== misc ====
     /// nullifies the Jacobian of its argument when calculating derivatives
-    | NullifyJacobian
+    | NullifyJacobian               // DONE
     /// assumes the specified Jacobian for its argument when calculating derivatives
-    | AssumeJacobian of Expr
+    | AssumeJacobian of Expr        // DONE
     /// prints the value together with the given string
     | Print of string
     /// dumps the value into the given dataset in the active HDF5 dump file

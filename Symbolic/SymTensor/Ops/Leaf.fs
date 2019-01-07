@@ -1149,6 +1149,58 @@ module UnaryOps =
         | _ -> None
 
 
+    /// Sets the Jacobian of its argument to zero when calculating derivatives.
+    type AssumeZeroDeriv = { X: Expr2 } with
+        interface IOp2 with      
+            member this.Check () = ()
+            member this.TypeName = this.X.TypeName
+            member this.Shape = this.X.Shape
+            member this.Args = Args.unary this.X
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
+            member this.SubstSymSizes env = this :> IOp2
+            member this.CanEvalAllSymSizes = true
+            member this.Deriv dOp = Args.unary dOp // TODO
+            member this.Eval env = Args.unaryX env.Args
+    let (|AssumeZeroDeriv|_|) (expr: Expr2) =
+        match expr.Op with
+        | :? AssumeZeroDeriv as this -> Some this.X
+        | _ -> None
+    
+    /// Nullifies the Jacobian of its argument when calculating derivatives.
+    let assumeZeroDeriv x =
+        {AssumeZeroDeriv.X=x} |> Expr2
+
+
+    /// Sets the Jacobian of its argument to zero when calculating derivatives.
+    type AssumeDeriv = {Deriv: Expr2; X: Expr2} with
+        interface IOp2 with      
+            member this.Check () = 
+                Check.sameType [this.Deriv; this.X]
+                if this.Deriv.NDims <> 2 then
+                    failwithf "Jacobian shape %A must be two-dimensional." this.Deriv.Shape
+                if this.Deriv.Shape.[1] <> this.X.NElems then
+                    failwithf "Jacobian shape %A must have %A elements in second dimension." 
+                        this.Deriv.Shape this.X.NElems
+            member this.TypeName = this.X.TypeName
+            member this.Shape = this.X.Shape
+            member this.Args =                 
+                Map.join (Args.unary this.X) (Map ["Deriv", this.Deriv])                
+            member this.ReplaceArgs args = 
+                {this with Deriv=args.["Deriv"]; X=Args.unaryX args} :> IOp2
+            member this.SubstSymSizes env = this :> IOp2
+            member this.CanEvalAllSymSizes = true
+            member this.Deriv dOp = Args.unary dOp // TODO
+            member this.Eval env = Args.unaryX env.Args
+    let (|AssumeDeriv|_|) (expr: Expr2) =
+        match expr.Op with
+        | :? AssumeDeriv as this -> Some this
+        | _ -> None
+    
+    /// Assumes the specified Jacobian when calculating derivatives.
+    let assumeDeriv deriv x =
+        {AssumeDeriv.Deriv=deriv; X=x} |> Expr2
+
+
 [<AutoOpen>]
 module BinaryOps =
 
@@ -1566,7 +1618,7 @@ module BinaryOps =
         | :? IfThenElse as this -> Some this
         | _ -> None
 
-    /// Elementwise uses elements from ifTrue if cond is true, otherwise elements from ifFalse.
+    /// Elementwise uses elements from `ifTrue` if `cond` is true for that element, otherwise elements from `ifFalse`.
     let ifThenElse (cond: Expr2) (ifTrue: Expr2) (ifFalse: Expr2) =
         let shps = [cond.Shape; ifTrue.Shape; ifFalse.Shape]
         let pShps = ShapeSpec.padToSameMany shps

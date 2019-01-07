@@ -90,6 +90,9 @@ type Expr2 (op: IOp2) =
     member this.NDims = List.length this.Shape
     static member nDims (expr: Expr2) = expr.NDims
 
+    member this.NElems = List.fold (*) SizeSpec.one this.Shape
+    static member nElems (expr: Expr2) = expr.NElems
+
     interface System.IEquatable<Expr2> with
         member this.Equals other = 
             this.Op.Equals other.Op
