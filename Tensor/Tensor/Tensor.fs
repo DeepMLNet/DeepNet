@@ -3622,6 +3622,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         member a.Round () = Tensor<'T>.Round a :> ITensor
         member a.Truncate () = Tensor<'T>.Truncate a :> ITensor
         member a.IsFinite () = Tensor<'T>.isFinite a :> ITensor
+        member a.AllFinite () = Tensor<'T>.allFinite a
 
         member a.Add b = a + (b :?> Tensor<'T>) :> ITensor
         member a.Subtract b = a - (b :?> Tensor<'T>) :> ITensor

@@ -1148,7 +1148,6 @@ module UnaryOps =
         | :? Store as this -> Some this
         | _ -> None
 
-
     /// Sets the Jacobian of its argument to zero when calculating derivatives.
     type AssumeZeroDeriv = { X: Expr2 } with
         interface IOp2 with      
@@ -1169,7 +1168,6 @@ module UnaryOps =
     /// Nullifies the Jacobian of its argument when calculating derivatives.
     let assumeZeroDeriv x =
         {AssumeZeroDeriv.X=x} |> Expr2
-
 
     /// Sets the Jacobian of its argument to zero when calculating derivatives.
     type AssumeDeriv = {Deriv: Expr2; X: Expr2} with
@@ -1199,6 +1197,103 @@ module UnaryOps =
     /// Assumes the specified Jacobian when calculating derivatives.
     let assumeDeriv deriv x =
         {AssumeDeriv.Deriv=deriv; X=x} |> Expr2
+
+    /// Annotation (no influence on value).
+    type Annotated = {Label: System.IComparable; X: Expr2} with
+        interface IOp2 with      
+            member this.Check () = ()
+            member this.TypeName = this.X.TypeName
+            member this.Shape = this.X.Shape
+            member this.Args = Args.unary this.X
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
+            member this.SubstSymSizes env = this :> IOp2
+            member this.CanEvalAllSymSizes = true
+            member this.Deriv dOp = Args.unary dOp 
+            member this.Eval env = Args.unaryX env.Args                  
+    let (|Annotated|_|) (expr: Expr2) =
+        match expr.Op with
+        | :? Annotated as this -> Some this
+        | _ -> None
+
+    /// Annotated expression (no influence on value).
+    let annotate label x = 
+        {Annotated.Label=label; X=x} |> Expr2
+    
+    /// Prints the value together with the given label.
+    type Print = {Label: string; X: Expr2} with
+        interface IOp2 with      
+            member this.Check () = ()
+            member this.TypeName = this.X.TypeName
+            member this.Shape = this.X.Shape
+            member this.Args = Args.unary this.X
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
+            member this.SubstSymSizes env = this :> IOp2
+            member this.CanEvalAllSymSizes = true
+            member this.Deriv dOp = Args.unary dOp 
+            member this.Eval env = 
+                let v = Args.unaryX env.Args
+                printfn "%s=\n%A\n" this.Label v
+                v                            
+    let (|Print|_|) (expr: Expr2) =
+        match expr.Op with
+        | :? Print as this -> Some this
+        | _ -> None
+    
+    /// Print the result with the given label when evaluated.
+    let print label x =
+        {Print.Label=label; X=x} |> Expr2
+
+    /// Dumps the result into the given dataset in the active HDF5 dump file.
+    type Dump = {Dataset: string; X: Expr2} with
+        interface IOp2 with      
+            member this.Check () = ()
+            member this.TypeName = this.X.TypeName
+            member this.Shape = this.X.Shape
+            member this.Args = Args.unary this.X
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
+            member this.SubstSymSizes env = this :> IOp2
+            member this.CanEvalAllSymSizes = true
+            member this.Deriv dOp = Args.unary dOp 
+            member this.Eval env = 
+                let v = Args.unaryX env.Args
+                Dump.dumpValue this.Dataset v
+                v                            
+    let (|Dump|_|) (expr: Expr2) =
+        match expr.Op with
+        | :? Dump as this -> Some this
+        | _ -> None
+
+    /// Dumps the result into the given dataset in the active HDF5 dump file.
+    let dump dataset x =
+        {Dump.Dataset=dataset; X=x} |> Expr2
+
+    /// If the value contains NaNs or infinities, outputs their location and 
+    /// stops the computation.
+    type CheckFinite = {Label: string; X: Expr2} with
+        interface IOp2 with      
+            member this.Check () = ()
+            member this.TypeName = this.X.TypeName
+            member this.Shape = this.X.Shape
+            member this.Args = Args.unary this.X
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
+            member this.SubstSymSizes env = this :> IOp2
+            member this.CanEvalAllSymSizes = true
+            member this.Deriv dOp = Args.unary dOp 
+            member this.Eval env = 
+                let v = Args.unaryX env.Args
+                if not (v.AllFinite ()) then
+                    printfn "Infinity or NaN encountered in %s with value:\n%A" this.Label v
+                    failwithf "Infinity or NaN encountered in %s." this.Label
+                v                            
+    let (|CheckFinite|_|) (expr: Expr2) =
+        match expr.Op with
+        | :? CheckFinite as this -> Some this
+        | _ -> None
+
+    /// If the value contains NaNs or infinities, outputs their location and 
+    /// stops the computation.
+    let checkFinite label x =
+        {CheckFinite.Label=label; X=x} |> Expr2
 
 
 [<AutoOpen>]

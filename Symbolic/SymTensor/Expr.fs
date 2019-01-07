@@ -173,14 +173,14 @@ type UnaryOp =
     /// assumes the specified Jacobian for its argument when calculating derivatives
     | AssumeJacobian of Expr        // DONE
     /// prints the value together with the given string
-    | Print of string
+    | Print of string               // DONE
     /// dumps the value into the given dataset in the active HDF5 dump file
-    | Dump of string
+    | Dump of string                // DONE
     /// checks the value for NaNs and infinities, outputs their location and 
     /// stops the computation
-    | CheckFinite of string
+    | CheckFinite of string         // DONE
     /// annotation (no influence on value)
-    | Annotated of string       
+    | Annotated of string           // DONE
     /// an op that will expand into an expression once symbolic sizes have
     /// been substituted
     | Held of derivsShp:ShapeSpec list * op:UnaryHeldOp

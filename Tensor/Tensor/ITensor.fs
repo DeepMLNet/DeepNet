@@ -149,6 +149,7 @@ type ITensor =
     abstract Round: unit -> ITensor
     abstract Truncate: unit -> ITensor
     abstract IsFinite: unit -> ITensor
+    abstract AllFinite: unit -> bool
 
     // type-neutral binary operations
     abstract Add: ITensor -> ITensor

@@ -26,6 +26,7 @@
     <Compile Include="Elem/Interpreter.fs" />
     <Compile Include="Elem/Deriv.fs" />
     <Compile Include="Interpolator.fs" />
+    <Compile Include="Dump.fs" />
     <Compile Include="Ops/Op.fs" />
     <Compile Include="Ops/Leaf.fs" />
     <Compile Include="Ops/Unary.fs" />
@@ -37,7 +38,6 @@
     <Compile Include="Optimizer.fs" />
     <Compile Include="UExpr.fs" />
     <Compile Include="TensorManikin.fs" />
-    <Compile Include="Dump.fs" />
     <Compile Include="Trace.fs" />
     <Compile Include="ExecUnitTypes.fs" />
     <Compile Include="DiagnosticsVisualizer.fs" />
