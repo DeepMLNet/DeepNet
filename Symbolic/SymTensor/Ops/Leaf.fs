@@ -846,7 +846,7 @@ module UnaryOps =
             member this.Eval env = (Args.unaryX env.Args).SumAxis this.Axis 
     let (|SumAxis|_|) (expr: Expr2) =
         match expr.Op with
-        | :? SumAxis as this -> Some this.X
+        | :? SumAxis as this -> Some this
         | _ -> None
 
     /// summation over given dimension
@@ -888,7 +888,7 @@ module UnaryOps =
             member this.Eval env = (Args.unaryX env.Args).ProductAxis this.Axis
     let (|ProductAxis|_|) (expr: Expr2) =
         match expr.Op with
-        | :? ProductAxis as this -> Some this.X
+        | :? ProductAxis as this -> Some this
         | _ -> None
 
     /// product over given dimension
@@ -917,7 +917,7 @@ module UnaryOps =
             member this.Eval env = (Args.unaryX env.Args).MaxAxis this.Axis
     let (|MaxAxis|_|) (expr: Expr2) =
         match expr.Op with
-        | :? MaxAxis as this -> Some this.X
+        | :? MaxAxis as this -> Some this
         | _ -> None
 
     /// Maximum over given dimension.
@@ -946,7 +946,7 @@ module UnaryOps =
             member this.Eval env = (Args.unaryX env.Args).MinAxis this.Axis
     let (|MinAxis|_|) (expr: Expr2) =
         match expr.Op with
-        | :? MinAxis as this -> Some this.X
+        | :? MinAxis as this -> Some this
         | _ -> None
 
     /// Minimum over given dimension.
@@ -975,7 +975,7 @@ module UnaryOps =
             member this.Eval env = (Args.unaryX env.Args).ArgMaxAxis this.Axis
     let (|ArgMaxAxis|_|) (expr: Expr2) =
         match expr.Op with
-        | :? ArgMaxAxis as this -> Some this.X
+        | :? ArgMaxAxis as this -> Some this
         | _ -> None
 
     /// Index of maximum over given dimension.
@@ -1000,7 +1000,7 @@ module UnaryOps =
             member this.Eval env = (Args.unaryX env.Args).ArgMinAxis this.Axis
     let (|ArgMinAxis|_|) (expr: Expr2) =
         match expr.Op with
-        | :? ArgMinAxis as this -> Some this.X
+        | :? ArgMinAxis as this -> Some this
         | _ -> None
 
     /// Index of minimum over given dimension.
@@ -1118,6 +1118,36 @@ module UnaryOps =
     let scatter (indices: Expr2 option list) (trgtShp: ShapeSpec) (x: Expr2) =
         let indices = indices |> List.map (Option.map (Expr2.broadcastToShape x.Shape))
         {Scatter.Indices=indices; Shape=trgtShp; X=x} |> Expr2
+
+    /// Store value to variable.
+    type Store = {X: Expr2; Var: Var} with
+        interface IOp2 with       
+            member this.Check () = 
+                if this.X.TypeName <> this.Var.TypeName then
+                    failwithf "Cannot store expression of type %A into variable of type %A."
+                              this.X.TypeName this.Var.TypeName
+                if not (ShapeSpec.equalWithoutBroadcastability this.X.Shape this.Var.Shape) then
+                    failwithf "Cannot store expression of shape %A into variable of shape %A." 
+                              this.X.Shape this.Var.Shape                
+            member this.TypeName = this.X.TypeName
+            member this.Shape = ShapeSpec.emptyVector
+            member this.Args = Args.unary this.X
+            member this.ReplaceArgs args = 
+                {this with X=Args.unaryX args} :> IOp2
+            member this.SubstSymSizes env = 
+                {this with Var={this.Var with Shape=SymSizeEnv.substShape env this.Var.Shape}} :> IOp2
+            member this.CanEvalAllSymSizes = ShapeSpec.canEval this.Var.Shape
+            member this.Deriv dOp = Map.empty
+            member this.Eval env = 
+                let tv = env.VarEnv |> VarEnv.get this.Var 
+                let v = Args.unaryX env.Args                
+                tv.CopyFrom (v.Transfer tv.Dev)
+                v.ZerosOfSameType v.Dev [0L]
+    let (|Store|_|) (expr: Expr2) =
+        match expr.Op with
+        | :? Store as this -> Some this
+        | _ -> None
+
 
 [<AutoOpen>]
 module BinaryOps =

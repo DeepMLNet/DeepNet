@@ -391,6 +391,7 @@ type Expr2 (op: IOp2) =
 [<AllowNullLiteral>]
 type internal IOpForwards =   
 
+    abstract Var: var:Var -> IOp2
     abstract ScalarConst: value:Const -> IOp2
     abstract SizeValue: size:SizeSpec -> IOp2
     abstract Reshape: shp:ShapeSpec -> x:Expr2 -> IOp2
@@ -421,8 +422,8 @@ type internal IOpForwards =
     abstract Floor: x:Expr2 -> IOp2
     abstract Round: x:Expr2 -> IOp2
     abstract Truncate: x:Expr2 -> IOp2
-
     abstract Not: x:Expr2 -> IOp2
+    abstract Store: var:Var -> x:Expr2 -> IOp2
 
     abstract Add: x:Expr2 -> y:Expr2 -> IOp2
     abstract Subtract: x:Expr2 -> y:Expr2 -> IOp2
@@ -430,18 +431,15 @@ type internal IOpForwards =
     abstract Divide: x:Expr2 -> y:Expr2 -> IOp2
     abstract Pow: x:Expr2 -> y:Expr2 -> IOp2
     abstract Modulo: x:Expr2 -> y:Expr2 -> IOp2
-
     abstract And: x:Expr2 -> y:Expr2 -> IOp2
     abstract Or: x:Expr2 -> y:Expr2 -> IOp2
     abstract Xor: x:Expr2 -> y:Expr2 -> IOp2
-
     abstract Equal: x:Expr2 -> y:Expr2 -> IOp2
     abstract NotEqual: x:Expr2 -> y:Expr2 -> IOp2
     abstract Less: x:Expr2 -> y:Expr2 -> IOp2
     abstract LessOrEqual: x:Expr2 -> y:Expr2 -> IOp2
     abstract Greater: x:Expr2 -> y:Expr2 -> IOp2
     abstract GreaterOrEqual: x:Expr2 -> y:Expr2 -> IOp2
-
     abstract Dot: x:Expr2 -> y:Expr2 -> Expr2
 
 [<AutoOpen>]

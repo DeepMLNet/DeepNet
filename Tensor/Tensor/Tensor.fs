@@ -3503,8 +3503,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         member this.Storage = this.Storage :> ITensorStorage
         member this.Dev = this.Dev
         member this.Copy (?order) = this.Copy (?order=order) :> ITensor
+        member this.CopyFrom src = this.CopyFrom (src :?> Tensor<'T>)
         member this.Transfer (dev) = this.Transfer (dev) :> ITensor
         member this.FillZero () = this.FillConst zero<'T>
+        member this.ZerosOfSameType dev shape = Tensor<'T>.zeros dev shape :> ITensor
         member this.Pretty = this.Pretty
         member this.Full = this.Full
 

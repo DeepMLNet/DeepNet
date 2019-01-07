@@ -165,7 +165,7 @@ type UnaryOp =
 
     // ==== variable storage ====
     /// variable write
-    | StoreToVar of Var
+    | StoreToVar of Var             // DONE
 
     // ==== misc ====
     /// nullifies the Jacobian of its argument when calculating derivatives
@@ -237,7 +237,7 @@ type BinaryOp =
         
     // ==== shape operations ====
     /// replace subtensor
-    | SetSubtensor of ExprRngsSpec                 
+    | SetSubtensor of ExprRngsSpec      // DONE?           
 
 /// ops with an arbitrary exprs as arguments
 [<StructuralComparison; StructuralEquality>] 

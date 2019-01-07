@@ -38,12 +38,16 @@ type ITensor =
 
     /// a tensor with the same storage but new layout
     abstract Relayout:          TensorLayout -> ITensor
-    /// returns a copy of the tensor
+    /// Returns a copy of the tensor.
     abstract Copy:              ?order:TensorOrder -> ITensor
+    /// Fills this tensor with a copy of the specified tensor.
+    abstract CopyFrom:          src:ITensor -> unit
     /// Transfers this tensor to the specifed device.
     abstract Transfer:          dev:ITensorDevice -> ITensor
     /// fills the tensors with zeros
     abstract FillZero:          unit -> unit
+    /// Tensor of same type filled with zeros.
+    abstract ZerosOfSameType:   dev:ITensorDevice -> shape:int64 list -> ITensor
 
     /// Element selection using boolean mask. Specify NoMask for a dimension if no masking is desired.   
     abstract M : m0:ITensor -> ITensor with get, set
