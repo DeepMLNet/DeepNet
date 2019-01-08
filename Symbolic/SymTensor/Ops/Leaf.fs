@@ -83,8 +83,8 @@ module LeafOps =
             member this.TypeName = this.Value.TypeName
             member this.Shape = ShapeSpec.scalar
             member this.Args = Map.empty
-            member this.ReplaceArgs args = this :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = this :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Map.empty
             member this.Eval env = this.Value.AsTensor env.Dev       
@@ -100,8 +100,8 @@ module LeafOps =
             member this.TypeName = TypeName.ofType<int64>
             member this.Shape = ShapeSpec.scalar
             member this.Args = Map.empty
-            member this.ReplaceArgs args = this :> IOp2
-            member this.SubstSymSizes env = { Value = SymSizeEnv.subst env this.Value } :> IOp2
+            member this.ReplaceArgs args = this :> _
+            member this.SubstSymSizes env = { Value = SymSizeEnv.subst env this.Value } :> _
             member this.CanEvalAllSymSizes = SizeSpec.canEval this.Value
             member this.Deriv dOp = Map.empty
             member this.Eval env = 
@@ -118,8 +118,8 @@ module LeafOps =
             member this.TypeName = this.Type
             member this.Shape = ShapeSpec.matrix this.Size this.Size
             member this.Args = Map.empty
-            member this.ReplaceArgs args = this :> IOp2
-            member this.SubstSymSizes env = {this with Size = SymSizeEnv.subst env this.Size} :> IOp2
+            member this.ReplaceArgs args = this :> _
+            member this.SubstSymSizes env = {this with Size = SymSizeEnv.subst env this.Size} :> _
             member this.CanEvalAllSymSizes = SizeSpec.canEval this.Size
             member this.Deriv dOp = Map.empty
             member this.Eval env = 
@@ -142,8 +142,8 @@ module LeafOps =
             member this.TypeName = this.Type
             member this.Shape = ShapeSpec.vector this.Size
             member this.Args = Map.empty
-            member this.ReplaceArgs args = this :> IOp2
-            member this.SubstSymSizes env = {this with Size = SymSizeEnv.subst env this.Size} :> IOp2
+            member this.ReplaceArgs args = this :> _
+            member this.SubstSymSizes env = {this with Size = SymSizeEnv.subst env this.Size} :> _
             member this.CanEvalAllSymSizes = SizeSpec.canEval this.Size
             member this.Deriv dOp = Map.empty
             member this.Eval env = 
@@ -166,9 +166,9 @@ module LeafOps =
             member this.TypeName = this.Var.TypeName
             member this.Shape = this.Var.Shape
             member this.Args = Map.empty
-            member this.ReplaceArgs args = this :> IOp2
+            member this.ReplaceArgs args = this :> _
             member this.SubstSymSizes env = 
-                {Var={this.Var with Shape=SymSizeEnv.substShape env this.Var.Shape}} :> IOp2
+                {Var={this.Var with Shape=SymSizeEnv.substShape env this.Var.Shape}} :> _
             member this.CanEvalAllSymSizes = ShapeSpec.canEval this.Var.Shape
             member this.Deriv dOp = Map.empty
             member this.Eval env = 
@@ -189,8 +189,8 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary dOp
             member this.Eval env = (Args.unaryX env.Args).UnaryPlus ()      
@@ -206,8 +206,8 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary -dOp
             member this.Eval env = (Args.unaryX env.Args).UnaryMinus ()       
@@ -223,8 +223,8 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = failwith "TODO" //Args.unary (dOp * Expr2.padLeft (Expr.signt dOp))
             member this.Eval env = (Args.unaryX env.Args).Abs ()       
@@ -240,8 +240,8 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary -dOp // TODO
             member this.Eval env = (Args.unaryX env.Args).Sgn ()       
@@ -257,8 +257,8 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary -dOp // TODO
             member this.Eval env = (Args.unaryX env.Args).Log ()       
@@ -274,8 +274,8 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary -dOp // TODO
             member this.Eval env = (Args.unaryX env.Args).Log10 ()       
@@ -291,8 +291,8 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary -dOp // TODO
             member this.Eval env = (Args.unaryX env.Args).Exp ()       
@@ -308,8 +308,8 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary -dOp // TODO
             member this.Eval env = (Args.unaryX env.Args).Sin ()       
@@ -325,8 +325,8 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary -dOp // TODO
             member this.Eval env = (Args.unaryX env.Args).Cos ()       
@@ -342,8 +342,8 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary -dOp // TODO
             member this.Eval env = (Args.unaryX env.Args).Tan ()       
@@ -359,8 +359,8 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary -dOp // TODO
             member this.Eval env = (Args.unaryX env.Args).Asin ()       
@@ -376,8 +376,8 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary -dOp // TODO
             member this.Eval env = (Args.unaryX env.Args).Acos ()       
@@ -393,8 +393,8 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary -dOp // TODO
             member this.Eval env = (Args.unaryX env.Args).Atan ()       
@@ -410,8 +410,8 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary -dOp // TODO
             member this.Eval env = (Args.unaryX env.Args).Sinh ()       
@@ -427,8 +427,8 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary -dOp // TODO
             member this.Eval env = (Args.unaryX env.Args).Cosh ()       
@@ -444,8 +444,8 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary -dOp // TODO
             member this.Eval env = (Args.unaryX env.Args).Tanh ()       
@@ -461,8 +461,8 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary -dOp // TODO
             member this.Eval env = (Args.unaryX env.Args).Sqrt ()       
@@ -478,8 +478,8 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary -dOp // TODO
             member this.Eval env = (Args.unaryX env.Args).Ceiling ()       
@@ -495,8 +495,8 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary -dOp // TODO
             member this.Eval env = (Args.unaryX env.Args).Floor ()       
@@ -512,8 +512,8 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary -dOp // TODO
             member this.Eval env = (Args.unaryX env.Args).Round ()       
@@ -529,8 +529,8 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary -dOp // TODO
             member this.Eval env = (Args.unaryX env.Args).Truncate ()       
@@ -550,8 +550,8 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary -dOp // TODO
             member this.Eval env = (Args.unaryX env.Args).Invert ()
@@ -575,8 +575,8 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary -dOp // TODO
             member this.Eval env = ~~~~(Args.unaryX env.Args :?> Tensor<bool>) :> ITensor       
@@ -595,9 +595,9 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.Shape
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
             member this.SubstSymSizes env = 
-                { this with Shape = SymSizeEnv.substShape env this.Shape } :> IOp2
+                { this with Shape = SymSizeEnv.substShape env this.Shape } :> _
             member this.CanEvalAllSymSizes = 
                 ShapeSpec.canEval this.Shape
             member this.Deriv dOp = Args.unary -dOp // TODO
@@ -624,9 +624,9 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.Shape
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
             member this.SubstSymSizes env = 
-                { this with Shape = SymSizeEnv.substShape env this.Shape } :> IOp2
+                { this with Shape = SymSizeEnv.substShape env this.Shape } :> _
             member this.CanEvalAllSymSizes = 
                 ShapeSpec.canEval this.Shape
             member this.Deriv dOp = Args.unary -dOp // TODO
@@ -648,8 +648,8 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape |> ShapeSpec.permuteAxes this.Permutation
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary -dOp // TODO
             member this.Eval env = (Args.unaryX env.Args) |> ITensor.permuteAxes this.Permutation
@@ -682,8 +682,8 @@ module UnaryOps =
             member this.ReplaceArgs args = 
                 let dynArgs = args |> Map.map (fun _ v -> v :> IDynElem)
                 let range = this.Range |> SimpleRangesSpec.replaceDynElems dynPrefix dynArgs               
-                {this with X=Args.unaryX args; Range=range} :> IOp2
-            member this.SubstSymSizes env = {this with Range = SymSizeEnv.substRange env this.Range} :> IOp2
+                {this with X=Args.unaryX args; Range=range} :> _
+            member this.SubstSymSizes env = {this with Range = SymSizeEnv.substRange env this.Range} :> _
             member this.CanEvalAllSymSizes = SimpleRangesSpec.canEvalSymbols this.Range
             member this.Deriv dOp = Args.unary -dOp // TODO
             member this.Eval env = 
@@ -721,8 +721,8 @@ module UnaryOps =
             member this.ReplaceArgs args = 
                 let dynArgs = args |> Map.map (fun _ v -> v :> IDynElem)
                 let range = this.Range |> SimpleRangesSpec.replaceDynElems dynPrefix dynArgs               
-                {this with X=Args.binaryX args; Y=Args.binaryY args; Range=range} :> IOp2
-            member this.SubstSymSizes env = {this with Range = SymSizeEnv.substRange env this.Range} :> IOp2
+                {this with X=Args.binaryX args; Y=Args.binaryY args; Range=range} :> _
+            member this.SubstSymSizes env = {this with Range = SymSizeEnv.substRange env this.Range} :> _
             member this.CanEvalAllSymSizes = SimpleRangesSpec.canEvalSymbols this.Range
             member this.Deriv dOp = Args.unary -dOp // TODO
             member this.Eval env = 
@@ -756,8 +756,8 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape 
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = {this with X = Args.unaryX args} :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = {this with X = Args.unaryX args} :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary -dOp // TODO
             member this.Eval env = (Args.unaryX env.Args) |> ITensor.reverseAxis this.Axis
@@ -784,8 +784,8 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape |> ShapeSpec.withoutAxis this.Axis2
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = {this with X = Args.unaryX args} :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = {this with X = Args.unaryX args} :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary -dOp // TODO
             member this.Eval env = (Args.unaryX env.Args).DiagAxis this.Axis1 this.Axis2
@@ -820,8 +820,8 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape |> List.insert this.Axis2 this.X.Shape.[this.Axis1]
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = {this with X = Args.unaryX args} :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = {this with X = Args.unaryX args} :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary -dOp // TODO
             member this.Eval env = (Args.unaryX env.Args).DiagMatAxis this.Axis1 this.Axis2
@@ -851,8 +851,8 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape |> ShapeSpec.withoutAxis this.Axis
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary -dOp // TODO
             member this.Eval env = (Args.unaryX env.Args).SumAxis this.Axis 
@@ -893,8 +893,8 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape |> ShapeSpec.withoutAxis this.Axis
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary -dOp // TODO
             member this.Eval env = (Args.unaryX env.Args).ProductAxis this.Axis
@@ -922,8 +922,8 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape |> ShapeSpec.withoutAxis this.Axis
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary -dOp // TODO
             member this.Eval env = (Args.unaryX env.Args).MaxAxis this.Axis
@@ -951,8 +951,8 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape |> ShapeSpec.withoutAxis this.Axis
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary -dOp // TODO
             member this.Eval env = (Args.unaryX env.Args).MinAxis this.Axis
@@ -980,8 +980,8 @@ module UnaryOps =
             member this.TypeName = TypeName.ofType<int64>
             member this.Shape = this.X.Shape |> ShapeSpec.withoutAxis this.Axis
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary -dOp // TODO
             member this.Eval env = (Args.unaryX env.Args).ArgMaxAxis this.Axis
@@ -1005,8 +1005,8 @@ module UnaryOps =
             member this.TypeName = TypeName.ofType<int64>
             member this.Shape = this.X.Shape |> ShapeSpec.withoutAxis this.Axis
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary -dOp // TODO
             member this.Eval env = (Args.unaryX env.Args).ArgMinAxis this.Axis
@@ -1064,8 +1064,8 @@ module UnaryOps =
                 let xArgs = Args.unary this.X
                 Map.join idxArgs xArgs
             member this.ReplaceArgs args =                
-                {this with X=Args.unaryX args; Indices=mapToList this.Indices.Length args} :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+                {this with X=Args.unaryX args; Indices=mapToList this.Indices.Length args} :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary -dOp // TODO
             member this.Eval env = 
@@ -1114,8 +1114,8 @@ module UnaryOps =
                 let xArgs = Args.unary this.X
                 Map.join idxArgs xArgs
             member this.ReplaceArgs args =                
-                {this with X=Args.unaryX args; Indices=mapToList this.Indices.Length args} :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+                {this with X=Args.unaryX args; Indices=mapToList this.Indices.Length args} :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary -dOp // TODO
             member this.Eval env = 
@@ -1145,9 +1145,9 @@ module UnaryOps =
             member this.Shape = ShapeSpec.emptyVector
             member this.Args = Args.unary this.X
             member this.ReplaceArgs args = 
-                {this with X=Args.unaryX args} :> IOp2
+                {this with X=Args.unaryX args} :> _
             member this.SubstSymSizes env = 
-                {this with Var={this.Var with Shape=SymSizeEnv.substShape env this.Var.Shape}} :> IOp2
+                {this with Var={this.Var with Shape=SymSizeEnv.substShape env this.Var.Shape}} :> _
             member this.CanEvalAllSymSizes = ShapeSpec.canEval this.Var.Shape
             member this.Deriv dOp = Map.empty
             member this.Eval env = 
@@ -1167,8 +1167,8 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary dOp // TODO
             member this.Eval env = Args.unaryX env.Args
@@ -1196,8 +1196,8 @@ module UnaryOps =
             member this.Args =                 
                 Map.join (Args.unary this.X) (Map ["Deriv", this.Deriv])                
             member this.ReplaceArgs args = 
-                {this with Deriv=args.["Deriv"]; X=Args.unaryX args} :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+                {this with Deriv=args.["Deriv"]; X=Args.unaryX args} :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary dOp // TODO
             member this.Eval env = Args.unaryX env.Args
@@ -1217,8 +1217,8 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary dOp 
             member this.Eval env = Args.unaryX env.Args                  
@@ -1238,8 +1238,8 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary dOp 
             member this.Eval env = 
@@ -1262,8 +1262,8 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary dOp 
             member this.Eval env = 
@@ -1287,8 +1287,8 @@ module UnaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.unary this.X
-            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.unary dOp 
             member this.Eval env = 
@@ -1318,8 +1318,8 @@ module BinaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.binary this.X this.Y
-            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.binary dOp dOp
             member this.Eval env = (Args.binaryX env.Args).Add (Args.binaryY env.Args)      
@@ -1335,8 +1335,8 @@ module BinaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.binary this.X this.Y
-            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.binary dOp dOp
             member this.Eval env = (Args.binaryX env.Args).Subtract (Args.binaryY env.Args)       
@@ -1352,8 +1352,8 @@ module BinaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.binary this.X this.Y
-            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.binary dOp dOp
             member this.Eval env = (Args.binaryX env.Args).Multiply (Args.binaryY env.Args)      
@@ -1369,8 +1369,8 @@ module BinaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.binary this.X this.Y
-            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.binary dOp dOp
             member this.Eval env = (Args.binaryX env.Args).Divide (Args.binaryY env.Args)       
@@ -1386,8 +1386,8 @@ module BinaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.binary this.X this.Y
-            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.binary dOp dOp
             member this.Eval env = (Args.binaryX env.Args).Pow (Args.binaryY env.Args)       
@@ -1403,8 +1403,8 @@ module BinaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.binary this.X this.Y
-            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.binary dOp dOp
             member this.Eval env = (Args.binaryX env.Args).Modulo (Args.binaryY env.Args)       
@@ -1420,8 +1420,8 @@ module BinaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.binary this.X this.Y
-            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.binary dOp dOp
             member this.Eval env = (Args.binaryX env.Args).MaxElemwise (Args.binaryY env.Args)       
@@ -1437,8 +1437,8 @@ module BinaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.binary this.X this.Y
-            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.binary dOp dOp
             member this.Eval env = (Args.binaryX env.Args).MinElemwise (Args.binaryY env.Args)       
@@ -1454,8 +1454,8 @@ module BinaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.binary this.X this.Y
-            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.binary dOp dOp
             member this.Eval env = 
@@ -1472,8 +1472,8 @@ module BinaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.binary this.X this.Y
-            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.binary dOp dOp
             member this.Eval env = 
@@ -1490,8 +1490,8 @@ module BinaryOps =
             member this.TypeName = this.X.TypeName
             member this.Shape = this.X.Shape
             member this.Args = Args.binary this.X this.Y
-            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.binary dOp dOp
             member this.Eval env = 
@@ -1508,8 +1508,8 @@ module BinaryOps =
             member this.TypeName = TypeName.ofType<bool>
             member this.Shape = this.X.Shape
             member this.Args = Args.binary this.X this.Y
-            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.binary dOp dOp
             member this.Eval env = (Args.binaryX env.Args).Equal (Args.binaryY env.Args)       
@@ -1525,8 +1525,8 @@ module BinaryOps =
             member this.TypeName = TypeName.ofType<bool>
             member this.Shape = this.X.Shape
             member this.Args = Args.binary this.X this.Y
-            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.binary dOp dOp
             member this.Eval env = (Args.binaryX env.Args).NotEqual (Args.binaryY env.Args)       
@@ -1542,8 +1542,8 @@ module BinaryOps =
             member this.TypeName = TypeName.ofType<bool>
             member this.Shape = this.X.Shape
             member this.Args = Args.binary this.X this.Y
-            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.binary dOp dOp
             member this.Eval env = (Args.binaryX env.Args).Less (Args.binaryY env.Args)       
@@ -1559,8 +1559,8 @@ module BinaryOps =
             member this.TypeName = TypeName.ofType<bool>
             member this.Shape = this.X.Shape
             member this.Args = Args.binary this.X this.Y
-            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.binary dOp dOp
             member this.Eval env = (Args.binaryX env.Args).LessOrEqual (Args.binaryY env.Args)       
@@ -1576,8 +1576,8 @@ module BinaryOps =
             member this.TypeName = TypeName.ofType<bool>
             member this.Shape = this.X.Shape
             member this.Args = Args.binary this.X this.Y
-            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.binary dOp dOp
             member this.Eval env = (Args.binaryX env.Args).Greater (Args.binaryY env.Args)       
@@ -1593,8 +1593,8 @@ module BinaryOps =
             member this.TypeName = TypeName.ofType<bool>
             member this.Shape = this.X.Shape
             member this.Args = Args.binary this.X this.Y
-            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.binary dOp dOp
             member this.Eval env = (Args.binaryX env.Args).GreaterOrEqual (Args.binaryY env.Args)       
@@ -1626,8 +1626,8 @@ module BinaryOps =
                 | na, nb when na=nb -> sa.[0 .. na-2] @ [sb.[nb-1]]
                 | _ -> failwithf "Invalid dot product shapes: %A and %A." sa sb
             member this.Args = Args.binary this.X this.Y
-            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.binary dOp dOp
             member this.Eval env = (Args.binaryX env.Args).Dot (Args.binaryY env.Args)       
@@ -1684,8 +1684,8 @@ module BinaryOps =
             member this.Shape = 
                 List.map2 (*) this.X.Shape this.Y.Shape
             member this.Args = Args.binary this.X this.Y
-            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.binary dOp dOp
             member this.Eval env = (Args.binaryX env.Args).TensorProduct (Args.binaryY env.Args)       
@@ -1714,8 +1714,8 @@ module BinaryOps =
             member this.ReplaceArgs args = 
                 {this with Cond=args.["Cond"]
                            IfTrue=args.["IfTrue"]
-                           IfFalse=args.["IfFalse"]} :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+                           IfFalse=args.["IfFalse"]} :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.binary dOp dOp
             member this.Eval env = 
@@ -1749,8 +1749,8 @@ module NaryOps =
             member this.TypeName = TypeName.ofType<int32>
             member this.Shape = ShapeSpec.emptyVector
             member this.Args = Args.nary this.Xs
-            member this.ReplaceArgs args = {this with Xs=Args.naryXs args} :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = {this with Xs=Args.naryXs args} :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.binary dOp dOp // TODO
             member this.Eval env = HostTensor.zeros<int32> [0L] :> ITensor
@@ -1788,11 +1788,11 @@ module NaryOps =
             member this.TypeName = this.Xs.Head.TypeName
             member this.Shape = this.Shape
             member this.Args = Args.nary this.Xs
-            member this.ReplaceArgs args = {this with Xs=Args.naryXs args} :> IOp2
+            member this.ReplaceArgs args = {this with Xs=Args.naryXs args} :> _
             member this.SubstSymSizes env = 
                 let sSize = SizeSpec.substSymbols env
                 {this with Shape=ShapeSpec.substSymbols env this.Shape
-                           Ranges=this.Ranges |> List.map (List.map (fun (f,l) -> sSize f, sSize l))} :> IOp2
+                           Ranges=this.Ranges |> List.map (List.map (fun (f,l) -> sSize f, sSize l))} :> _
             member this.CanEvalAllSymSizes = 
                 ShapeSpec.canEval this.Shape &&
                 List.forall BaseRangesSpec.canEval this.Ranges
@@ -1825,11 +1825,11 @@ module NaryOps =
             member this.TypeName = Elem.Expr.typeName this.ElemExpr
             member this.Shape = this.Shape
             member this.Args = Args.nary this.Xs
-            member this.ReplaceArgs args = {this with Xs=Args.naryXs args} :> IOp2
+            member this.ReplaceArgs args = {this with Xs=Args.naryXs args} :> _
             member this.SubstSymSizes env = 
                 let sSize = SizeSpec.substSymbols env
                 {this with Shape=ShapeSpec.substSymbols env this.Shape
-                           ElemExpr=Elem.Expr.substSymSizes env this.ElemExpr} :> IOp2
+                           ElemExpr=Elem.Expr.substSymSizes env this.ElemExpr} :> _
             member this.CanEvalAllSymSizes = 
                 ShapeSpec.canEval this.Shape &&
                 Elem.Expr.canEvalAllSymSizes this.ElemExpr
@@ -1872,8 +1872,8 @@ module NaryOps =
             member this.TypeName = this.Xs.Head.TypeName
             member this.Shape = this.Xs.Head.Shape
             member this.Args = Args.nary this.Xs
-            member this.ReplaceArgs args = {this with Xs=Args.naryXs args} :> IOp2
-            member this.SubstSymSizes env = this :> IOp2
+            member this.ReplaceArgs args = {this with Xs=Args.naryXs args} :> _
+            member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = Args.binary dOp dOp // TODO
             member this.Eval env = 
@@ -1904,3 +1904,82 @@ module NaryOps =
     /// The interpolator is created using the Interpolator.create function.
     let interpolate3D interpolator x y z =
         interpolate interpolator [x; y; z]
+
+
+[<AutoOpen>]
+module LoopOps = 
+
+    /// a slice of an argument to the loop
+    type SequenceArgSlice = {
+        /// the index of the argument
+        ArgIdx:     int
+        /// the dimension the loop is performed over
+        SliceDim:   int
+    }
+
+    /// references a loop channel of a previous iteration
+    type PreviousChannel = {
+        /// the channel to use
+        Channel:       string
+        /// the delay, must be at least one
+        Delay:         SizeSpec
+        /// the index of the argument specifying the initial values
+        InitialArg:    int
+    }
+
+    /// a loop variable value specification
+    type LoopInput = 
+        /// provides the loop argument to all loop iterations
+        | ConstArg of argIdx:int
+        /// provides a slice of the loop argument to each loop iteration
+        | SequenceArgSlice of SequenceArgSlice
+        /// provides the value of a loop channel from a previous loop iteration
+        | PreviousChannel of PreviousChannel
+        /// provides the index of the current loop iteration (zero-based)
+        | IterationIndex
+        /// provides the number of remaining loop iterations after this iteration
+        | IterationsRemaining
+
+    /// the value of a loop channel
+    type LoopValue = {
+        /// the expression to compute the loop channel;
+        /// it may only use variables defined in LoopSpecT.Vars
+        Expr:       Expr2
+        /// the dimension to concatenate the results along to produce the loop output
+        SliceDim:   int
+    }
+
+
+    /// Elementwise interpolation using a value table.
+    type Loop = {
+        /// number of loop iterations
+        Length:     SizeSpec
+        /// specifies the values of the variables used in the channel value expressions,
+        /// i.e. LoopValueT.Expr
+        Vars:       Map<Var, LoopInput>   
+        /// specifies the values of the loop channels
+        Channels:   Map<string, LoopValue>
+        /// inputs
+        Xs:         Expr2 list
+    } with
+        interface IMultiChannelOp with       
+            member this.Check () = ()
+            member this.Channels = 
+                this.Channels |> Map.toList |> List.map fst
+            member this.TypeNames = 
+                this.Channels |> Map.map (fun _ lv -> lv.Expr.TypeName)
+            member this.Shapes = 
+                this.Channels |> Map.map (fun _ lv -> lv.Expr.Shape)
+            member this.Args = Args.nary this.Xs
+            member this.ReplaceArgs args = {this with Xs=Args.naryXs args} :> _
+            member this.SubstSymSizes env = this :> _
+            member this.CanEvalAllSymSizes = true
+            member this.Deriv dOp = failwith "TODO" // TODO
+            member this.Eval env = 
+                failwith "TODO"
+    //let (|Loop|_|) (expr: Expr2) =
+    //    match expr.Op with
+    //    | :? Loop as this -> Some this
+    //    | _ -> None
+
+

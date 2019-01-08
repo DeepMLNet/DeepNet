@@ -25,38 +25,44 @@ type internal PlusElems (elems: SizeSpec) =
     new (intElems: int64) = PlusElems (SizeSpec.fix intElems)
     member this.Elems = elems
 
-/// A mathematical operation in an expression.
-/// This models a mathematical function or operator that takes one or more tensors
-/// and returns one tensor.
-type IOp2 =
+
+/// Base interface for a mathematical operation in an expression.
+type IBaseOp =
     inherit System.IComparable
       
     /// Should check if the types and shapes of the arguments are acceptable and,
     /// if not, raise an exception.
     abstract Check: unit -> unit
-
-    /// Should return the type of the result.
-    abstract TypeName: TypeName
-
-    /// Should return the shape of the result.
-    abstract Shape: ShapeSpec      
-        
+       
     /// Returns the arguments of this op.
     abstract Args: ArgsMap
 
     /// Creates a new op with the arguments replaced by the specified arguments.
-    abstract ReplaceArgs: ArgsMap -> IOp2
+    abstract ReplaceArgs: ArgsMap -> IBaseOp
 
     /// Should return the expression with all symbolic sizes substituted using the specified
     /// substitution table.
     /// Return a *new* op with substitution applied. Do not apply the mapping in-place.
-    abstract SubstSymSizes: env: SymSizeEnv -> IOp2
+    abstract SubstSymSizes: env: SymSizeEnv -> IBaseOp
 
     /// Should be true, if all symbolic sizes can be evaluated to numeric sizes.
     /// This is the case if the function ShapeSpec.canEval or SizeSpec.canEval respectively
     /// return true on all sizes used in this op.
     abstract CanEvalAllSymSizes: bool
 
+
+/// A mathematical operation in an expression with a single output value.
+/// This models a mathematical function or operator that takes one or more tensors
+/// and returns one tensor.
+type IOp2 =
+    inherit IBaseOp
+      
+    /// Should return the type of the result.
+    abstract TypeName: TypeName
+
+    /// Should return the shape of the result.
+    abstract Shape: ShapeSpec      
+        
     /// Should compute the derivative w.r.t. each argument given the derivative w.r.t. the op.
     /// The derivative is always an NxM matrix where N is the number of elements of the function
     /// the derivative of which is being taken and M is the number of elements of the argument
@@ -70,6 +76,37 @@ type IOp2 =
     /// as a reference implementation for verifying the correctness of optimized (e.g. CUDA) 
     /// implementations. This method may be omitted when no verification will be done.
     abstract Eval: env:EvalEnv -> Tensor.ITensor
+
+
+/// A mathematical operation in an expression with multiple output values.
+/// This models a mathematical function or operator that takes one or more tensors
+/// and returns multiple tensors.
+type IMultiChannelOp =
+    inherit IBaseOp
+      
+    /// The output channels of this operation.
+    abstract Channels: string List
+
+    /// Should return the types of the results.
+    abstract TypeNames: Map<string, TypeName>
+
+    /// Should return the shapes of the results.
+    abstract Shapes: Map<string, ShapeSpec>      
+        
+    /// Should compute the derivative w.r.t. each argument given the derivative w.r.t. the op.
+    /// The derivative is always an NxM matrix where N is the number of elements of the function
+    /// the derivative of which is being taken and M is the number of elements of the argument
+    /// w.r.t. which the derivative is being taken. 
+    /// Thus, if dOp is an NxK matrix and an argument has M elements, the derivative matrix
+    /// you return w.r.t. that argument must have NxM elements.
+    abstract Deriv: dOp:Map<string, Expr2> -> Map<string, Expr2>
+
+    /// Should evaluate the numerical value of this op given the numerical values of its arguments.
+    /// This evaluation should be done on the host using the simplest means possible and is used
+    /// as a reference implementation for verifying the correctness of optimized (e.g. CUDA) 
+    /// implementations. This method may be omitted when no verification will be done.
+    abstract Eval: env:EvalEnv -> Map<string, Tensor.ITensor>
+
 
 
 type Expr2 (op: IOp2) =
