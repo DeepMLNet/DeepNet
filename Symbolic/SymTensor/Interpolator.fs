@@ -192,3 +192,16 @@ module Interpolator =
             res.[idx] <- interpolateInDim [] x |> conv<'T>
         res    
 
+
+type internal IInterpolator =
+    abstract Interpolate: Interpolator -> ITensor list -> ITensor
+type TInterpolator<'T> =
+    interface IInterpolator with
+        member __.Interpolate ip es = 
+            let es = es |> List.map (fun e -> e :?> Tensor<'T>)
+            Interpolator.interpolate ip es :> ITensor
+
+type Interpolator with
+    /// Performs interpolation on host.
+    static member interpolateUntyped (ip: Interpolator) (es: ITensor list) : ITensor =
+        (Generic<TInterpolator<_>, IInterpolator> [es.Head.DataType]).Interpolate ip es

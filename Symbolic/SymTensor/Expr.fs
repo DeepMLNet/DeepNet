@@ -250,7 +250,7 @@ type NaryOp =
     /// elementwise calculated tensor
     | Elements of shape:ShapeSpec * elemExpr:Elem.Expr          // DONE
     /// elementwise interpolation
-    | Interpolate of Interpolator
+    | Interpolate of Interpolator                               // DONE
     /// use specified channel of a multi-channel op
     | Channel of channelOp:MultiChannelOp * channel:Channel
     /// extension op
