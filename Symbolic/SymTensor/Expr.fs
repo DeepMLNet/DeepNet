@@ -244,11 +244,11 @@ type BinaryOp =
 type NaryOp =
 
     /// evaluate all subexpressions but discard them
-    | Discard        // DONE
+    | Discard                                                   // DONE
     /// build tensor using numeric ranges
-    | BuildTensor of shp:ShapeSpec * rngs:BaseRangesSpec list
+    | BuildTensor of shp:ShapeSpec * rngs:BaseRangesSpec list   // DONE
     /// elementwise calculated tensor
-    | Elements of shape:ShapeSpec * elemExpr:Elem.Expr
+    | Elements of shape:ShapeSpec * elemExpr:Elem.Expr          // DONE
     /// elementwise interpolation
     | Interpolate of Interpolator
     /// use specified channel of a multi-channel op

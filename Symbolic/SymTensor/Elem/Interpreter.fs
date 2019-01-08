@@ -125,8 +125,8 @@ module Interpreter =
             |> Map.ofSeq
         doEval initialSymVals expr
 
-    /// Evaluates all elements of an element expression
-    let eval (expr: Expr) (args: Tensor.Tensor<'T> list) (resShape: NShapeSpec) =
+    /// Evaluates all elements of an element expression.
+    let eval (expr: Expr) (args: Tensor.Tensor<'T> list) (resShape: NShapeSpec) : Tensor.Tensor<'T> =
         let res = Tensor.HostTensor.zeros<'T> resShape
         for idx in Tensor.Backend.TensorLayout.allIdxOfShape resShape do
             let symIdx = idx |> List.map SizeSpec.fix
@@ -135,3 +135,16 @@ module Interpreter =
         res
 
 
+type internal IInterpreter = 
+    abstract Eval: Expr -> Tensor.ITensor list -> NShapeSpec -> Tensor.ITensor
+type internal TInterpreter<'T> () =
+    interface IInterpreter with 
+        member this.Eval expr args resShape =
+            let args = args |> List.map (fun a -> a :?> Tensor.Tensor<'T>)
+            Interpreter.eval expr args resShape :> Tensor.ITensor
+
+type Interpreter =
+    /// Evaluates all elements of an element expression using untyped tensors.
+    static member evalUntyped (expr: Expr) (args: Tensor.ITensor list) (resShape: NShapeSpec) : Tensor.ITensor = 
+        (Generic<TInterpreter<_>, IInterpreter> [args.Head.DataType]).Eval expr args resShape
+    

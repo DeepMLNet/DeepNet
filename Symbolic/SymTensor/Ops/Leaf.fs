@@ -1798,13 +1798,13 @@ module NaryOps =
                 List.forall BaseRangesSpec.canEval this.Ranges
             member this.Deriv dOp = Args.binary dOp dOp // TODO
             member this.Eval env = 
-                let trgt = HostTensor.zeros<'R> (ShapeSpec.eval this.Shape)
                 let vs = Args.naryXs env.Args
+                let trgt = vs.Head.ZerosOfSameType vs.Head.Dev (ShapeSpec.eval this.Shape)
                 for rng, e in List.zip this.Ranges vs do                            
                     let aryRng = rng |> List.map (fun (first, last) -> 
                         Rng.Rng (Some (SizeSpec.eval first), Some (SizeSpec.eval last)))
                     trgt.[aryRng] <- e 
-                trgt :> ITensor
+                trgt
     let (|BuildTensor|_|) (expr: Expr2) =
         match expr.Op with
         | :? BuildTensor as this -> Some this
@@ -1815,3 +1815,35 @@ module NaryOps =
         {BuildTensor.Shape=shape; Ranges=ranges; Xs=xs} |> Expr2
 
     
+    /// Elementwise calculated tensor.
+    type Elements = {Shape: ShapeSpec; ElemExpr: Elem.Expr; Xs: Expr2 list} with
+        interface IOp2 with       
+            member this.Check () = 
+                let tns = this.Xs |> List.map Expr2.typeName
+                let ss = this.Xs |> List.map Expr2.shape
+                Elem.Expr.check this.ElemExpr |> ignore
+                Elem.Expr.checkCompatibility this.ElemExpr ss tns this.Shape   
+            member this.TypeName = Elem.Expr.typeName this.ElemExpr
+            member this.Shape = this.Shape
+            member this.Args = Args.nary this.Xs
+            member this.ReplaceArgs args = {this with Xs=Args.naryXs args} :> IOp2
+            member this.SubstSymSizes env = 
+                let sSize = SizeSpec.substSymbols env
+                {this with Shape=ShapeSpec.substSymbols env this.Shape
+                           ElemExpr=Elem.Expr.substSymSizes env this.ElemExpr} :> IOp2
+            member this.CanEvalAllSymSizes = 
+                ShapeSpec.canEval this.Shape &&
+                Elem.Expr.canEvalAllSymSizes this.ElemExpr
+            member this.Deriv dOp = Args.binary dOp dOp // TODO
+            member this.Eval env = 
+                let esv = Args.naryXs env.Args
+                let nResShape = ShapeSpec.eval this.Shape
+                Elem.Interpreter.evalUntyped this.ElemExpr esv nResShape 
+    let (|Elements|_|) (expr: Expr2) =
+        match expr.Op with
+        | :? Elements as this -> Some this
+        | _ -> None
+
+    /// Calculates a tensor elementwise using the given element expression and result shape.
+    let elements shape elemExpr xs =
+        {Elements.Shape=shape; ElemExpr=elemExpr; Xs=xs} |> Expr2
