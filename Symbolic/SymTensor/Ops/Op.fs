@@ -108,6 +108,12 @@ type IMultiChannelOp =
     abstract Eval: env:EvalEnv -> Map<string, Tensor.ITensor>
 
 
+type IExpr = 
+
+    inherit System.IComparable
+    inherit System.IComparable<IExpr>
+    inherit System.IEquatable<IExpr>
+
 
 type Expr2 (op: IOp2) =
     
@@ -130,23 +136,30 @@ type Expr2 (op: IOp2) =
     member this.NElems = List.fold (*) SizeSpec.one this.Shape
     static member nElems (expr: Expr2) = expr.NElems
 
-    interface System.IEquatable<Expr2> with
+    interface IExpr
+
+    interface System.IEquatable<IExpr> with
         member this.Equals other = 
-            this.Op.Equals other.Op
+            match other with
+            | :? Expr2 as other -> this.Op.Equals other.Op
+            | _ -> false
 
     override this.Equals other =
         match other with
-        | :? Expr2 as other -> (this :> System.IEquatable<_>).Equals other
+        | :? IExpr as other -> (this :> System.IEquatable<_>).Equals other
         | _ -> false
 
-    interface System.IComparable<Expr2> with
+    interface System.IComparable<IExpr> with
         member this.CompareTo other =
-            compare this.Op other.Op
+            match other with
+            | :? Expr2 as other -> compare this.Op other.Op
+            | :? MultiChannelExpr -> 1
+            | _ -> failwithf "Cannot compate Expr to type %A." (other.GetType())
 
     interface System.IComparable with
         member this.CompareTo other =
             match other with
-            | :? Expr2 as other -> (this :> System.IComparable<_>).CompareTo other
+            | :? IExpr as other -> (this :> System.IComparable<_>).CompareTo other
             | _ -> failwithf "Cannot compare Expr to type %A." (other.GetType())
 
     override this.GetHashCode() =
@@ -426,6 +439,63 @@ type Expr2 (op: IOp2) =
     static member (<<>>) (x: System.IComparable, y: Expr2) = (Expr2.scalar x) <<>> y
 
     static member ( .* ) (x: Expr2, y: Expr2) = OpForwards.Dot x y
+
+
+type MultiChannelExpr (op: IMultiChannelOp) =   
+    do op.Check()
+        
+    member this.Op = op
+    static member op (expr: Expr2) = expr.Op
+
+    member this.TypeNames = op.TypeNames
+    static member typeNames (expr: MultiChannelExpr) = expr.TypeNames
+
+    member this.DataTypes = this.TypeNames |> Map.map (fun _ tn -> tn.Type)
+
+    member this.Shapes = op.Shapes
+    static member shapes (expr: MultiChannelExpr) = expr.Shapes
+
+    member this.NDims = this.Shapes |> Map.map (fun _ s -> List.length s)
+    static member nDims (expr: MultiChannelExpr) = expr.NDims
+
+    member this.NElems = this.Shapes |> Map.map (fun _ s -> List.fold (*) SizeSpec.one s)
+    static member nElems (expr: MultiChannelExpr) = expr.NElems
+
+    member this.Channels = op.Channels
+    static member channels (expr: MultiChannelExpr) = expr.Channels
+
+    //member this.Item 
+    //    with get (channel: string) = 
+    //        this.GetSlice (allArgs)
+
+    interface IExpr
+
+    interface System.IEquatable<IExpr> with
+        member this.Equals other = 
+            match other with
+            | :? MultiChannelExpr as other -> this.Op.Equals other.Op
+            | _ -> false
+
+    override this.Equals other =
+        match other with
+        | :? IExpr as other -> (this :> System.IEquatable<_>).Equals other
+        | _ -> false
+
+    interface System.IComparable<IExpr> with
+        member this.CompareTo other =
+            match other with
+            | :? MultiChannelExpr as other -> compare this.Op other.Op
+            | :? Expr2 -> -1
+            | _ -> failwithf "Cannot compate MultiChannelExpr to type %A." (other.GetType())
+
+    interface System.IComparable with
+        member this.CompareTo other =
+            match other with
+            | :? IExpr as other -> (this :> System.IComparable<_>).CompareTo other
+            | _ -> failwithf "Cannot compare MultiChannelExpr to type %A." (other.GetType())
+
+    override this.GetHashCode() =
+        hash this.Op
 
 
 [<AllowNullLiteral>]

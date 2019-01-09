@@ -1307,6 +1307,30 @@ module UnaryOps =
     let checkFinite label x =
         {CheckFinite.Label=label; X=x} |> Expr2
 
+    /// Accesses the specified channel of a multi-channnel expression.
+    type Channel = {Channel: string; X: MultiChannelExpr} with
+        interface IOp2 with      
+            member this.Check () = 
+                if not (this.X.Channels |> List.contains this.Channel) then
+                    failwithf "Multi-channel expression does not contain channel %A, it contains channels %A." 
+                              this.Channel this.X.Channels
+            member this.TypeName = this.X.TypeNames.[this.Channel]
+            member this.Shape = this.X.Shapes.[this.Channel]
+            member this.Args = Args.unary this.X
+            member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+            member this.SubstSymSizes env = this :> _
+            member this.CanEvalAllSymSizes = true
+            member this.Deriv dOp = Args.unary dOp 
+            member this.Eval env = 
+                let v = Args.unaryX env.Args
+                if not (v.AllFinite ()) then
+                    printfn "Infinity or NaN encountered in %s with value:\n%A" this.Label v
+                    failwithf "Infinity or NaN encountered in %s." this.Label
+                v                            
+    let (|Channel|_|) (expr: Expr2) =
+        match expr.Op with
+        | :? Channel as this -> Some this
+        | _ -> None
 
 [<AutoOpen>]
 module BinaryOps =
@@ -1977,9 +2001,9 @@ module LoopOps =
             member this.Deriv dOp = failwith "TODO" // TODO
             member this.Eval env = 
                 failwith "TODO"
-    //let (|Loop|_|) (expr: Expr2) =
-    //    match expr.Op with
-    //    | :? Loop as this -> Some this
-    //    | _ -> None
+    let (|Loop|_|) (expr: MultiChannelExpr) =
+        match expr.Op with
+        | :? Loop as this -> Some this
+        | _ -> None
 
 
