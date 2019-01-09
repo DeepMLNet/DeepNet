@@ -252,9 +252,9 @@ type NaryOp =
     /// elementwise interpolation
     | Interpolate of Interpolator                               // DONE
     /// use specified channel of a multi-channel op
-    | Channel of channelOp:MultiChannelOp * channel:Channel
+    | Channel of channelOp:MultiChannelOp * channel:Channel     // DONE 
     /// extension op
-    | ExtensionOp of IOp
+    | ExtensionOp of IOp                                        // removed
 
 /// a channel of a multi-channel op or loop
 type Channel = string

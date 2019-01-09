@@ -7,6 +7,7 @@ open Tensor.Backend
 
     
 type ArgsMap = Map<string, Expr2>
+type MultiChannelArgsMap = Map<string, MultiChannelExpr>
 
 /// Information necessary to evaluate an expression.
 /// Currently this just holds the variable values, but may contain further information in the future.
@@ -17,6 +18,8 @@ type EvalEnv = {
     Dev:    ITensorDevice
     /// Argument values.
     Args:   Map<string, ITensor>
+    /// Multi-channel argument values.
+    MultiChannelArgs:   Map<string, Map<string, ITensor>>
 }
 
 
@@ -49,6 +52,12 @@ type IBaseOp =
     /// This is the case if the function ShapeSpec.canEval or SizeSpec.canEval respectively
     /// return true on all sizes used in this op.
     abstract CanEvalAllSymSizes: bool
+
+
+/// Operation that uses multi-channel expressions as its arguments.
+type IMultiChannelArgsOp = 
+    abstract MultiChannelArgs: MultiChannelArgsMap
+    abstract ReplaceMultiChannelArgs: MultiChannelArgsMap -> IMultiChannelArgsOp
 
 
 /// A mathematical operation in an expression with a single output value.
@@ -108,6 +117,12 @@ type IMultiChannelOp =
     abstract Eval: env:EvalEnv -> Map<string, Tensor.ITensor>
 
 
+/// An op that contains variables.
+type IVarContainingOp =
+    /// Variables contained in that op.
+    abstract Vars: Set<Var>
+
+
 type IExpr = 
 
     inherit System.IComparable
@@ -115,10 +130,52 @@ type IExpr =
     inherit System.IEquatable<IExpr>
 
 
-type Expr2 (op: IOp2) =
-    
+module internal ExprTools =
+    /// Returns all variables contained in an op and its arguments.
+    let extractVars (op: IBaseOp) =
+        let opVars =
+            match op with
+            | :? IVarContainingOp as op -> op.Vars
+            | _ -> Set.empty
+        let argVars =
+            op.Args |> Map.toSeq |> Seq.map (fun (_, arg) -> arg.Vars) |> Set.unionMany
+        let mcArgVars =
+            match op with
+            | :? IMultiChannelArgsOp as op ->
+                op.MultiChannelArgs |> Map.toSeq |> Seq.map (fun (_, mcArg) -> mcArg.Vars) |> Set.unionMany
+            | _ -> Set.empty
+        Set.unionMany [opVars; argVars; mcArgVars]
+
+    /// Returns true, if all symbolic sizes of the op and its arguments can be evaluated to numeric values.
+    let canEvalAllSymSizes (op: IBaseOp) =
+        let argsEvalable = 
+            op.Args |> Map.forall (fun _ arg -> arg.CanEvalAllSymSizes)
+        let mcArgsEvalable = 
+            match op with
+            | :? IMultiChannelArgsOp as op ->
+                op.MultiChannelArgs |> Map.forall (fun _ mcArg -> mcArg.CanEvalAllSymSizes)
+            | _ -> true
+        argsEvalable && mcArgsEvalable && op.CanEvalAllSymSizes
+
+    let substSymSizes (env: SymSizeEnv) (op: IBaseOp) =
+        let op = op.SubstSymSizes env
+        let subsArgs = op.Args |> Map.map (fun _ arg -> Expr2.substSymSizes env arg)
+        let op = op.ReplaceArgs subsArgs
+        let op =
+            match op with
+            | :? IMultiChannelArgsOp as op ->
+                let subsArgs = 
+                    op.MultiChannelArgs |> Map.map (fun _ mcArg -> MultiChannelExpr.substSymSizes env mcArg)
+                op.ReplaceMultiChannelArgs subsArgs :?> IBaseOp
+            | _ -> op
+        op
+
+type Expr2 (op: IOp2) =    
     do op.Check()
         
+    let _vars = lazy (ExprTools.extractVars op)
+    let _canEvalAllSymSizes = lazy (ExprTools.canEvalAllSymSizes op)
+
     member this.Op = op
     static member op (expr: Expr2) = expr.Op
 
@@ -135,6 +192,15 @@ type Expr2 (op: IOp2) =
 
     member this.NElems = List.fold (*) SizeSpec.one this.Shape
     static member nElems (expr: Expr2) = expr.NElems
+
+    member this.Vars = _vars.Force()
+    static member vars (expr: Expr2) = expr.Vars
+
+    member this.CanEvalAllSymSizes = _canEvalAllSymSizes.Force()
+    static member canEvalAllSymSizes (expr: Expr2) = expr.CanEvalAllSymSizes
+
+    static member substSymSizes (env: SymSizeEnv) (expr: Expr2) =
+        ExprTools.substSymSizes env expr.Op :?> IOp2 |> Expr2
 
     interface IExpr
 
@@ -154,7 +220,7 @@ type Expr2 (op: IOp2) =
             match other with
             | :? Expr2 as other -> compare this.Op other.Op
             | :? MultiChannelExpr -> 1
-            | _ -> failwithf "Cannot compate Expr to type %A." (other.GetType())
+            | _ -> failwithf "Cannot compare Expr to type %A." (other.GetType())
 
     interface System.IComparable with
         member this.CompareTo other =
@@ -444,6 +510,9 @@ type Expr2 (op: IOp2) =
 type MultiChannelExpr (op: IMultiChannelOp) =   
     do op.Check()
         
+    let _vars = lazy (ExprTools.extractVars op)
+    let _canEvalAllSymSizes = lazy (ExprTools.canEvalAllSymSizes op)
+
     member this.Op = op
     static member op (expr: Expr2) = expr.Op
 
@@ -464,9 +533,18 @@ type MultiChannelExpr (op: IMultiChannelOp) =
     member this.Channels = op.Channels
     static member channels (expr: MultiChannelExpr) = expr.Channels
 
-    //member this.Item 
-    //    with get (channel: string) = 
-    //        this.GetSlice (allArgs)
+    member this.Vars = _vars.Force()
+    static member vars (expr: Expr2) = expr.Vars
+
+    member this.CanEvalAllSymSizes = _canEvalAllSymSizes.Force()
+    static member canEvalAllSymSizes (expr: Expr2) = expr.CanEvalAllSymSizes
+
+    static member substSymSizes (env: SymSizeEnv) (expr: MultiChannelExpr) =
+        ExprTools.substSymSizes env expr.Op :?> IMultiChannelOp |> MultiChannelExpr
+
+    member this.Item 
+        with get (channel: string) = 
+            OpForwards.Channel channel this |> Expr2
 
     interface IExpr
 
@@ -510,6 +588,7 @@ type internal IOpForwards =
     abstract Subtensor: range:SimpleRangesSpec -> x:Expr2 -> IOp2
     abstract IsSubtensor: expr:Expr2 -> (SimpleRangesSpec * Expr2 * Expr2) option
     abstract SetSubtensor: range:SimpleRangesSpec -> x:Expr2 -> y:Expr2 -> IOp2
+    abstract Channel: channel:string -> x:MultiChannelExpr -> IOp2
 
     abstract UnaryPlus: x:Expr2 -> IOp2
     abstract Negate: x:Expr2 -> IOp2

@@ -13,7 +13,7 @@ type internal OpForwards() =
         member __.Subtensor range x = {Subtensor.Range=range; X=x} :> IOp2
         member __.IsSubtensor expr = isSubtensor expr
         member __.SetSubtensor range x y = {SetSubtensor.Range=range; X=x; Y=y} :> IOp2
-        member __.Store var x = {Store.Var=var; X=x} :> IOp2
+        member __.Channel channel x = {Channel.Channel=channel; X=x} :> IOp2
 
         member __.UnaryPlus x = {UnaryPlus.X = x} :> IOp2
         member __.Negate x = {Negate.X = x} :> IOp2
@@ -36,8 +36,8 @@ type internal OpForwards() =
         member __.Floor x = {Floor.X = x} :> IOp2
         member __.Round x = {Round.X = x} :> IOp2
         member __.Truncate x = {Truncate.X = x} :> IOp2
-
         member __.Not x = {Not.X = x} :> IOp2
+        member __.Store var x = {Store.Var=var; X=x} :> IOp2
 
         member __.Add x y = {Add.X = x; Y = y} :> IOp2
         member __.Subtract x y = {Subtract.X = x; Y = y} :> IOp2
@@ -45,16 +45,13 @@ type internal OpForwards() =
         member __.Divide x y = {Divide.X = x; Y = y} :> IOp2
         member __.Pow x y = {Pow.X = x; Y = y} :> IOp2
         member __.Modulo x y = {Modulo.X = x; Y = y} :> IOp2
-
         member __.And x y = {And.X = x; Y = y} :> IOp2
         member __.Or x y = {Or.X = x; Y = y} :> IOp2
         member __.Xor x y = {Xor.X = x; Y = y} :> IOp2
-
         member __.Equal x y = {Equal.X = x; Y = y} :> IOp2
         member __.NotEqual x y = {NotEqual.X = x; Y = y} :> IOp2
         member __.Less x y = {Less.X = x; Y = y} :> IOp2
         member __.LessOrEqual x y = {LessOrEqual.X = x; Y = y} :> IOp2
         member __.Greater x y = {Greater.X = x; Y = y} :> IOp2
         member __.GreaterOrEqual x y = {GreaterOrEqual.X = x; Y = y} :> IOp2
-
         member __.Dot x y = dot x y
