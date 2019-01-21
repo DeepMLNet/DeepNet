@@ -262,7 +262,7 @@ type Channel = string
 /// an n-ary op with multiple output channels
 type MultiChannelOp =
     /// iterative evaluation of one or multiple expresisons
-    | Loop of spec:LoopSpec    
+    | Loop of spec:LoopSpec                                     // DONE
      
 /// a slice of an argument to the loop
 type SequenceArgSlice = {

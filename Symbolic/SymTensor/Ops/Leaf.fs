@@ -2065,9 +2065,9 @@ module LoopOps =
                             |> Seq.map (fun (vs, li) ->
                                 let vs = {vs with Shape = ShapeSpec.substSymbols env vs.Shape}
                                 let li = match li with
-                                        | PreviousChannel pc -> 
+                                         | PreviousChannel pc -> 
                                             PreviousChannel {pc with Delay = SizeSpec.substSymbols env pc.Delay}
-                                        | _ -> li
+                                         | _ -> li
                                 vs, li)
                             |> Map.ofSeq
                     Channels = this.Channels
@@ -2142,7 +2142,7 @@ module LoopOps =
                     if dependsOnVars && not dependsOnLoopVars then
                         //if not (dependsOnLoopVars expr) then
                         let vs = addConstVar expr
-                        Expr2.makeVar vs
+                        {VarArg.Var=vs} |> Expr2
                     else
                         failwith "TODO"
                         //match expr with                   
