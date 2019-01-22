@@ -4,7 +4,7 @@ open SymTensor
 
 type internal OpForwards() =
     interface IOpForwards with
-        member __.ScalarConst value = {ScalarConst.Value=value} :> IOp2
+        member __.Scalar value = {Scalar.Value=value} :> IOp2
         member __.SizeValue value = {SizeValue.Value=value} :> IOp2
         member __.Var var = {VarArg.Var=var} :> IOp2
         member __.Reshape shp x = {Reshape.Shape=shp; X=x} :> IOp2

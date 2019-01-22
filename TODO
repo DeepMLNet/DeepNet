@@ -48,3 +48,5 @@
 - we can make a base type, but how to store arguments again?
 
 
+- next step:
+	- implement derivatives and derivation algorithm

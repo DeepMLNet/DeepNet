@@ -188,7 +188,7 @@ type UnaryOp =
 /// an op that will expand into an expression once symbolic sizes have been substituted
 type UnaryHeldOp =
     /// replicates the axes to the specified size
-    | ReplicateTo of dim:int * size:SizeSpec
+    | ReplicateTo of dim:int * size:SizeSpec // ignore for now, perhaps we find a better method to implement this.
 
 /// a simplified range specification of one dimension
 type ExprRngSpec = SimpleRangeSpec<Expr>

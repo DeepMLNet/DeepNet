@@ -73,11 +73,14 @@ type IOp2 =
     abstract Shape: ShapeSpec      
         
     /// Should compute the derivative w.r.t. each argument given the derivative w.r.t. the op.
-    /// The derivative is always an NxM matrix where N is the number of elements of the function
-    /// the derivative of which is being taken and M is the number of elements of the argument
-    /// w.r.t. which the derivative is being taken. 
-    /// Thus, if dOp is an NxK matrix and an argument has M elements, the derivative matrix
-    /// you return w.r.t. that argument must have NxM elements.
+    ///
+    /// `dOp` is the incoming derivative, i.e. the derivative with respect to this op.
+    /// Assuming that N is the number of elements of the function the derivative is being taken and
+    /// the output shape of this op is M1xM2x...xMD, the incoming derivative will be of shape
+    /// NxM1xM2x...xMD.
+    ///
+    /// The outgoing derivatives should be of shape NxK1xK2x...xKD where K1xK2x...xKD is the
+    /// shape of the respective argument.
     abstract Deriv: dOp:Expr2 -> Map<string, Expr2>
 
     /// Should evaluate the numerical value of this op given the numerical values of its arguments.
@@ -283,7 +286,7 @@ type Expr2 (op: IOp2) =
 
     /// scalar constant of given value
     static member scalar (f: obj) = 
-        Expr2 (OpForwards.ScalarConst (Const.ofValue f)) 
+        Expr2 (OpForwards.Scalar (Const.ofValue f)) 
 
     /// scalar of given value converted to same type as given expression
     static member scalarOfSameType (expr: Expr2) f = 
@@ -506,6 +509,28 @@ type Expr2 (op: IOp2) =
 
     static member ( .* ) (x: Expr2, y: Expr2) = OpForwards.Dot x y
 
+    /// Sign keeping type.
+    static member signt (expr: Expr2) =
+        Expr2.SignT expr
+
+    /// Square root.
+    static member sqrtt (expr: Expr2) =
+        Expr2.Sqrt expr
+
+    /// Tensor of given shape filled with specified value.
+    static member filled (shp: ShapeSpec) value =
+        let bcShp = shp |> List.map (fun _ -> SizeSpec.broadcastable)
+        Expr2.scalar value |> Expr2.reshape bcShp |> Expr2.broadcast shp
+
+    /// Zero tensor of given shape.
+    [<RequiresExplicitTypeArguments>]
+    static member zeros<'T> (shp: ShapeSpec) =
+        Expr2.filled shp (conv<'T> 0)
+
+    /// Zero tensor of given type and shape.
+    static member zerosOfType typ shp =
+        Expr2.filled shp (convTo typ 0)
+
 
 type MultiChannelExpr (op: IMultiChannelOp) =   
     do op.Check()
@@ -580,7 +605,7 @@ type MultiChannelExpr (op: IMultiChannelOp) =
 type internal IOpForwards =   
 
     abstract Var: var:Var -> IOp2
-    abstract ScalarConst: value:Const -> IOp2
+    abstract Scalar: value:Const -> IOp2
     abstract SizeValue: size:SizeSpec -> IOp2
     abstract Reshape: shp:ShapeSpec -> x:Expr2 -> IOp2
     abstract DoBroadcast: shp:ShapeSpec -> x:Expr2 -> IOp2
