@@ -1,238 +1,25 @@
-﻿namespace rec SymTensor.Ops
+﻿namespace SymTensor
 
-open SymTensor
+open SymTensor.Ops
 open DeepNet.Utils
-open Tensor
-open Tensor.Backend
-
-    
-type ArgsMap = Map<string, Expr2>
-type MultiChannelArgsMap = Map<string, MultiChannelExpr>
-
-/// Information necessary to evaluate an expression.
-/// Currently this just holds the variable values, but may contain further information in the future.
-type EvalEnv = {
-    /// Values of variables.
-    VarEnv: VarEnv
-    /// Device to store result on.
-    Dev:    ITensorDevice
-    /// Argument values.
-    Args:   Map<string, ITensor>
-    /// Multi-channel argument values.
-    MultiChannelArgs:   Map<string, Map<string, ITensor>>
-}
 
 
-/// start plus the specified number of (symbolic elements)
-type internal PlusElems (elems: SizeSpec) =
-    new (intElems: int64) = PlusElems (SizeSpec.fix intElems)
-    member this.Elems = elems
-
-
-/// Base interface for a mathematical operation in an expression.
-type IBaseOp =
-    inherit System.IComparable
-      
-    /// Should check if the types and shapes of the arguments are acceptable and,
-    /// if not, raise an exception.
-    abstract Check: unit -> unit
-       
-    /// Returns the arguments of this op.
-    abstract Args: ArgsMap
-
-    /// Creates a new op with the arguments replaced by the specified arguments.
-    abstract ReplaceArgs: ArgsMap -> IBaseOp
-
-    /// Should return the expression with all symbolic sizes substituted using the specified
-    /// substitution table.
-    /// Return a *new* op with substitution applied. Do not apply the mapping in-place.
-    abstract SubstSymSizes: env: SymSizeEnv -> IBaseOp
-
-    /// Should be true, if all symbolic sizes can be evaluated to numeric sizes.
-    /// This is the case if the function ShapeSpec.canEval or SizeSpec.canEval respectively
-    /// return true on all sizes used in this op.
-    abstract CanEvalAllSymSizes: bool
-
-
-/// Operation that uses multi-channel expressions as its arguments.
-type IMultiChannelArgsOp = 
-    abstract MultiChannelArgs: MultiChannelArgsMap
-    abstract ReplaceMultiChannelArgs: MultiChannelArgsMap -> IMultiChannelArgsOp
-
-
-/// A mathematical operation in an expression with a single output value.
-/// This models a mathematical function or operator that takes one or more tensors
-/// and returns one tensor.
-type IOp2 =
-    inherit IBaseOp
-      
-    /// Should return the type of the result.
-    abstract TypeName: TypeName
-
-    /// Should return the shape of the result.
-    abstract Shape: ShapeSpec      
-        
-    /// Should compute the derivative w.r.t. each argument given the derivative w.r.t. the op.
-    ///
-    /// `dOp` is the incoming derivative, i.e. the derivative with respect to this op.
-    /// Assuming that N is the number of elements of the function the derivative is being taken and
-    /// the output shape of this op is M1xM2x...xMD, the incoming derivative will be of shape
-    /// NxM1xM2x...xMD.
-    ///
-    /// The outgoing derivatives should be of shape NxK1xK2x...xKD where K1xK2x...xKD is the
-    /// shape of the respective argument.
-    abstract Deriv: dOp:Expr2 -> Map<string, Expr2>
-
-    /// Should evaluate the numerical value of this op given the numerical values of its arguments.
-    /// This evaluation should be done on the host using the simplest means possible and is used
-    /// as a reference implementation for verifying the correctness of optimized (e.g. CUDA) 
-    /// implementations. This method may be omitted when no verification will be done.
-    abstract Eval: env:EvalEnv -> Tensor.ITensor
-
-
-/// A mathematical operation in an expression with multiple output values.
-/// This models a mathematical function or operator that takes one or more tensors
-/// and returns multiple tensors.
-type IMultiChannelOp =
-    inherit IBaseOp
-      
-    /// The output channels of this operation.
-    abstract Channels: string List
-
-    /// Should return the types of the results.
-    abstract TypeNames: Map<string, TypeName>
-
-    /// Should return the shapes of the results.
-    abstract Shapes: Map<string, ShapeSpec>      
-        
-    /// Should compute the derivative w.r.t. each argument given the derivative w.r.t. the op.
-    /// The derivative is always an NxM matrix where N is the number of elements of the function
-    /// the derivative of which is being taken and M is the number of elements of the argument
-    /// w.r.t. which the derivative is being taken. 
-    /// Thus, if dOp is an NxK matrix and an argument has M elements, the derivative matrix
-    /// you return w.r.t. that argument must have NxM elements.
-    abstract Deriv: dOp:Map<string, Expr2> -> Map<string, Expr2>
-
-    /// Should evaluate the numerical value of this op given the numerical values of its arguments.
-    /// This evaluation should be done on the host using the simplest means possible and is used
-    /// as a reference implementation for verifying the correctness of optimized (e.g. CUDA) 
-    /// implementations. This method may be omitted when no verification will be done.
-    abstract Eval: env:EvalEnv -> Map<string, Tensor.ITensor>
-
-
-/// An op that contains variables.
-type IVarContainingOp =
-    /// Variables contained in that op.
-    abstract Vars: Set<Var>
-
-
-type IExpr = 
-
-    inherit System.IComparable
-    inherit System.IComparable<IExpr>
-    inherit System.IEquatable<IExpr>
-
-
-module internal ExprTools =
-    /// Returns all variables contained in an op and its arguments.
-    let extractVars (op: IBaseOp) =
-        let opVars =
-            match op with
-            | :? IVarContainingOp as op -> op.Vars
-            | _ -> Set.empty
-        let argVars =
-            op.Args |> Map.toSeq |> Seq.map (fun (_, arg) -> arg.Vars) |> Set.unionMany
-        let mcArgVars =
-            match op with
-            | :? IMultiChannelArgsOp as op ->
-                op.MultiChannelArgs |> Map.toSeq |> Seq.map (fun (_, mcArg) -> mcArg.Vars) |> Set.unionMany
-            | _ -> Set.empty
-        Set.unionMany [opVars; argVars; mcArgVars]
-
-    /// Returns true, if all symbolic sizes of the op and its arguments can be evaluated to numeric values.
-    let canEvalAllSymSizes (op: IBaseOp) =
-        let argsEvalable = 
-            op.Args |> Map.forall (fun _ arg -> arg.CanEvalAllSymSizes)
-        let mcArgsEvalable = 
-            match op with
-            | :? IMultiChannelArgsOp as op ->
-                op.MultiChannelArgs |> Map.forall (fun _ mcArg -> mcArg.CanEvalAllSymSizes)
-            | _ -> true
-        argsEvalable && mcArgsEvalable && op.CanEvalAllSymSizes
-
-    let substSymSizes (env: SymSizeEnv) (op: IBaseOp) =
-        let op = op.SubstSymSizes env
-        let subsArgs = op.Args |> Map.map (fun _ arg -> Expr2.substSymSizes env arg)
-        let op = op.ReplaceArgs subsArgs
-        let op =
-            match op with
-            | :? IMultiChannelArgsOp as op ->
-                let subsArgs = 
-                    op.MultiChannelArgs |> Map.map (fun _ mcArg -> MultiChannelExpr.substSymSizes env mcArg)
-                op.ReplaceMultiChannelArgs subsArgs :?> IBaseOp
-            | _ -> op
-        op
 
 type Expr2 (op: IOp2) =    
-    do op.Check()
-        
-    let _vars = lazy (ExprTools.extractVars op)
-    let _canEvalAllSymSizes = lazy (ExprTools.canEvalAllSymSizes op)
+    inherit BaseExpr(op)
 
-    member this.Op = op
+    new (baseExpr: BaseExpr) =
+        Expr2(baseExpr.Op)
+
     static member op (expr: Expr2) = expr.Op
-
-    member this.TypeName = op.TypeName   
     static member typeName (expr: Expr2) = expr.TypeName
-
-    member this.DataType = this.TypeName.Type
-
-    member this.Shape = op.Shape
     static member shape (expr: Expr2) = expr.Shape
-
-    member this.NDims = List.length this.Shape
     static member nDims (expr: Expr2) = expr.NDims
-
-    member this.NElems = List.fold (*) SizeSpec.one this.Shape
     static member nElems (expr: Expr2) = expr.NElems
-
-    member this.Vars = _vars.Force()
     static member vars (expr: Expr2) = expr.Vars
-
-    member this.CanEvalAllSymSizes = _canEvalAllSymSizes.Force()
     static member canEvalAllSymSizes (expr: Expr2) = expr.CanEvalAllSymSizes
-
-    static member substSymSizes (env: SymSizeEnv) (expr: Expr2) =
-        ExprTools.substSymSizes env expr.Op :?> IOp2 |> Expr2
-
-    interface IExpr
-
-    interface System.IEquatable<IExpr> with
-        member this.Equals other = 
-            match other with
-            | :? Expr2 as other -> this.Op.Equals other.Op
-            | _ -> false
-
-    override this.Equals other =
-        match other with
-        | :? IExpr as other -> (this :> System.IEquatable<_>).Equals other
-        | _ -> false
-
-    interface System.IComparable<IExpr> with
-        member this.CompareTo other =
-            match other with
-            | :? Expr2 as other -> compare this.Op other.Op
-            | :? MultiChannelExpr -> 1
-            | _ -> failwithf "Cannot compare Expr to type %A." (other.GetType())
-
-    interface System.IComparable with
-        member this.CompareTo other =
-            match other with
-            | :? IExpr as other -> (this :> System.IComparable<_>).CompareTo other
-            | _ -> failwithf "Cannot compare Expr to type %A." (other.GetType())
-
-    override this.GetHashCode() =
-        hash this.Op
+    static member substSymSizes (env: SymSizeEnv) (expr: Expr2) : Expr2 =
+        expr.SubstSymSizes env |> Expr2
 
     /// Checks that given axis is valid for specified expression
     static member internal checkAxis ax (expr: Expr2) =
@@ -286,7 +73,7 @@ type Expr2 (op: IOp2) =
 
     /// scalar constant of given value
     static member scalar (f: obj) = 
-        Expr2 (OpForwards.Scalar (Const.ofValue f)) 
+        {Scalar.Value=Const.ofValue f} |> Expr2 
 
     /// scalar of given value converted to same type as given expression
     static member scalarOfSameType (expr: Expr2) f = 
@@ -295,7 +82,7 @@ type Expr2 (op: IOp2) =
 
     /// Scalar with value of given size and type int64.
     static member size (size: SizeSpec) = 
-        OpForwards.SizeValue size |> Expr2
+        {SizeValue.Value=size} |> Expr2
 
     /// Permutes the axes as specified.
     /// Each entry in the specified permutation specifies the *new* position of 
@@ -530,137 +317,4 @@ type Expr2 (op: IOp2) =
     /// Zero tensor of given type and shape.
     static member zerosOfType typ shp =
         Expr2.filled shp (convTo typ 0)
-
-
-type MultiChannelExpr (op: IMultiChannelOp) =   
-    do op.Check()
-        
-    let _vars = lazy (ExprTools.extractVars op)
-    let _canEvalAllSymSizes = lazy (ExprTools.canEvalAllSymSizes op)
-
-    member this.Op = op
-    static member op (expr: Expr2) = expr.Op
-
-    member this.TypeNames = op.TypeNames
-    static member typeNames (expr: MultiChannelExpr) = expr.TypeNames
-
-    member this.DataTypes = this.TypeNames |> Map.map (fun _ tn -> tn.Type)
-
-    member this.Shapes = op.Shapes
-    static member shapes (expr: MultiChannelExpr) = expr.Shapes
-
-    member this.NDims = this.Shapes |> Map.map (fun _ s -> List.length s)
-    static member nDims (expr: MultiChannelExpr) = expr.NDims
-
-    member this.NElems = this.Shapes |> Map.map (fun _ s -> List.fold (*) SizeSpec.one s)
-    static member nElems (expr: MultiChannelExpr) = expr.NElems
-
-    member this.Channels = op.Channels
-    static member channels (expr: MultiChannelExpr) = expr.Channels
-
-    member this.Vars = _vars.Force()
-    static member vars (expr: Expr2) = expr.Vars
-
-    member this.CanEvalAllSymSizes = _canEvalAllSymSizes.Force()
-    static member canEvalAllSymSizes (expr: Expr2) = expr.CanEvalAllSymSizes
-
-    static member substSymSizes (env: SymSizeEnv) (expr: MultiChannelExpr) =
-        ExprTools.substSymSizes env expr.Op :?> IMultiChannelOp |> MultiChannelExpr
-
-    member this.Item 
-        with get (channel: string) = 
-            OpForwards.Channel channel this |> Expr2
-
-    interface IExpr
-
-    interface System.IEquatable<IExpr> with
-        member this.Equals other = 
-            match other with
-            | :? MultiChannelExpr as other -> this.Op.Equals other.Op
-            | _ -> false
-
-    override this.Equals other =
-        match other with
-        | :? IExpr as other -> (this :> System.IEquatable<_>).Equals other
-        | _ -> false
-
-    interface System.IComparable<IExpr> with
-        member this.CompareTo other =
-            match other with
-            | :? MultiChannelExpr as other -> compare this.Op other.Op
-            | :? Expr2 -> -1
-            | _ -> failwithf "Cannot compate MultiChannelExpr to type %A." (other.GetType())
-
-    interface System.IComparable with
-        member this.CompareTo other =
-            match other with
-            | :? IExpr as other -> (this :> System.IComparable<_>).CompareTo other
-            | _ -> failwithf "Cannot compare MultiChannelExpr to type %A." (other.GetType())
-
-    override this.GetHashCode() =
-        hash this.Op
-
-
-[<AllowNullLiteral>]
-type internal IOpForwards =   
-
-    abstract Var: var:Var -> IOp2
-    abstract Scalar: value:Const -> IOp2
-    abstract SizeValue: size:SizeSpec -> IOp2
-    abstract Reshape: shp:ShapeSpec -> x:Expr2 -> IOp2
-    abstract DoBroadcast: shp:ShapeSpec -> x:Expr2 -> IOp2
-    abstract PermuteAxes: perm:int list -> x:Expr2 -> IOp2
-    abstract Subtensor: range:SimpleRangesSpec -> x:Expr2 -> IOp2
-    abstract IsSubtensor: expr:Expr2 -> (SimpleRangesSpec * Expr2 * Expr2) option
-    abstract SetSubtensor: range:SimpleRangesSpec -> x:Expr2 -> y:Expr2 -> IOp2
-    abstract Channel: channel:string -> x:MultiChannelExpr -> IOp2
-
-    abstract UnaryPlus: x:Expr2 -> IOp2
-    abstract Negate: x:Expr2 -> IOp2
-    abstract Abs: x:Expr2 -> IOp2
-    abstract SignT: x:Expr2 -> IOp2
-    abstract Log: x:Expr2 -> IOp2
-    abstract Log10: x:Expr2 -> IOp2
-    abstract Exp: x:Expr2 -> IOp2
-    abstract Sin: x:Expr2 -> IOp2
-    abstract Cos: x:Expr2 -> IOp2
-    abstract Tan: x:Expr2 -> IOp2
-    abstract Asin: x:Expr2 -> IOp2
-    abstract Acos: x:Expr2 -> IOp2
-    abstract Atan: x:Expr2 -> IOp2
-    abstract Sinh: x:Expr2 -> IOp2
-    abstract Cosh: x:Expr2 -> IOp2
-    abstract Tanh: x:Expr2 -> IOp2
-    abstract Sqrt: x:Expr2 -> IOp2
-    abstract Ceiling: x:Expr2 -> IOp2
-    abstract Floor: x:Expr2 -> IOp2
-    abstract Round: x:Expr2 -> IOp2
-    abstract Truncate: x:Expr2 -> IOp2
-    abstract Not: x:Expr2 -> IOp2
-    abstract Store: var:Var -> x:Expr2 -> IOp2
-
-    abstract Add: x:Expr2 -> y:Expr2 -> IOp2
-    abstract Subtract: x:Expr2 -> y:Expr2 -> IOp2
-    abstract Multiply: x:Expr2 -> y:Expr2 -> IOp2
-    abstract Divide: x:Expr2 -> y:Expr2 -> IOp2
-    abstract Pow: x:Expr2 -> y:Expr2 -> IOp2
-    abstract Modulo: x:Expr2 -> y:Expr2 -> IOp2
-    abstract And: x:Expr2 -> y:Expr2 -> IOp2
-    abstract Or: x:Expr2 -> y:Expr2 -> IOp2
-    abstract Xor: x:Expr2 -> y:Expr2 -> IOp2
-    abstract Equal: x:Expr2 -> y:Expr2 -> IOp2
-    abstract NotEqual: x:Expr2 -> y:Expr2 -> IOp2
-    abstract Less: x:Expr2 -> y:Expr2 -> IOp2
-    abstract LessOrEqual: x:Expr2 -> y:Expr2 -> IOp2
-    abstract Greater: x:Expr2 -> y:Expr2 -> IOp2
-    abstract GreaterOrEqual: x:Expr2 -> y:Expr2 -> IOp2
-    abstract Dot: x:Expr2 -> y:Expr2 -> Expr2
-
-[<AutoOpen>]
-module internal OpForwardTypes = 
-    let OpForwards : IOpForwards = 
-        let typ = System.Type.GetType("OpForwards")
-        System.Activator.CreateInstance(typ) :?> IOpForwards
-
-
 
