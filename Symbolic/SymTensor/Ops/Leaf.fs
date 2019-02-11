@@ -280,7 +280,8 @@ module UnaryOps =
             member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = 
-                dOp * Expr2.padLeft (this.X ** (-Deriv.one this.X)) |> Args.unary
+                let one = Deriv.one this.X
+                dOp * Expr2.padLeft (this.X ** (-one)) |> Args.unary
             member this.Eval env = (Args.unaryX env.Args).Log ()       
     let (|Log|_|) (expr: Expr2) =
         match expr.Op with
@@ -298,7 +299,9 @@ module UnaryOps =
             member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = 
-                dOp * Expr2.padLeft (this.X ** (-Deriv.one this.X) / log (Deriv.ten this.X)) |> Args.unary
+                let one = Deriv.one this.X
+                let ten = Deriv.ten this.X
+                dOp * Expr2.padLeft (this.X ** (-one) / log ten) |> Args.unary
             member this.Eval env = (Args.unaryX env.Args).Log10 ()       
     let (|Log10|_|) (expr: Expr2) =
         match expr.Op with
@@ -316,7 +319,7 @@ module UnaryOps =
             member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp = 
-                dOp * Expr.padLeft (exp this.X) |> Args.unary
+                dOp * Expr2.padLeft (exp this.X) |> Args.unary
             member this.Eval env = (Args.unaryX env.Args).Exp ()       
     let (|Exp|_|) (expr: Expr2) =
         match expr.Op with
@@ -333,7 +336,8 @@ module UnaryOps =
             member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
             member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
-            member this.Deriv dOp = Args.unary -dOp // TODO
+            member this.Deriv dOp = 
+                dOp * Expr2.padLeft (cos this.X) |> Args.unary
             member this.Eval env = (Args.unaryX env.Args).Sin ()       
     let (|Sin|_|) (expr: Expr2) =
         match expr.Op with
@@ -350,7 +354,8 @@ module UnaryOps =
             member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
             member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
-            member this.Deriv dOp = Args.unary -dOp // TODO
+            member this.Deriv dOp = 
+                dOp * Expr2.padLeft (-sin this.X) |> Args.unary
             member this.Eval env = (Args.unaryX env.Args).Cos ()       
     let (|Cos|_|) (expr: Expr2) =
         match expr.Op with
@@ -367,7 +372,10 @@ module UnaryOps =
             member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
             member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
-            member this.Deriv dOp = Args.unary -dOp // TODO
+            member this.Deriv dOp = 
+                let one = Deriv.one this.X
+                let two = Deriv.two this.X
+                dOp * Expr2.padLeft (one + (tan this.X) ** two) |> Args.unary
             member this.Eval env = (Args.unaryX env.Args).Tan ()       
     let (|Tan|_|) (expr: Expr2) =
         match expr.Op with
@@ -384,7 +392,10 @@ module UnaryOps =
             member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
             member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
-            member this.Deriv dOp = Args.unary -dOp // TODO
+            member this.Deriv dOp = 
+                let one = Deriv.one this.X
+                let two = Deriv.two this.X
+                dOp * Expr2.padLeft (one / Expr2.sqrtt (one - this.X ** two)) |> Args.unary
             member this.Eval env = (Args.unaryX env.Args).Asin ()       
     let (|Asin|_|) (expr: Expr2) =
         match expr.Op with
@@ -401,7 +412,10 @@ module UnaryOps =
             member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
             member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
-            member this.Deriv dOp = Args.unary -dOp // TODO
+            member this.Deriv dOp =
+                let one = Deriv.one this.X
+                let two = Deriv.two this.X
+                dOp * Expr2.padLeft (-one / Expr2.sqrtt (one - this.X ** two)) |> Args.unary
             member this.Eval env = (Args.unaryX env.Args).Acos ()       
     let (|Acos|_|) (expr: Expr2) =
         match expr.Op with
@@ -418,7 +432,10 @@ module UnaryOps =
             member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
             member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
-            member this.Deriv dOp = Args.unary -dOp // TODO
+            member this.Deriv dOp =
+                let one = Deriv.one this.X
+                let two = Deriv.two this.X
+                dOp * Expr2.padLeft (one / (one + this.X ** two)) |> Args.unary 
             member this.Eval env = (Args.unaryX env.Args).Atan ()       
     let (|Atan|_|) (expr: Expr2) =
         match expr.Op with
@@ -435,7 +452,8 @@ module UnaryOps =
             member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
             member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
-            member this.Deriv dOp = Args.unary -dOp // TODO
+            member this.Deriv dOp = 
+                dOp * Expr2.padLeft (cosh this.X) |> Args.unary
             member this.Eval env = (Args.unaryX env.Args).Sinh ()       
     let (|Sinh|_|) (expr: Expr2) =
         match expr.Op with
@@ -452,7 +470,8 @@ module UnaryOps =
             member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
             member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
-            member this.Deriv dOp = Args.unary -dOp // TODO
+            member this.Deriv dOp = 
+                dOp * Expr2.padLeft (sinh this.X) |> Args.unary
             member this.Eval env = (Args.unaryX env.Args).Cosh ()       
     let (|Cosh|_|) (expr: Expr2) =
         match expr.Op with
@@ -469,7 +488,10 @@ module UnaryOps =
             member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
             member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
-            member this.Deriv dOp = Args.unary -dOp // TODO
+            member this.Deriv dOp = 
+                let one = Deriv.one this.X
+                let two = Deriv.two this.X
+                dOp * Expr2.padLeft (one - (tanh this.X) ** two) |> Args.unary
             member this.Eval env = (Args.unaryX env.Args).Tanh ()       
     let (|Tanh|_|) (expr: Expr2) =
         match expr.Op with
@@ -486,7 +508,10 @@ module UnaryOps =
             member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
             member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
-            member this.Deriv dOp = Args.unary -dOp // TODO
+            member this.Deriv dOp = 
+                let one = Deriv.one this.X
+                let two = Deriv.two this.X
+                dOp * Expr2.padLeft (one / (two * Expr2.sqrtt this.X)) |> Args.unary
             member this.Eval env = (Args.unaryX env.Args).Sqrt ()       
     let (|Sqrt|_|) (expr: Expr2) =
         match expr.Op with
@@ -503,7 +528,7 @@ module UnaryOps =
             member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
             member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
-            member this.Deriv dOp = Args.unary -dOp // TODO
+            member this.Deriv dOp = Deriv.zeros dOp this.X |> Args.unary
             member this.Eval env = (Args.unaryX env.Args).Ceiling ()       
     let (|Ceiling|_|) (expr: Expr2) =
         match expr.Op with
@@ -520,7 +545,7 @@ module UnaryOps =
             member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
             member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
-            member this.Deriv dOp = Args.unary -dOp // TODO
+            member this.Deriv dOp = Deriv.zeros dOp this.X |> Args.unary
             member this.Eval env = (Args.unaryX env.Args).Floor ()       
     let (|Floor|_|) (expr: Expr2) =
         match expr.Op with
@@ -537,7 +562,7 @@ module UnaryOps =
             member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
             member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
-            member this.Deriv dOp = Args.unary -dOp // TODO
+            member this.Deriv dOp = Deriv.zeros dOp this.X |> Args.unary
             member this.Eval env = (Args.unaryX env.Args).Round ()       
     let (|Round|_|) (expr: Expr2) =
         match expr.Op with
@@ -554,7 +579,7 @@ module UnaryOps =
             member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
             member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
-            member this.Deriv dOp = Args.unary -dOp // TODO
+            member this.Deriv dOp = Deriv.zeros dOp this.X |> Args.unary
             member this.Eval env = (Args.unaryX env.Args).Truncate ()       
     let (|Truncate|_|) (expr: Expr2) =
         match expr.Op with
@@ -575,7 +600,9 @@ module UnaryOps =
             member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
             member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
-            member this.Deriv dOp = Args.unary -dOp // TODO
+            member this.Deriv dOp = 
+                let self = this |> Expr2
+                -(Expr2.padLeft self.T) .* dOp .* (Expr2.padLeft self.T) |> Args.unary 
             member this.Eval env = (Args.unaryX env.Args).Invert ()
     let (|Invert|_|) (expr: Expr2) =
         match expr.Op with
@@ -600,7 +627,7 @@ module UnaryOps =
             member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
             member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
-            member this.Deriv dOp = Args.unary -dOp // TODO
+            member this.Deriv dOp = Deriv.zeros dOp this.X |> Args.unary
             member this.Eval env = ~~~~(Args.unaryX env.Args :?> Tensor<bool>) :> ITensor       
     let (|Not|_|) (expr: Expr2) =
         match expr.Op with
@@ -622,8 +649,11 @@ module UnaryOps =
                 { this with Shape = SymSizeEnv.substShape env this.Shape } :> _
             member this.CanEvalAllSymSizes = 
                 ShapeSpec.canEval this.Shape
-            member this.Deriv dOp = Args.unary -dOp // TODO
-            member this.Eval env = (Args.unaryX env.Args) |> ITensor.reshape (ShapeSpec.eval this.Shape)       
+            member this.Deriv dOp =
+                let funElems = dOp.Shape.[0]
+                dOp |> Expr2.reshape (funElems :: this.X.Shape) |> Args.unary
+            member this.Eval env =
+                (Args.unaryX env.Args) |> ITensor.reshape (ShapeSpec.eval this.Shape)       
     let (|Reshape|_|) (expr: Expr2) =
         match expr.Op with
         | :? Reshape as this -> Some this
@@ -651,7 +681,15 @@ module UnaryOps =
                 { this with Shape = SymSizeEnv.substShape env this.Shape } :> _
             member this.CanEvalAllSymSizes = 
                 ShapeSpec.canEval this.Shape
-            member this.Deriv dOp = Args.unary -dOp // TODO
+            member this.Deriv dOp = 
+                let mutable dOpUnBc = dOp
+                for ax, (bSize, xSize) in List.indexed (List.zip this.Shape this.X.Shape) do
+                    match bSize, xSize with
+                    | SizeSpec.Broadcast, SizeSpec.Broadcast -> ()
+                    | _, SizeSpec.Broadcast ->
+                        dOpUnBc <- dOpUnBc |> sumKeepingAxis (ax + 1)
+                    | _ -> ()
+                dOpUnBc |> Args.unary                 
             member this.Eval env = (Args.unaryX env.Args) |> ITensor.broadcastTo (ShapeSpec.eval this.Shape)      
     let (|DoBroadcast|_|) (expr: Expr2) =
         match expr.Op with
@@ -673,7 +711,11 @@ module UnaryOps =
             member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
             member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
-            member this.Deriv dOp = Args.unary -dOp // TODO
+            member this.Deriv dOp =
+                let backPerm = Permutation.invert this.Permutation
+                let dOpPerm = 
+                    0 :: List.map (fun p -> p + 1) backPerm
+                dOp |> Expr2.permuteAxes dOpPerm |> Args.unary                 
             member this.Eval env = (Args.unaryX env.Args) |> ITensor.permuteAxes this.Permutation
     let (|PermuteAxes|_|) (expr: Expr2) =
         match expr.Op with
@@ -707,7 +749,11 @@ module UnaryOps =
                 {this with X=Args.unaryX args; Range=range} :> _
             member this.SubstSymSizes env = {this with Range = SymSizeEnv.substRange env this.Range} :> _
             member this.CanEvalAllSymSizes = SimpleRangesSpec.canEvalSymbols this.Range
-            member this.Deriv dOp = Args.unary -dOp // TODO
+            member this.Deriv dOp = 
+                let funElems = dOp.Shape.[0]
+                let agExpanded = Expr2.zerosOfType dOp.DataType (funElems :: this.X.Shape)
+                Expr2.setSubtensor agExpanded.[SimpleRangeSpec.All :: this.Range] dOp
+                |> Args.unary
             member this.Eval env = 
                 // TODO: dynamic range is always copied to host
                 let dynVals = 
@@ -746,7 +792,11 @@ module UnaryOps =
                 {this with X=Args.binaryX args; Y=Args.binaryY args; Range=range} :> _
             member this.SubstSymSizes env = {this with Range = SymSizeEnv.substRange env this.Range} :> _
             member this.CanEvalAllSymSizes = SimpleRangesSpec.canEvalSymbols this.Range
-            member this.Deriv dOp = Args.unary -dOp // TODO
+            member this.Deriv dOp = 
+                let dYExp = dOp.[SimpleRangeSpec.All :: this.Range]
+                let zeros = Expr2.zerosOfType dYExp.DataType dYExp.Shape
+                let dXExp = Expr2.setSubtensor dOp.[SimpleRangeSpec.All :: this.Range] zeros
+                Args.binary dXExp dYExp
             member this.Eval env = 
                 // TODO: dynamic range is always copied to host
                 let dynVals = 
@@ -781,7 +831,8 @@ module UnaryOps =
             member this.ReplaceArgs args = {this with X = Args.unaryX args} :> _
             member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
-            member this.Deriv dOp = Args.unary -dOp // TODO
+            member this.Deriv dOp =
+                dOp |> reverseAxis (ax + 1) |> Args.unary
             member this.Eval env = (Args.unaryX env.Args) |> ITensor.reverseAxis this.Axis
     let (|ReverseAxis|_|) (expr: Expr2) =
         match expr.Op with
