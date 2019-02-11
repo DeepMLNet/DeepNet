@@ -832,7 +832,7 @@ module UnaryOps =
             member this.SubstSymSizes env = this :> _
             member this.CanEvalAllSymSizes = true
             member this.Deriv dOp =
-                dOp |> reverseAxis (ax + 1) |> Args.unary
+                dOp |> reverseAxis (this.Axis + 1) |> Args.unary
             member this.Eval env = (Args.unaryX env.Args) |> ITensor.reverseAxis this.Axis
     let (|ReverseAxis|_|) (expr: Expr2) =
         match expr.Op with
