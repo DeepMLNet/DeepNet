@@ -39,6 +39,11 @@ module internal Deriv =
         DOp: Expr2
     } with
         member this.Expr = Expr2 this.Op
+        member this.FunElems =
+            this.DOp.Shape.[0]
+        member this.DOpJac =
+            let wrtElems = this.DOp.Shape.[1..] |> ShapeSpec.nElem
+            this.DOp |> Expr2.reshape [this.FunElems; wrtElems]
         member this.X = this.Op.Args |> Args.unaryX :?> Expr2
         member this.Y = this.Op.Args |> Args.binaryY :?> Expr2
         member this.Xs =

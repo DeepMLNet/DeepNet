@@ -1525,11 +1525,11 @@ type Expr =
     /// broadcast of SizeBroadcast dimensions // DONE
     static member broadcast ss a = Unary(DoBroadcast(ss), a) |> Expr.check
 
-    /// enables broadcasting in the given dimension, it must be of size one
+    /// enables broadcasting in the given dimension, it must be of size one // DONE
     static member enableBroadcast dim a = 
         a |> Expr.reshape (Expr.shapeOf a |> ShapeSpec.enableBroadcast dim)
 
-    /// disables broadcasting in the given dimension
+    /// disables broadcasting in the given dimension // DONE
     static member disableBroadcast dim a =
         a |> Expr.reshape (Expr.shapeOf a |> ShapeSpec.disableBroadcast dim)
   
@@ -1646,7 +1646,7 @@ type Expr =
         Expr.filled shp zero
 
     /// zero tensor with same shape and type as given tensor
-    static member zerosLike expr = 
+    static member zerosLike expr = // DONE
         Expr.zerosOfSameType expr expr.Shape
 
     /// variable of given name and shape

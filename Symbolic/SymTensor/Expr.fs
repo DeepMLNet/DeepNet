@@ -88,6 +88,14 @@ type Expr2 (op: IOp2) =
         | [bcA; bcB] -> bcA, bcB
         | _ -> failwith "impossible"
 
+    /// enables broadcasting in the given dimension, it must be of size one
+    static member enableBroadcast dim (a: Expr2) = 
+        a |> Expr2.reshape (a.Shape |> ShapeSpec.enableBroadcast dim)
+
+    /// disables broadcasting in the given dimension
+    static member disableBroadcast dim (a: Expr2) =
+        a |> Expr2.reshape (a.Shape |> ShapeSpec.disableBroadcast dim)
+  
     /// scalar constant of given value
     static member scalar (f: obj) = 
         {Scalar.Value=Const.ofValue f} |> Expr2 
@@ -334,6 +342,10 @@ type Expr2 (op: IOp2) =
     /// Zero tensor of given type and shape.
     static member zerosOfType typ shp =
         Expr2.filled shp (convTo typ 0)
+
+    /// zero tensor with same shape and type as given tensor
+    static member zerosLike (expr: Expr2) = 
+        Expr2.zerosOfType expr.DataType expr.Shape
 
     /// Computes the inverse of a matrix.
     /// If the input has more than two dimensions, the inverses

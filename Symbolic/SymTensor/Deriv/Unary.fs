@@ -231,7 +231,6 @@ type SubtensorDeriv(op: Subtensor) =
             let env = Deriv.Env.make op dOp 
             let funElems = env.DOp.Shape.[0]
             let agExpanded = Expr2.zerosOfType dOp.DataType (funElems :: env.X.Shape)
-            
             env.DOp
             |> Expr2.setSubtensor agExpanded.[SimpleRangeSpec.All :: op.Range] 
             |> Deriv.unary
@@ -250,22 +249,24 @@ type DiagDeriv(op: Diag) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = Deriv.Env.make op dOp 
-            failwith "TODO"
+            env.DOp |> Expr2.diagMatAxis (op.Axis1 + 1) (op.Axis2 + 1) |> Deriv.unary
+
 
 [<OpExtender>]
 type DiagMatDeriv(op: DiagMat) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = Deriv.Env.make op dOp 
-            failwith "TODO"
-
-
+            env.DOp |> Expr2.diagAxis (op.Axis1 + 1) (op.Axis2 + 1) |> Deriv.unary
+ 
+ 
 [<OpExtender>]
 type SumAxisDeriv(op: SumAxis) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = Deriv.Env.make op dOp 
-            failwith "TODO"
+            let bcEgExp = env.DOp |> Expr2.reshape (env.DOp.Shape |> ShapeSpec.insertBroadcastAxis (op.Axis + 1))
+            bcEgExp |> Expr2.broadcast (bcEgExp.Shape |> ShapeSpec.set (op.Axis + 1) env.X.Shape.[op.Axis]) |> Deriv.unary 
 
 
 [<OpExtender>]
@@ -273,7 +274,11 @@ type ProductAxisDeriv(op: ProductAxis) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = Deriv.Env.make op dOp 
-            failwith "TODO"
+            // TODO: This division method incorrectly returns NaN for zero elements.
+            //       But currently I do not see any efficient alternative.
+            let aBc = env.X |> Expr2.reshape (SizeSpec.broadcastable :: ShapeSpec.flatten env.X.Shape)
+            let pBc = env.Expr |> Expr2.reshape [SizeSpec.broadcastable; SizeSpec.broadcastable]
+            (env.DOpJac |> Expr2.enableBroadcast 1) * (pBc / aBc) |> Deriv.unary
 
 
 [<OpExtender>]
@@ -281,7 +286,9 @@ type MaxAxisDeriv(op: MaxAxis) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = Deriv.Env.make op dOp 
-            failwith "TODO"
+            let bcExpr = env.Expr |> Expr2.reshape (env.Expr.Shape |> ShapeSpec.insertBroadcastAxis op.Axis)
+            let bcEgExp = env.DOp |> Expr2.reshape (env.DOp.Shape |> ShapeSpec.insertBroadcastAxis (op.Axis + 1))
+            Expr2.ifThenElse (Expr2.padLeft (env.X ==== bcExpr)) bcEgExp (Expr2.zerosLike bcEgExp) |> Deriv.unary
 
 
 [<OpExtender>]
@@ -289,7 +296,7 @@ type MinAxisDeriv(op: MinAxis) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = Deriv.Env.make op dOp 
-            failwith "TODO"
+            env.Zeros env.X |> Deriv.unary
 
 
 [<OpExtender>]
@@ -297,7 +304,7 @@ type ArgMaxAxisDeriv(op: ArgMaxAxis) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = Deriv.Env.make op dOp 
-            failwith "TODO"
+            env.Zeros env.X |> Deriv.unary
 
 
 [<OpExtender>]
@@ -305,7 +312,7 @@ type ArgMinAxisDeriv(op: ArgMinAxis) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = Deriv.Env.make op dOp 
-            failwith "TODO"
+            env.Zeros env.X |> Deriv.unary
 
 
 [<OpExtender>]
@@ -313,7 +320,8 @@ type GatherDeriv(op: Gather) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = Deriv.Env.make op dOp 
-            failwith "TODO"
+            let dIndices = op.Indices |> List.map (Option.map (fun i -> i :?> Expr2 |> Expr2.padLeft))
+            env.DOp |> Expr2.scatter (None::dIndices) (env.FunElems :: env.X.Shape) |> Deriv.unary
 
 
 [<OpExtender>]
@@ -321,7 +329,9 @@ type ScatterDeriv(op: Scatter) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = Deriv.Env.make op dOp 
-            failwith "TODO"
+            let dIndices = op.Indices |> List.map (Option.map (fun idx -> 
+                idx :?> Expr2 |> Expr2.broadcastToShape (env.FunElems :: idx.Shape)))                   
+            env.DOp |> Expr2.gather (None::dIndices) |> Deriv.unary
 
 
 [<OpExtender>]
@@ -337,15 +347,23 @@ type AssumeZeroDerivDeriv(op: AssumeZeroDeriv) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = Deriv.Env.make op dOp 
-            failwith "TODO"
+            env.Zeros env.X |> Deriv.unary
     
 
 [<OpExtender>]
 type AssumeDerivDeriv(op: AssumeDeriv) =
     interface IDerivableOp with      
         member this.Deriv dOp =
+            // TODO: does this op make sense the way it currently works?
             let env = Deriv.Env.make op dOp 
-            failwith "TODO"
+            let deriv = op.Deriv :?> Expr2
+            match env.FunElems, deriv.Shape.[0] with
+            | fl, jl when fl = jl -> deriv
+            | fl, jl when jl = SizeSpec.broadcastable -> 
+                deriv |> Expr2.broadcast [fl; deriv.Shape.[1]]
+            | _ -> failwithf "Cannot broadcast specified Jacobian of shape %A to required 
+                              Jacobian shape %A" deriv.Shape env.DOp.Shape
+            |> Deriv.unary
     
 
 [<OpExtender>]
@@ -353,7 +371,7 @@ type AnnotatedDeriv(op: Annotated) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = Deriv.Env.make op dOp 
-            failwith "TODO"
+            env.DOp |> Deriv.unary
  
 
 [<OpExtender>]
@@ -361,7 +379,7 @@ type PrintDeriv(op: Print) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = Deriv.Env.make op dOp 
-            failwith "TODO"
+            env.DOp |> Deriv.unary
     
 
 [<OpExtender>]
@@ -369,7 +387,7 @@ type DumpDeriv(op: Dump) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = Deriv.Env.make op dOp 
-            failwith "TODO"
+            env.DOp |> Deriv.unary
 
 
 [<OpExtender>]
@@ -377,7 +395,7 @@ type CheckFiniteDeriv(op: CheckFinite) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = Deriv.Env.make op dOp 
-            failwith "TODO"
+            env.DOp |> Expr2.checkFinite (sprintf "Derivative wrt %s" op.Label) |> Deriv.unary 
 
 
 [<OpExtender>]
