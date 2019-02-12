@@ -8,7 +8,7 @@ open OpTools
 
 /// Unary plus.
 type UnaryPlus = { X: BaseExpr } with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = ()
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -21,7 +21,7 @@ type UnaryPlus = { X: BaseExpr } with
 
 /// Negation.
 type Negate = { X: BaseExpr } with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = ()
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -34,7 +34,7 @@ type Negate = { X: BaseExpr } with
 
 /// Absolute value.
 type Abs = { X: BaseExpr } with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = ()
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -47,7 +47,7 @@ type Abs = { X: BaseExpr } with
     
 /// Sign.
 type SignT = { X: BaseExpr } with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = ()
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -60,7 +60,7 @@ type SignT = { X: BaseExpr } with
 
 /// Logarithm to base exp.
 type Log = { X: BaseExpr } with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = ()
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -73,7 +73,7 @@ type Log = { X: BaseExpr } with
 
 /// Logarithm to base 10.
 type Log10 = { X: BaseExpr } with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = ()
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -86,7 +86,7 @@ type Log10 = { X: BaseExpr } with
 
 /// Exponential function.
 type Exp = { X: BaseExpr } with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = ()
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -99,7 +99,7 @@ type Exp = { X: BaseExpr } with
 
 /// Sine.
 type Sin = { X: BaseExpr } with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = ()
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -112,7 +112,7 @@ type Sin = { X: BaseExpr } with
 
 /// Cosine.
 type Cos = { X: BaseExpr } with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = ()
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -125,7 +125,7 @@ type Cos = { X: BaseExpr } with
 
 /// Tangent.
 type Tan = { X: BaseExpr } with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = ()
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -138,7 +138,7 @@ type Tan = { X: BaseExpr } with
 
 /// Inverse sine.
 type Asin = { X: BaseExpr } with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = ()
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -152,7 +152,7 @@ type Asin = { X: BaseExpr } with
 
 /// Inverse cosine.
 type Acos = { X: BaseExpr } with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = ()
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -165,7 +165,7 @@ type Acos = { X: BaseExpr } with
 
 /// Inverse tangent.
 type Atan = { X: BaseExpr } with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = ()
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -178,7 +178,7 @@ type Atan = { X: BaseExpr } with
 
 /// Hyperbolic sine.
 type Sinh = { X: BaseExpr } with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = ()
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -190,7 +190,7 @@ type Sinh = { X: BaseExpr } with
 
 /// Hyperbolic cosine.
 type Cosh = { X: BaseExpr } with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = ()
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -202,7 +202,7 @@ type Cosh = { X: BaseExpr } with
 
 /// Hyperbolic tangent.
 type Tanh = { X: BaseExpr } with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = ()
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -214,7 +214,7 @@ type Tanh = { X: BaseExpr } with
         
 /// Square root.
 type Sqrt = { X: BaseExpr } with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = ()
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -226,7 +226,7 @@ type Sqrt = { X: BaseExpr } with
 
 /// Round towards positive infinity.
 type Ceiling = { X: BaseExpr } with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = ()
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -238,7 +238,7 @@ type Ceiling = { X: BaseExpr } with
 
 /// Round towards negative infinity.
 type Floor = { X: BaseExpr } with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = ()
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -250,7 +250,7 @@ type Floor = { X: BaseExpr } with
 
 /// Round towards nearest integer.
 type Round = { X: BaseExpr } with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = ()
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -262,7 +262,7 @@ type Round = { X: BaseExpr } with
 
 /// Round towards zeros.
 type Truncate = { X: BaseExpr } with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = ()
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -274,7 +274,7 @@ type Truncate = { X: BaseExpr } with
 
 /// (Batched) matrix inverse.
 type Invert = { X: BaseExpr } with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = 
             if this.X.NDims < 2 then
                 failwithf "Need at least a matrix to invert but got shape %A" this.X.Shape
@@ -291,7 +291,7 @@ type Invert = { X: BaseExpr } with
 
 /// Logical not.
 type Not = { X: BaseExpr } with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = Check.bool [this.X]
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -303,7 +303,7 @@ type Not = { X: BaseExpr } with
 
 /// Reshape
 type Reshape = { X: BaseExpr; Shape: ShapeSpec } with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = 
             if ShapeSpec.nElem this.X.Shape .<> ShapeSpec.nElem this.Shape then
                 failwithf "Cannot change number of elements while reshaping from %A to %A." 
@@ -321,7 +321,7 @@ type Reshape = { X: BaseExpr; Shape: ShapeSpec } with
 
 /// Broadcast.
 type DoBroadcast = { X: BaseExpr; Shape: ShapeSpec } with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = 
             if ShapeSpec.nDim this.X.Shape <> ShapeSpec.nDim this.Shape then
                 failwithf "Tensor of shape %A does not have same number of dimesions as broadcast shape %A."
@@ -346,7 +346,7 @@ type DoBroadcast = { X: BaseExpr; Shape: ShapeSpec } with
 
 /// Permute the axes.
 type PermuteAxes = {X: BaseExpr; Permutation: int list} with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = 
             if ShapeSpec.nDim this.X.Shape <> List.length this.Permutation then
                 failwithf "Permutation %A must have same rank as shape %A." this.Permutation this.X.Shape
@@ -364,7 +364,7 @@ type PermuteAxes = {X: BaseExpr; Permutation: int list} with
 
 /// Read a slice from a tensor.
 type Subtensor = {X: BaseExpr; Range: SimpleRangesSpec} with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = 
             Check.range this.Range this.X
         member this.TypeName = this.X.TypeName
@@ -401,7 +401,7 @@ type Subtensor = {X: BaseExpr; Range: SimpleRangesSpec} with
 
 /// Reverses the tensor in the specified dimension.
 type ReverseAxis = {X: BaseExpr; Axis: int} with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = Check.axis this.Axis this.X
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape 
@@ -414,7 +414,7 @@ type ReverseAxis = {X: BaseExpr; Axis: int} with
 
 /// Extract the diagonal(s) along the given axes.
 type Diag = {X: BaseExpr; Axis1: int; Axis2: int} with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = 
             Check.axis this.Axis1 this.X
             Check.axis this.Axis2 this.X 
@@ -434,7 +434,7 @@ type Diag = {X: BaseExpr; Axis1: int; Axis2: int} with
 
 /// Build a matrix with the specified diagonal.
 type DiagMat = {X: BaseExpr; Axis1: int; Axis2: int} with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = 
             Check.axis this.Axis1 this.X
             if not (0 <= this.Axis2 && this.Axis2 <= this.X.NDims) then
@@ -453,7 +453,7 @@ type DiagMat = {X: BaseExpr; Axis1: int; Axis2: int} with
 
 /// Sum over specified axis.
 type SumAxis = {X: BaseExpr; Axis: int} with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = Check.axis this.Axis this.X
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape |> ShapeSpec.withoutAxis this.Axis
@@ -466,7 +466,7 @@ type SumAxis = {X: BaseExpr; Axis: int} with
 
 /// Product over specified axis.
 type ProductAxis = {X: BaseExpr; Axis: int} with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = Check.axis this.Axis this.X
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape |> ShapeSpec.withoutAxis this.Axis
@@ -479,7 +479,7 @@ type ProductAxis = {X: BaseExpr; Axis: int} with
 
 /// Maximum over specified axis.
 type MaxAxis = {X: BaseExpr; Axis: int} with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = Check.axis this.Axis this.X
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape |> ShapeSpec.withoutAxis this.Axis
@@ -492,7 +492,7 @@ type MaxAxis = {X: BaseExpr; Axis: int} with
 
 /// Minimum over specified axis.
 type MinAxis = {X: BaseExpr; Axis: int} with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = Check.axis this.Axis this.X
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape |> ShapeSpec.withoutAxis this.Axis
@@ -505,7 +505,7 @@ type MinAxis = {X: BaseExpr; Axis: int} with
 
 /// Maximum over specified axis.
 type ArgMaxAxis = {X: BaseExpr; Axis: int} with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = Check.axis this.Axis this.X
         member this.TypeName = TypeName.ofType<int64>
         member this.Shape = this.X.Shape |> ShapeSpec.withoutAxis this.Axis
@@ -518,7 +518,7 @@ type ArgMaxAxis = {X: BaseExpr; Axis: int} with
 
 /// Minimum over specified axis.
 type ArgMinAxis = {X: BaseExpr; Axis: int} with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = Check.axis this.Axis this.X
         member this.TypeName = TypeName.ofType<int64>
         member this.Shape = this.X.Shape |> ShapeSpec.withoutAxis this.Axis
@@ -531,7 +531,7 @@ type ArgMinAxis = {X: BaseExpr; Axis: int} with
 
 /// Select elements according to the specified index tensors
 type Gather = {X: BaseExpr; Indices: BaseExpr option list} with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = 
             if this.X.NDims <> this.Indices.Length then
                 failwithf "Gather source has shape %A but %d index tensors were specified." 
@@ -568,7 +568,7 @@ type Gather = {X: BaseExpr; Indices: BaseExpr option list} with
 
 /// Disperses elements according to the specified index tensors.
 type Scatter = {X: BaseExpr; Indices: BaseExpr option list; Shape: ShapeSpec} with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = 
             for dim, idx in List.indexed this.Indices do
                 match idx with
@@ -598,7 +598,7 @@ type Scatter = {X: BaseExpr; Indices: BaseExpr option list; Shape: ShapeSpec} wi
 
 /// Store value to variable.
 type Store = {X: BaseExpr; Var: Var} with
-    interface IOp2 with       
+    interface IOp with       
         member this.Check () = 
             if this.X.TypeName <> this.Var.TypeName then
                 failwithf "Cannot store expression of type %A into variable of type %A."
@@ -623,7 +623,7 @@ type Store = {X: BaseExpr; Var: Var} with
 
 /// Sets the Jacobian of its argument to zero when calculating derivatives.
 type AssumeZeroDeriv = { X: BaseExpr } with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = ()
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -636,7 +636,7 @@ type AssumeZeroDeriv = { X: BaseExpr } with
 
 /// Sets the Jacobian of its argument to zero when calculating derivatives.
 type AssumeDeriv = {Deriv: BaseExpr; X: BaseExpr} with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = 
             Check.sameType [this.Deriv; this.X]
             if this.Deriv.NDims <> 2 then
@@ -657,7 +657,7 @@ type AssumeDeriv = {Deriv: BaseExpr; X: BaseExpr} with
 
 /// Annotation (no influence on value).
 type Annotated = {Label: System.IComparable; X: BaseExpr} with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = ()
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -670,7 +670,7 @@ type Annotated = {Label: System.IComparable; X: BaseExpr} with
     
 /// Prints the value together with the given label.
 type Print = {Label: string; X: BaseExpr} with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = ()
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -686,7 +686,7 @@ type Print = {Label: string; X: BaseExpr} with
 
 /// Dumps the result into the given dataset in the active HDF5 dump file.
 type Dump = {Dataset: string; X: BaseExpr} with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = ()
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -703,7 +703,7 @@ type Dump = {Dataset: string; X: BaseExpr} with
 /// If the value contains NaNs or infinities, outputs their location and 
 /// stops the computation.
 type CheckFinite = {Label: string; X: BaseExpr} with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = ()
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -721,7 +721,7 @@ type CheckFinite = {Label: string; X: BaseExpr} with
 
 /// Accesses the specified channel of a multi-channnel expression.
 type Channel = {Channel: string; X: BaseMultiChannelExpr} with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = 
             if not (this.X.Channels |> List.contains this.Channel) then
                 failwithf "Multi-channel expression with channels %A does not have channel %A." 

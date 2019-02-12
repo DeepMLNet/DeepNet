@@ -8,7 +8,7 @@ open OpTools
 
 /// Addition.
 type Add = { X: BaseExpr; Y: BaseExpr } with
-    interface IOp2 with       
+    interface IOp with       
         member this.Check () = Check.sameType [this.X; this.Y]; Check.sameShape [this.X; this.Y]
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -20,7 +20,7 @@ type Add = { X: BaseExpr; Y: BaseExpr } with
 
 /// Subtraction.
 type Subtract = { X: BaseExpr; Y: BaseExpr } with
-    interface IOp2 with       
+    interface IOp with       
         member this.Check () = Check.sameType [this.X; this.Y]; Check.sameShape [this.X; this.Y]
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -32,7 +32,7 @@ type Subtract = { X: BaseExpr; Y: BaseExpr } with
 
 /// Multiplication.
 type Multiply = { X: BaseExpr; Y: BaseExpr } with
-    interface IOp2 with       
+    interface IOp with       
         member this.Check () = Check.sameType [this.X; this.Y]; Check.sameShape [this.X; this.Y]
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -44,7 +44,7 @@ type Multiply = { X: BaseExpr; Y: BaseExpr } with
 
 /// Division.
 type Divide = { X: BaseExpr; Y: BaseExpr } with
-    interface IOp2 with       
+    interface IOp with       
         member this.Check () = Check.sameType [this.X; this.Y]; Check.sameShape [this.X; this.Y]
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -56,7 +56,7 @@ type Divide = { X: BaseExpr; Y: BaseExpr } with
 
 /// Exponentiation.
 type Pow = { X: BaseExpr; Y: BaseExpr } with
-    interface IOp2 with       
+    interface IOp with       
         member this.Check () = Check.sameType [this.X; this.Y]; Check.sameShape [this.X; this.Y]
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -68,7 +68,7 @@ type Pow = { X: BaseExpr; Y: BaseExpr } with
 
 /// Modulo.
 type Modulo = { X: BaseExpr; Y: BaseExpr } with
-    interface IOp2 with       
+    interface IOp with       
         member this.Check () = Check.sameType [this.X; this.Y]; Check.sameShape [this.X; this.Y]
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -80,7 +80,7 @@ type Modulo = { X: BaseExpr; Y: BaseExpr } with
 
 /// Elementwise maximum.
 type MaxElemwise = { X: BaseExpr; Y: BaseExpr } with
-    interface IOp2 with       
+    interface IOp with       
         member this.Check () = Check.sameType [this.X; this.Y]; Check.sameShape [this.X; this.Y]
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -92,7 +92,7 @@ type MaxElemwise = { X: BaseExpr; Y: BaseExpr } with
 
 /// Elementwise minimum.
 type MinElemwise = { X: BaseExpr; Y: BaseExpr } with
-    interface IOp2 with       
+    interface IOp with       
         member this.Check () = Check.sameType [this.X; this.Y]; Check.sameShape [this.X; this.Y]
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -104,7 +104,7 @@ type MinElemwise = { X: BaseExpr; Y: BaseExpr } with
 
 /// Logical And.
 type And = { X: BaseExpr; Y: BaseExpr } with
-    interface IOp2 with       
+    interface IOp with       
         member this.Check () = Check.bool [this.X; this.Y]; Check.sameShape [this.X; this.Y]
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -117,7 +117,7 @@ type And = { X: BaseExpr; Y: BaseExpr } with
 
 /// Logical Or.
 type Or = { X: BaseExpr; Y: BaseExpr } with
-    interface IOp2 with       
+    interface IOp with       
         member this.Check () = Check.bool [this.X; this.Y]; Check.sameShape [this.X; this.Y]
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -130,7 +130,7 @@ type Or = { X: BaseExpr; Y: BaseExpr } with
 
 /// Logical Xor.
 type Xor = { X: BaseExpr; Y: BaseExpr } with
-    interface IOp2 with       
+    interface IOp with       
         member this.Check () = Check.bool [this.X; this.Y]; Check.sameShape [this.X; this.Y]
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
@@ -143,7 +143,7 @@ type Xor = { X: BaseExpr; Y: BaseExpr } with
 
 /// Equal.
 type Equal = { X: BaseExpr; Y: BaseExpr } with
-    interface IOp2 with       
+    interface IOp with       
         member this.Check () = Check.sameType [this.X; this.Y]; Check.sameShape [this.X; this.Y]
         member this.TypeName = TypeName.ofType<bool>
         member this.Shape = this.X.Shape
@@ -155,7 +155,7 @@ type Equal = { X: BaseExpr; Y: BaseExpr } with
 
 /// Not equal.
 type NotEqual = { X: BaseExpr; Y: BaseExpr } with
-    interface IOp2 with       
+    interface IOp with       
         member this.Check () = Check.sameType [this.X; this.Y]; Check.sameShape [this.X; this.Y]
         member this.TypeName = TypeName.ofType<bool>
         member this.Shape = this.X.Shape
@@ -167,7 +167,7 @@ type NotEqual = { X: BaseExpr; Y: BaseExpr } with
 
 /// Less than.
 type Less = { X: BaseExpr; Y: BaseExpr } with
-    interface IOp2 with       
+    interface IOp with       
         member this.Check () = Check.sameType [this.X; this.Y]; Check.sameShape [this.X; this.Y]
         member this.TypeName = TypeName.ofType<bool>
         member this.Shape = this.X.Shape
@@ -179,7 +179,7 @@ type Less = { X: BaseExpr; Y: BaseExpr } with
 
 /// Less then or equal.
 type LessOrEqual = { X: BaseExpr; Y: BaseExpr } with
-    interface IOp2 with       
+    interface IOp with       
         member this.Check () = Check.sameType [this.X; this.Y]; Check.sameShape [this.X; this.Y]
         member this.TypeName = TypeName.ofType<bool>
         member this.Shape = this.X.Shape
@@ -191,7 +191,7 @@ type LessOrEqual = { X: BaseExpr; Y: BaseExpr } with
 
 /// Greater than.
 type Greater = { X: BaseExpr; Y: BaseExpr } with
-    interface IOp2 with       
+    interface IOp with       
         member this.Check () = Check.sameType [this.X; this.Y]; Check.sameShape [this.X; this.Y]
         member this.TypeName = TypeName.ofType<bool>
         member this.Shape = this.X.Shape
@@ -203,7 +203,7 @@ type Greater = { X: BaseExpr; Y: BaseExpr } with
 
 /// Greater than or equal.
 type GreaterOrEqual = { X: BaseExpr; Y: BaseExpr } with
-    interface IOp2 with       
+    interface IOp with       
         member this.Check () = Check.sameType [this.X; this.Y]; Check.sameShape [this.X; this.Y]
         member this.TypeName = TypeName.ofType<bool>
         member this.Shape = this.X.Shape
@@ -216,7 +216,7 @@ type GreaterOrEqual = { X: BaseExpr; Y: BaseExpr } with
 
 /// Dot product.
 type Dot = { X: BaseExpr; Y: BaseExpr } with
-    interface IOp2 with       
+    interface IOp with       
         member this.Check () = 
             Check.sameType [this.X; this.Y]
             let sa, sb = this.X.Shape, this.Y.Shape
@@ -245,7 +245,7 @@ type Dot = { X: BaseExpr; Y: BaseExpr } with
 
 /// Tensor product.
 type TensorProduct = { X: BaseExpr; Y: BaseExpr } with
-    interface IOp2 with       
+    interface IOp with       
         member this.Check () = 
             Check.sameType [this.X; this.Y]
             let sa, sb = this.X.Shape, this.Y.Shape
@@ -263,7 +263,7 @@ type TensorProduct = { X: BaseExpr; Y: BaseExpr } with
 
 /// Element-wise if-then-else.
 type IfThenElse = {Cond: BaseExpr; IfTrue: BaseExpr; IfFalse: BaseExpr} with
-    interface IOp2 with       
+    interface IOp with       
         member this.Check () = 
             Check.sameType [this.IfTrue; this.IfFalse]
             Check.bool [this.Cond]
@@ -286,7 +286,7 @@ type IfThenElse = {Cond: BaseExpr; IfTrue: BaseExpr; IfFalse: BaseExpr} with
 
 /// Replace a slice of a tensor with another tensor.
 type SetSubtensor = {X: BaseExpr; Y: BaseExpr; Range: SimpleRangesSpec} with
-    interface IOp2 with      
+    interface IOp with      
         member this.Check () = 
             Check.sameType [this.X; this.Y]
             Check.range this.Range this.X

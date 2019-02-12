@@ -24,7 +24,7 @@ type MultiChannelExpr (op: IMultiChannelOp) =
     /// Accesses the specified channel of this multi-channel expression.
     member this.Item 
         with get (channel: string) = 
-            {Channel.Channel=channel; X=this} |> Expr2
+            {Channel.Channel=channel; X=this} |> Expr
 
     /// A loop provides iterative evaluation of one or multiple expresisons.
     /// All variables occurs in the loop channel expressions must be defined as loop variables.

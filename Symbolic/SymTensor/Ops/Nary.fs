@@ -7,7 +7,7 @@ open Tensor
 
 /// Discards the results of all arguments.
 type Discard = {Xs: BaseExpr list} with
-    interface IOp2 with       
+    interface IOp with       
         member this.Check () = ()
         member this.TypeName = TypeName.ofType<int32>
         member this.Shape = ShapeSpec.emptyVector
@@ -20,7 +20,7 @@ type Discard = {Xs: BaseExpr list} with
 
 /// Build tensor using numeric ranges.
 type BuildTensor = {Shape: ShapeSpec; Ranges: BaseRangesSpec list; Xs: BaseExpr list} with
-    interface IOp2 with       
+    interface IOp with       
         member this.Check () = 
             Check.sameType this.Xs
             if this.Ranges.Length <> this.Xs.Length then
@@ -63,7 +63,7 @@ type BuildTensor = {Shape: ShapeSpec; Ranges: BaseRangesSpec list; Xs: BaseExpr 
 
 /// Elementwise calculated tensor.
 type Elements = {Shape: ShapeSpec; ElemExpr: Elem.Expr; Xs: BaseExpr list} with
-    interface IOp2 with       
+    interface IOp with       
         member this.Check () = 
             let tns = this.Xs |> List.map (fun x -> x.TypeName)
             let ss = this.Xs |> List.map (fun x -> x.Shape)
@@ -88,7 +88,7 @@ type Elements = {Shape: ShapeSpec; ElemExpr: Elem.Expr; Xs: BaseExpr list} with
 
 /// Elementwise interpolation using a value table.
 type Interpolate = {Interpolator: Interpolator; Xs: BaseExpr list} with
-    interface IOp2 with       
+    interface IOp with       
         member this.Check () = 
             Check.sameType this.Xs
             let nDims = this.Interpolator.MinArg.Length

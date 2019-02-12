@@ -7,7 +7,7 @@ open SymTensor.Ops
 
 module internal Deriv =
     ///// Expands the second dimension of the Jacobian into the shape of this expression.
-    //let expand (dOp: Expr2) (expr: IOp2) = 
+    //let expand (dOp: Expr2) (expr: IOp) = 
     //    let funElems = dOp.Shape.[0]
     //    dOp |> Expr2.reshape (funElems :: expr.Shape)
 
@@ -20,36 +20,36 @@ module internal Deriv =
     /// Returns a zero derivative for the specified argument.
     let zeros (dOp: BaseExpr) (arg: BaseExpr) =
         let shape = dOp.Shape.[0] :: arg.Shape
-        Expr2.zerosOfType arg.DataType shape
+        Expr.zerosOfType arg.DataType shape
 
     let zero (arg: BaseExpr) =
-        (convTo arg.DataType 0) |> Expr2.scalar
+        (convTo arg.DataType 0) |> Expr.scalar
 
     let one (arg: BaseExpr) =
-        (convTo arg.DataType 1) |> Expr2.scalar
+        (convTo arg.DataType 1) |> Expr.scalar
 
     let two (arg: BaseExpr) =
-        (convTo arg.DataType 2) |> Expr2.scalar
+        (convTo arg.DataType 2) |> Expr.scalar
 
     let ten (arg: BaseExpr) =
-        (convTo arg.DataType 10) |> Expr2.scalar
+        (convTo arg.DataType 10) |> Expr.scalar
 
     type Env = {
-        Op: IOp2
-        DOp: Expr2
+        Op: IOp
+        DOp: Expr
     } with
-        member this.Expr = Expr2 this.Op
+        member this.Expr = Expr this.Op
         member this.FunElems =
             this.DOp.Shape.[0]
         member this.DOpJac =
             let wrtElems = this.DOp.Shape.[1..] |> ShapeSpec.nElem
-            this.DOp |> Expr2.reshape [this.FunElems; wrtElems]
-        member this.X = this.Op.Args |> Args.unaryX :?> Expr2
-        member this.Y = this.Op.Args |> Args.binaryY :?> Expr2
+            this.DOp |> Expr.reshape [this.FunElems; wrtElems]
+        member this.X = this.Op.Args |> Args.unaryX :?> Expr
+        member this.Y = this.Op.Args |> Args.binaryY :?> Expr
         member this.Xs =
             this.Op.Args
             |> Args.naryXs
-            |> List.map (fun x -> x :?> Expr2)
+            |> List.map (fun x -> x :?> Expr)
         member this.Zeros arg = zeros this.DOp arg 
         member this.Zero = zero this.DOp
         member this.One = one this.DOp
@@ -58,17 +58,17 @@ module internal Deriv =
         
         static member make op (dOp: BaseExpr) = {
             Op = op
-            DOp = dOp :?> Expr2
+            DOp = dOp :?> Expr
         }
     
 
     let expr (dOp: BaseExpr) =
-        dOp :?> Expr2
+        dOp :?> Expr
 
     let unary x =
         Args.unary (x :> BaseExpr)
 
-    let unaryExpr (dOp: BaseExpr) (f: Expr2 -> Expr2) =
+    let unaryExpr (dOp: BaseExpr) (f: Expr -> Expr) =
         dOp |> expr |> f |> unary
 
     let binary x y =

@@ -8,7 +8,7 @@ open SymTensor
 
 /// Scalar constant value
 type Scalar = { Value: Const } with
-    interface IOp2 with    
+    interface IOp with    
         member this.Check () = ()
         member this.TypeName = this.Value.TypeName
         member this.Shape = ShapeSpec.scalar
@@ -23,7 +23,7 @@ type Scalar = { Value: Const } with
     
 /// Value of the specified size
 type SizeValue = { Value: SizeSpec } with
-    interface IOp2 with    
+    interface IOp with    
         member this.Check () = ()
         member this.TypeName = TypeName.ofType<int64>
         member this.Shape = ShapeSpec.scalar
@@ -39,7 +39,7 @@ type SizeValue = { Value: SizeSpec } with
 
 /// Identity matrix
 type Identity = { Size: SizeSpec; Type: TypeName} with     
-    interface IOp2 with    
+    interface IOp with    
         member this.Check () = ()
         member this.TypeName = this.Type
         member this.Shape = ShapeSpec.matrix this.Size this.Size
@@ -63,7 +63,7 @@ and internal IdentityTyped<'T> () =
 
 /// Counting vector of given size
 type Arange = { Size: SizeSpec; Type: TypeName} with
-    interface IOp2 with    
+    interface IOp with    
         member this.Check () = ()
         member this.TypeName = this.Type
         member this.Shape = ShapeSpec.vector this.Size
@@ -87,7 +87,7 @@ and internal ArangeTyped<'T> () =
 
 /// Argument (placeholder for a variable).
 type VarArg = { Var: Var } with
-    interface IOp2 with       
+    interface IOp with       
         member this.Check () = ()
         member this.TypeName = this.Var.TypeName
         member this.Shape = this.Var.Shape

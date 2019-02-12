@@ -30,8 +30,8 @@ type MultiplyDeriv(op: Multiply) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = Deriv.Env.make op dOp 
-            let dX = env.DOp * (Expr2.padLeft env.Y)
-            let dY = env.DOp * (Expr2.padLeft env.X)
+            let dX = env.DOp * (Expr.padLeft env.Y)
+            let dY = env.DOp * (Expr.padLeft env.X)
             Deriv.binary dX dY
 
 
@@ -40,8 +40,8 @@ type DivideDeriv(op: Divide) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = Deriv.Env.make op dOp 
-            let dX = env.DOp * (Expr2.padLeft env.Y)
-            let dY = env.DOp * (Expr2.padLeft env.X)
+            let dX = env.DOp * (Expr.padLeft env.Y)
+            let dY = env.DOp * (Expr.padLeft env.X)
             Deriv.binary dX dY
 
 
@@ -52,7 +52,7 @@ type ModuloDeriv(op: Modulo) =
             failwith "TODO: FIX"
             let env = Deriv.Env.make op dOp 
             let dX = env.DOp 
-            let dY = env.DOp * Expr2.padLeft (-truncate (env.X / env.Y))
+            let dY = env.DOp * Expr.padLeft (-truncate (env.X / env.Y))
             Deriv.binary dX dY
 
 
@@ -61,8 +61,8 @@ type PowerDeriv(op: Pow) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = Deriv.Env.make op dOp 
-            let dX = env.DOp * Expr2.padLeft (env.Y * env.X**(env.Y - env.One))
-            let dY = env.DOp * Expr2.padLeft (env.X**env.Y * log env.X)
+            let dX = env.DOp * Expr.padLeft (env.Y * env.X**(env.Y - env.One))
+            let dY = env.DOp * Expr.padLeft (env.X**env.Y * log env.X)
             Deriv.binary dX dY
 
 
@@ -72,8 +72,8 @@ type SetSubtensorDeriv(op: SetSubtensor) =
         member this.Deriv dOp =
             let env = Deriv.Env.make op dOp 
             let dYExp = env.DOp.[SimpleRangeSpec.All :: op.Range]
-            let zeros = Expr2.zerosOfType dYExp.DataType dYExp.Shape
-            let dXExp = Expr2.setSubtensor env.DOp.[SimpleRangeSpec.All :: op.Range] zeros
+            let zeros = Expr.zerosOfType dYExp.DataType dYExp.Shape
+            let dXExp = Expr.setSubtensor env.DOp.[SimpleRangeSpec.All :: op.Range] zeros
             Deriv.binary dXExp dYExp
 
 

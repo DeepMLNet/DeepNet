@@ -71,7 +71,7 @@ type IMultiChannelArgsOp =
 /// A mathematical operation in an expression with a single output value.
 /// This models a mathematical function or operator that takes one or more tensors
 /// and returns one tensor.
-type IOp2 =
+type IOp =
     inherit IBaseOp
       
     /// Should return the type of the result.
@@ -197,7 +197,7 @@ module internal ExprTools =
 
 
 /// Base for single-channel expressions.
-type BaseExpr (op: IOp2) =
+type BaseExpr (op: IOp) =
     do op.Check()
         
     let _vars = lazy (ExprTools.extractVars op)
@@ -215,7 +215,7 @@ type BaseExpr (op: IOp2) =
     member this.Vars = _vars.Force()
     member this.CanEvalAllSymSizes = _canEvalAllSymSizes.Force()
     member this.SubstSymSizes (env: SymSizeEnv) =
-        ExprTools.substSymSizes env op :?> IOp2 |> BaseExpr
+        ExprTools.substSymSizes env op :?> IOp |> BaseExpr
 
     interface System.IEquatable<IExpr> with
         member this.Equals other = 
