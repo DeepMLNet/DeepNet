@@ -1,6 +1,6 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Platforms>AnyCPU;x64</Platforms>
+    <Platforms>x64</Platforms>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../Tensor/Tensor/Tensor.fsproj" />
@@ -33,12 +33,14 @@
     <Compile Include="Ops/Unary.fs" />
     <Compile Include="Ops\Binary.fs" />
     <Compile Include="Ops\Nary.fs" />
+    <Compile Include="Ops\LoopTypes.fs" />
     <Compile Include="Ops\Loop.fs" />
     <Compile Include="Expr.fs" />
-    <Compile Include="ExprRecognizers.fs" />
     <Compile Include="MultiChannelExpr.fs" />
-    <Compile Include="Deriv\Consts.fs" />
+    <Compile Include="Recognizers.fs" />
+    <Compile Include="Deriv\Tools.fs" />
     <Compile Include="Deriv\Unary.fs" />
+    <Compile Include="Deriv\Binary.fs" />
     <None Include="Old\Expr.fs" />
     <None Include="Old\ExprInfo.fs" />
     <None Include="Old\Deriv.fs" />

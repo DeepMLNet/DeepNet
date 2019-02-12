@@ -4,7 +4,8 @@ open SymTensor.Ops
 
 
 /// Active recognizers for single-channel expressions.
-module Expr =
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module Expr2 =
 
     let (|Scalar|_|) (expr: Expr2) =
         match expr.Op with
@@ -384,4 +385,14 @@ module Expr =
     let (|Interpolate|_|) (expr: Expr2) =
         match expr.Op with
         | :? Interpolate as this -> Some this
+        | _ -> None
+
+
+/// Active recognizers for multi-channel expressions.
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module MultiChannelExpr =
+
+    let (|Loop|_|) (expr: MultiChannelExpr) =
+        match expr.Op with
+        | :? Loop as this -> Some this
         | _ -> None

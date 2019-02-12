@@ -1,6 +1,4 @@
-﻿open System.Xml.Linq
-
-namespace SymTensor
+﻿namespace SymTensor
 
 open SymTensor.Ops
 open DeepNet.Utils

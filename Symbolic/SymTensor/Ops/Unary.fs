@@ -378,7 +378,7 @@ type Subtensor = {X: BaseExpr; Range: SimpleRangesSpec} with
             let xArgs = Args.unary this.X 
             let dynArgs = 
                 SimpleRangesSpec.dynElems dynPrefix this.Range
-                |> Map.map (fun _ v -> v :?> Expr2)
+                |> Map.map (fun _ v -> v :?> BaseExpr)
             Map.join xArgs dynArgs
         member this.ReplaceArgs args = 
             let dynArgs = args |> Map.map (fun _ v -> v :> IDynElem)
@@ -546,13 +546,13 @@ type Gather = {X: BaseExpr; Indices: BaseExpr option list} with
                     failwithf "All index tensors for gather must be of type int64, but got type %A." idx.DataType
                 | Some idx when idx.Shape <> trgtShape ->
                     failwithf "All gather indices must have equal shape, but got shapes %A."
-                                (this.Indices |> List.map (Option.map Expr2.shape))
+                                (this.Indices |> List.map (Option.map (fun e -> e.Shape)))
                 | None when dim >= ShapeSpec.nDim trgtShape ->
                     failwithf "Gather index dimensions beyond the number of target dimensions \
                                 must not be None."
                 | _ -> ()
         member this.TypeName = this.X.TypeName
-        member this.Shape = this.Indices |> List.pick id |> Expr2.shape
+        member this.Shape = (this.Indices |> List.pick id).Shape
         member this.Args = 
             let idxArgs = this.Indices |> listToMap                
             let xArgs = Args.unary this.X
@@ -576,7 +576,7 @@ type Scatter = {X: BaseExpr; Indices: BaseExpr option list; Shape: ShapeSpec} wi
                     failwithf "All index tensors for scatter must be of type int64, but got type %A." idx.DataType
                 | Some idx when idx.Shape <> this.X.Shape ->
                     failwithf "All scatter indices must have shape of source %A, but got %A." 
-                                this.X.Shape (this.Indices |> List.map (Option.map Expr2.shape))
+                                this.X.Shape (this.Indices |> List.map (Option.map (fun e -> e.Shape)))
                 | None when dim >= this.X.NDims ->
                     failwithf "Scatter index dimensions beyond the number of source dimensions \
                                 must not be None."
@@ -720,7 +720,7 @@ type CheckFinite = {Label: string; X: BaseExpr} with
 
 
 /// Accesses the specified channel of a multi-channnel expression.
-type Channel = {Channel: string; X: MultiChannelExpr} with
+type Channel = {Channel: string; X: BaseMultiChannelExpr} with
     interface IOp2 with      
         member this.Check () = 
             if not (this.X.Channels |> List.contains this.Channel) then

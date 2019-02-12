@@ -65,8 +65,8 @@ type BuildTensor = {Shape: ShapeSpec; Ranges: BaseRangesSpec list; Xs: BaseExpr 
 type Elements = {Shape: ShapeSpec; ElemExpr: Elem.Expr; Xs: BaseExpr list} with
     interface IOp2 with       
         member this.Check () = 
-            let tns = this.Xs |> List.map Expr2.typeName
-            let ss = this.Xs |> List.map Expr2.shape
+            let tns = this.Xs |> List.map (fun x -> x.TypeName)
+            let ss = this.Xs |> List.map (fun x -> x.Shape)
             Elem.Expr.check this.ElemExpr |> ignore
             Elem.Expr.checkCompatibility this.ElemExpr ss tns this.Shape   
         member this.TypeName = Elem.Expr.typeName this.ElemExpr

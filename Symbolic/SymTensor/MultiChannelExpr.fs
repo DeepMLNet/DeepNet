@@ -21,6 +21,18 @@ type MultiChannelExpr (op: IMultiChannelOp) =
     static member substSymSizes (env: SymSizeEnv) (expr: MultiChannelExpr) =
         expr.SubstSymSizes env |> MultiChannelExpr
 
+    /// Accesses the specified channel of this multi-channel expression.
     member this.Item 
         with get (channel: string) = 
-            {Channel.Channel=channel; X=this} |> MultiChannelExpr
+            {Channel.Channel=channel; X=this} |> Expr2
+
+    /// A loop provides iterative evaluation of one or multiple expresisons.
+    /// All variables occurs in the loop channel expressions must be defined as loop variables.
+    /// The function `loop` performs automatic lifting of constants and thus allows for easy
+    /// usage of variables external to the loop.
+    static member loopNoLift length vars channels xs =
+        Ops.Loop.noLift length vars channels xs |> MultiChannelExpr
+
+    /// A loop provides iterative evaluation of one or multiple expresisons.
+    static member loop length vars channels xs =
+        Ops.Loop.withLift length vars channels xs |> MultiChannelExpr
