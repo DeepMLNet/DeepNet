@@ -204,6 +204,7 @@ type BaseExpr (op: IOp2) =
     let _canEvalAllSymSizes = lazy (ExprTools.canEvalAllSymSizes op)
 
     interface IExpr
+    interface IDynElem
 
     member this.Op = op
     member this.TypeName = op.TypeName   

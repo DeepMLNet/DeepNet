@@ -61,3 +61,21 @@ module Args =
         if [0 .. xs.Length-1] <> List.map fst xs then
             failwithf "Cannot convert argument map to argument list: %A" am
         xs |> List.map snd
+
+
+/// Helper functions for ops.
+module internal OpTools =
+    let dynPrefix = "D"
+    
+    let listToMap (list: 'a option list) =
+        list 
+        |> List.indexed 
+        |> List.choose (function 
+                        | i, Some v -> Some (sprintf "I%d" i, v)
+                        | _, None -> None)
+        |> Map.ofList
+
+    let mapToList length (map: Map<string, 'a>) =
+        [0 .. length-1]
+        |> List.map (fun i -> map |> Map.tryFind (sprintf "I%d" i))
+

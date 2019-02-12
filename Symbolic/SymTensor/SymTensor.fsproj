@@ -37,8 +37,7 @@
     <Compile Include="Expr.fs" />
     <Compile Include="ExprRecognizers.fs" />
     <Compile Include="MultiChannelExpr.fs" />
-    <Compile Include="Deriv\Internal.fs" />
-    <Compile Include="Deriv\Leaf.fs" />
+    <Compile Include="Deriv\Consts.fs" />
     <Compile Include="Deriv\Unary.fs" />
     <None Include="Old\Expr.fs" />
     <None Include="Old\ExprInfo.fs" />

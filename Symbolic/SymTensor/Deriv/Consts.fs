@@ -1,10 +1,10 @@
 ﻿namespace SymTensor.Deriv 
 
+open DeepNet.Utils
+open SymTensor
 
-#if false
 
-//[<AutoOpen>]
-module private Deriv =
+module internal Consts =
     ///// Expands the second dimension of the Jacobian into the shape of this expression.
     //let expand (dOp: Expr2) (expr: IOp2) = 
     //    let funElems = dOp.Shape.[0]
@@ -33,7 +33,7 @@ module private Deriv =
     let ten (arg: Expr2) =
         (convTo arg.DataType 10) |> Expr2.scalar
 
-#endif
+
 
 
 
