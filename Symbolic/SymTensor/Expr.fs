@@ -224,6 +224,9 @@ type Expr (op: IOp) =
         with get ([<System.ParamArray>] allArgs: obj []) = 
             this.GetSlice (allArgs)
 
+    /// Expression using the specified variable as its argument.
+    static member makeVar var =
+        Expr {VarArg.Var=var}
 
     /// Expression a with the specified subtensor replaced with b.
     static member setSubtensor (trgt: Expr) (src: Expr) =
@@ -319,6 +322,7 @@ type Expr (op: IOp) =
     static member (>>==) (x: System.IComparable, y: Expr) = (Expr.scalar x) >>== y
     static member (<<>>) (x: System.IComparable, y: Expr) = (Expr.scalar x) <<>> y
 
+    /// Dot product.
     static member ( .* ) (x: Expr, y: Expr) = Expr {Dot.X=x; Y=y}
 
     /// Sign keeping type.
@@ -358,6 +362,41 @@ type Expr (op: IOp) =
     /// Reverses the tensor in the specified dimension.
     static member reverseAxis axis (x: Expr) =
         {ReverseAxis.Axis=axis; X=x} |> Expr  
+
+    /// Concatenates the sequence of tensors in the specified dimension.
+    static member concat dim (es: Expr seq) =
+        // check that arguments are correctly sized
+        let es = List.ofSeq es
+        let shps = es |> List.map Expr.shape
+        match es with
+        | [] -> failwithf "need at least one tensor to concatenate"
+        | h :: ts ->
+            if not (0 <= dim && dim < h.NDims) then
+                failwithf "cannot concatenate over non-existant dimension %d given shapes %A" dim shps
+            for t in ts do
+                if t.TypeName <> h.TypeName then
+                    failwithf "all arguments must have same type but got types %A" (es |> List.map (fun e -> e.DataType))
+                if t.NDims <> h.NDims then
+                    failwithf "all arguments must have same number of dimensions but shapes %A were specifed" shps                        
+                for i, (sa, sb) in List.indexed (List.zip h.Shape t.Shape) do
+                    if i <> dim && sa .<> sb then
+                        failwithf "all arguments must have same shape expect in concatenation dimension %d but \
+                                   shapes %A were specified" dim shps
+                    
+        // calculate shape of concatenation
+        let totalElems = es |> Seq.sumBy (fun e -> e.Shape.[dim])
+        let shp = es.Head.Shape |> ShapeSpec.set dim totalElems
+
+        // build concatenation using iterative subtensor replacement
+        let concatenated, _ =
+            ((Expr.zerosOfType es.Head.DataType shp, SizeSpec.zero), es)
+            ||> List.fold (fun (concatSoFar, pos) e ->
+                let len = e.Shape.[dim]
+                let slice: RangesSpec = 
+                    List.replicate e.NDims RangeSpec.All
+                    |> List.set dim (RangeSpec.SymStartSymEnd (Some pos, Some (pos + len - 1L)))
+                Expr.setSubtensor concatSoFar.[slice] e, pos + len)
+        concatenated
 
     /// Extracts the diagonal along the given axes.
     static member diagAxis ax1 ax2 (x: Expr) = 
@@ -598,4 +637,6 @@ type Expr (op: IOp) =
     /// The interpolator is created using the Interpolator.create function.
     static member interpolate3D interpolator x y z =
         Expr.interpolate interpolator [x; y; z]
+
+
 

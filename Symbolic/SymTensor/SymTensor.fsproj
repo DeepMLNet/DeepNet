@@ -29,6 +29,7 @@
     <Compile Include="Dump.fs" />
     <Compile Include="Ops\Base.fs" />
     <Compile Include="Ops\Tools.fs" />
+    <Compile Include="Ops\ExprGroup.fs" />
     <Compile Include="Ops/Leaf.fs" />
     <Compile Include="Ops/Unary.fs" />
     <Compile Include="Ops\Binary.fs" />
@@ -38,12 +39,13 @@
     <Compile Include="Expr.fs" />
     <Compile Include="MultiChannelExpr.fs" />
     <Compile Include="Recognizers.fs" />
+    <Compile Include="Deriv\Base.fs" />
     <Compile Include="Deriv\Tools.fs" />
     <Compile Include="Deriv\Unary.fs" />
     <Compile Include="Deriv\Binary.fs" />
     <Compile Include="Deriv\Nary.fs" />
+    <Compile Include="Deriv\Loop.fs" />
     <None Include="Old\Expr.fs" />
-    <None Include="Old\ExprInfo.fs" />
     <None Include="Old\Deriv.fs" />
     <None Include="Old\Hold.fs" />
     <None Include="Old\Optimizer.fs" />

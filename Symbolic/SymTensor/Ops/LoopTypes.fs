@@ -13,6 +13,7 @@ type SequenceArgSlice = {
     SliceDim:   int
 }
 
+
 /// references a loop channel of a previous iteration
 type PreviousChannel = {
     /// the channel to use
@@ -22,6 +23,7 @@ type PreviousChannel = {
     /// the index of the argument specifying the initial values
     InitialArg:    int
 }
+
 
 /// a loop variable value specification
 type Input = 
@@ -35,6 +37,7 @@ type Input =
     | IterationIndex
     /// provides the number of remaining loop iterations after this iteration
     | IterationsRemaining
+
 
 /// the value of a loop channel
 type Value = {

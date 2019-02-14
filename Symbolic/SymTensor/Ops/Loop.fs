@@ -165,19 +165,7 @@ type Loop = {
                         let vs = addConstVar expr
                         BaseExpr {VarArg.Var=vs} 
                     else
-                        failwith "TODO"
-                        //match expr with                   
-                        //| Unary (Gather indices, a) ->
-                        //    Unary (Gather (indices |> List.map (Option.map lift)), lift a)
-                        //| Unary (Scatter (indices, trgtShp), a) ->
-                        //    Unary (Scatter (indices |> List.map (Option.map lift), trgtShp), lift a)
-                        //| Binary (IfThenElse cond, a, b) ->
-                        //    Binary (IfThenElse (lift cond), lift a, lift b)
-
-                        //| Leaf _ -> expr
-                        //| Unary (op, a) -> Unary (op, lift a)
-                        //| Binary (op, a, b) -> Binary (op, lift a, lift b)
-                        //| Nary (op, es) -> Nary (op, es |> List.map lift)
+                        expr.MapArgs lift
                 lifted.[expr] <- rep
                 rep
                 

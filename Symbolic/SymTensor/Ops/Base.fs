@@ -11,7 +11,7 @@ open System
 type ArgsMap = Map<string, BaseExpr>
 
 /// Map containing argument expression by name for multi-channel arguments.
-type MultiChannelArgsMap = Map<string, BaseMultiChannelExpr>
+type MultiChannelArgsMap = Map<string, string * BaseMultiChannelExpr>
 
 
 /// Information necessary to evaluate an expression.
@@ -216,6 +216,12 @@ type BaseExpr (op: IOp) =
     member this.CanEvalAllSymSizes = _canEvalAllSymSizes.Force()
     member this.SubstSymSizes (env: SymSizeEnv) =
         ExprTools.substSymSizes env op :?> IOp |> BaseExpr
+
+    member this.MapArgs (fn: BaseExpr -> BaseExpr) =
+        op.Args
+        |> Map.map (fun _ arg -> fn arg)
+        |> op.ReplaceArgs :?> IOp
+        |> BaseExpr
 
     interface System.IEquatable<IExpr> with
         member this.Equals other = 
