@@ -6,16 +6,16 @@ open SymTensor.Ops
 
 
 module internal Deriv =
-    ///// Expands the second dimension of the Jacobian into the shape of this expression.
-    //let expand (dOp: Expr2) (expr: IOp) = 
-    //    let funElems = dOp.Shape.[0]
-    //    dOp |> Expr2.reshape (funElems :: expr.Shape)
+    /// Expands the second dimension of the Jacobian into the shape of this expression.
+    let expand (dOpJac: Expr) (expr: Expr) = 
+        let funElems = dOpJac.Shape.[0]
+        dOpJac |> Expr.reshape (funElems :: expr.Shape)
 
-    ///// Flattens all but the first dimension of the Jacobian into one dimension.
-    //let collapse (g: Expr2) =
-    //    let funElems = g.Shape.[0]
-    //    let wrtElems = g.Shape.[1..] |> ShapeSpec.nElem
-    //    g |> Expr2.reshape [funElems; wrtElems]
+    /// Flattens all but the first dimension of the Jacobian into one dimension.
+    let collapse (dOp: Expr) =
+        let funElems = dOp.Shape.[0]
+        let wrtElems = dOp.Shape.[1..] |> ShapeSpec.nElem
+        dOp |> Expr.reshape [funElems; wrtElems]
 
     /// Returns a zero derivative for the specified argument.
     let zeros (dOp: BaseExpr) (arg: BaseExpr) =

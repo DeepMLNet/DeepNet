@@ -18,6 +18,7 @@ type Add = { X: BaseExpr; Y: BaseExpr } with
         member this.CanEvalAllSymSizes = true
         member this.Eval env = (Args.binaryX env.Args).Add (Args.binaryY env.Args)      
 
+
 /// Subtraction.
 type Subtract = { X: BaseExpr; Y: BaseExpr } with
     interface IOp with       
@@ -29,6 +30,7 @@ type Subtract = { X: BaseExpr; Y: BaseExpr } with
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env = (Args.binaryX env.Args).Subtract (Args.binaryY env.Args)       
+
 
 /// Multiplication.
 type Multiply = { X: BaseExpr; Y: BaseExpr } with
@@ -42,6 +44,7 @@ type Multiply = { X: BaseExpr; Y: BaseExpr } with
         member this.CanEvalAllSymSizes = true
         member this.Eval env = (Args.binaryX env.Args).Multiply (Args.binaryY env.Args)      
 
+
 /// Division.
 type Divide = { X: BaseExpr; Y: BaseExpr } with
     interface IOp with       
@@ -53,6 +56,7 @@ type Divide = { X: BaseExpr; Y: BaseExpr } with
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env = (Args.binaryX env.Args).Divide (Args.binaryY env.Args)       
+
 
 /// Exponentiation.
 type Pow = { X: BaseExpr; Y: BaseExpr } with
@@ -66,6 +70,7 @@ type Pow = { X: BaseExpr; Y: BaseExpr } with
         member this.CanEvalAllSymSizes = true
         member this.Eval env = (Args.binaryX env.Args).Pow (Args.binaryY env.Args)       
 
+
 /// Modulo.
 type Modulo = { X: BaseExpr; Y: BaseExpr } with
     interface IOp with       
@@ -77,6 +82,7 @@ type Modulo = { X: BaseExpr; Y: BaseExpr } with
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env = (Args.binaryX env.Args).Modulo (Args.binaryY env.Args)       
+
 
 /// Elementwise maximum.
 type MaxElemwise = { X: BaseExpr; Y: BaseExpr } with
@@ -90,6 +96,7 @@ type MaxElemwise = { X: BaseExpr; Y: BaseExpr } with
         member this.CanEvalAllSymSizes = true
         member this.Eval env = (Args.binaryX env.Args).MaxElemwise (Args.binaryY env.Args)       
 
+
 /// Elementwise minimum.
 type MinElemwise = { X: BaseExpr; Y: BaseExpr } with
     interface IOp with       
@@ -101,6 +108,30 @@ type MinElemwise = { X: BaseExpr; Y: BaseExpr } with
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env = (Args.binaryX env.Args).MinElemwise (Args.binaryY env.Args)       
+
+
+/// Element-wise if-then-else.
+type IfThenElse = {Cond: BaseExpr; IfTrue: BaseExpr; IfFalse: BaseExpr} with
+    interface IOp with       
+        member this.Check () = 
+            Check.sameType [this.IfTrue; this.IfFalse]
+            Check.bool [this.Cond]
+            Check.sameShape [this.Cond; this.IfTrue; this.IfFalse]
+        member this.TypeName = this.IfTrue.TypeName
+        member this.Shape = this.IfTrue.Shape
+        member this.Args = 
+            Map ["Cond", this.Cond
+                 "IfTrue", this.IfTrue
+                 "IfFalse", this.IfFalse]
+        member this.ReplaceArgs args = 
+            {this with Cond=args.["Cond"]
+                       IfTrue=args.["IfTrue"]
+                       IfFalse=args.["IfFalse"]} :> _
+        member this.SubstSymSizes env = this :> _
+        member this.CanEvalAllSymSizes = true
+        member this.Eval env = 
+            env.Args.["IfTrue"].IfThenElse env.Args.["IfFalse"] env.Args.["Cond"]
+
 
 /// Logical And.
 type And = { X: BaseExpr; Y: BaseExpr } with
@@ -115,6 +146,7 @@ type And = { X: BaseExpr; Y: BaseExpr } with
         member this.Eval env = 
             (Args.binaryX env.Args :?> Tensor<bool>) &&&& (Args.binaryY env.Args :?> Tensor<bool>) :> ITensor       
 
+
 /// Logical Or.
 type Or = { X: BaseExpr; Y: BaseExpr } with
     interface IOp with       
@@ -127,6 +159,7 @@ type Or = { X: BaseExpr; Y: BaseExpr } with
         member this.CanEvalAllSymSizes = true
         member this.Eval env = 
             (Args.binaryX env.Args :?> Tensor<bool>) |||| (Args.binaryY env.Args :?> Tensor<bool>) :> ITensor       
+
 
 /// Logical Xor.
 type Xor = { X: BaseExpr; Y: BaseExpr } with
@@ -141,6 +174,7 @@ type Xor = { X: BaseExpr; Y: BaseExpr } with
         member this.Eval env = 
             (Args.binaryX env.Args :?> Tensor<bool>) ^^^^ (Args.binaryY env.Args :?> Tensor<bool>) :> ITensor       
 
+
 /// Equal.
 type Equal = { X: BaseExpr; Y: BaseExpr } with
     interface IOp with       
@@ -152,6 +186,7 @@ type Equal = { X: BaseExpr; Y: BaseExpr } with
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env = (Args.binaryX env.Args).Equal (Args.binaryY env.Args)       
+
 
 /// Not equal.
 type NotEqual = { X: BaseExpr; Y: BaseExpr } with
@@ -165,6 +200,7 @@ type NotEqual = { X: BaseExpr; Y: BaseExpr } with
         member this.CanEvalAllSymSizes = true
         member this.Eval env = (Args.binaryX env.Args).NotEqual (Args.binaryY env.Args)       
 
+
 /// Less than.
 type Less = { X: BaseExpr; Y: BaseExpr } with
     interface IOp with       
@@ -176,6 +212,7 @@ type Less = { X: BaseExpr; Y: BaseExpr } with
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env = (Args.binaryX env.Args).Less (Args.binaryY env.Args)       
+
 
 /// Less then or equal.
 type LessOrEqual = { X: BaseExpr; Y: BaseExpr } with
@@ -189,6 +226,7 @@ type LessOrEqual = { X: BaseExpr; Y: BaseExpr } with
         member this.CanEvalAllSymSizes = true
         member this.Eval env = (Args.binaryX env.Args).LessOrEqual (Args.binaryY env.Args)       
 
+
 /// Greater than.
 type Greater = { X: BaseExpr; Y: BaseExpr } with
     interface IOp with       
@@ -200,6 +238,7 @@ type Greater = { X: BaseExpr; Y: BaseExpr } with
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env = (Args.binaryX env.Args).Greater (Args.binaryY env.Args)       
+
 
 /// Greater than or equal.
 type GreaterOrEqual = { X: BaseExpr; Y: BaseExpr } with
@@ -259,29 +298,6 @@ type TensorProduct = { X: BaseExpr; Y: BaseExpr } with
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env = (Args.binaryX env.Args).TensorProduct (Args.binaryY env.Args)       
-
-
-/// Element-wise if-then-else.
-type IfThenElse = {Cond: BaseExpr; IfTrue: BaseExpr; IfFalse: BaseExpr} with
-    interface IOp with       
-        member this.Check () = 
-            Check.sameType [this.IfTrue; this.IfFalse]
-            Check.bool [this.Cond]
-            Check.sameShape [this.Cond; this.IfTrue; this.IfFalse]
-        member this.TypeName = this.IfTrue.TypeName
-        member this.Shape = this.IfTrue.Shape
-        member this.Args = 
-            Map ["Cond", this.Cond
-                 "IfTrue", this.IfTrue
-                 "IfFalse", this.IfFalse]
-        member this.ReplaceArgs args = 
-            {this with Cond=args.["Cond"]
-                       IfTrue=args.["IfTrue"]
-                       IfFalse=args.["IfFalse"]} :> _
-        member this.SubstSymSizes env = this :> _
-        member this.CanEvalAllSymSizes = true
-        member this.Eval env = 
-            env.Args.["IfTrue"].IfThenElse env.Args.["IfFalse"] env.Args.["Cond"]
 
 
 /// Replace a slice of a tensor with another tensor.
