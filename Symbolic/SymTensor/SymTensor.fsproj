@@ -41,6 +41,7 @@
     <Compile Include="Deriv\Tools.fs" />
     <Compile Include="Deriv\Unary.fs" />
     <Compile Include="Deriv\Binary.fs" />
+    <Compile Include="Deriv\Nary.fs" />
     <None Include="Old\Expr.fs" />
     <None Include="Old\ExprInfo.fs" />
     <None Include="Old\Deriv.fs" />
