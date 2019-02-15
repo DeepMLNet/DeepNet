@@ -52,7 +52,7 @@ type BuildTensor = {Shape: ShapeSpec; Ranges: BaseRangesSpec list; Xs: BaseExpr 
             ShapeSpec.canEval this.Shape &&
             List.forall BaseRangesSpec.canEval this.Ranges
         member this.Eval env = 
-            let vs = Args.naryXs env.Args
+            let vs = ArgValue.naryXs env.Args
             let trgt = vs.Head.ZerosOfSameType vs.Head.Dev (ShapeSpec.eval this.Shape)
             for rng, e in List.zip this.Ranges vs do                            
                 let aryRng = rng |> List.map (fun (first, last) -> 
@@ -81,7 +81,7 @@ type Elements = {Shape: ShapeSpec; ElemExpr: Elem.Expr; Xs: BaseExpr list} with
             ShapeSpec.canEval this.Shape &&
             Elem.Expr.canEvalAllSymSizes this.ElemExpr
         member this.Eval env = 
-            let esv = Args.naryXs env.Args
+            let esv = ArgValue.naryXs env.Args
             let nResShape = ShapeSpec.eval this.Shape
             Elem.Interpreter.evalUntyped this.ElemExpr esv nResShape 
 
@@ -115,7 +115,7 @@ type Interpolate = {Interpolator: Interpolator; Xs: BaseExpr list} with
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env = 
-            let esv = Args.naryXs env.Args
+            let esv = ArgValue.naryXs env.Args
             Interpolator.interpolateUntyped this.Interpolator esv
 
 

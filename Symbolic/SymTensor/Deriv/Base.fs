@@ -2,6 +2,7 @@
 
 open System.Diagnostics
 open DeepNet.Utils
+open SymTensor.Ops
 
 
 [<AutoOpen>]
@@ -12,99 +13,104 @@ module DerivTypes =
         /// the number of elements of the function the derivative is taken of
         FunElems:   SizeSpec
         /// the Jacobians w.r.t. the variables occuring in the expression
-        Jacobians:  Map<Var, Expr>
+        Jacobians:  Map<Var, BaseExpr>
     }
 
 
+    type XChDeriv =
+        | SingleChDeriv of BaseExpr
+        | MultiChDeriv of Map<string, BaseExpr>
+
+
+    //type IncomingDeriv =
+    //    | FullDeriv of expr:BaseExpr
+    //    | ChDeriv of channel:string * expr:BaseMultiChannelExpr
+
+
 /// Derivative computation functions.
-module Deriv =
+module Deriv = 
+
+    let private add (x: BaseExpr) (y: BaseExpr) =
+        (x :?> Expr) + (y :?> Expr) :> BaseExpr
 
     /// merges two derivative maps
     let private merge (aGrads: DerivT) (bGrads: DerivT) : DerivT =
         if aGrads.FunElems <> bGrads.FunElems then
-            failwithf "cannot merge derivatives with different number of function elements: %A and %A"
+            failwithf "Cannot merge derivatives with different number of function elements: %A and %A."
                 aGrads.FunElems bGrads.FunElems
         let jacs =
             (aGrads.Jacobians, bGrads.Jacobians)
-            ||> Map.fold (fun m v vg -> match Map.tryFind v m with
-                                        | Some ovg -> m |> Map.add v (vg + ovg)
-                                        | None -> m |> Map.add v vg) 
+            ||> Map.fold (fun m v vg -> 
+                match Map.tryFind v m with
+                | Some ovg -> m |> Map.add v (add vg ovg)
+                | None -> m |> Map.add v vg) 
         {FunElems=aGrads.FunElems; Jacobians=jacs}
 
     /// empty derivatives for expression
-    let private empty expr =
-        {FunElems=Expr.nElems expr; Jacobians=Map.empty}
+    let private empty (expr: BaseExpr) =
+        {FunElems=expr.NElems; Jacobians=Map.empty}
 
-
-    /// calculates the Jacobian of all arguments of an expression given the Jacobian of the expression
-    let rec private reverseDiffStep (expr: Expr) (eg: Expr) : List<Expr * Expr> =    
-        let exprShp = expr.Shape
-        let funElems = eg.Shape.[0]  
-
-        // check type and shape
-        if expr.TypeName <> eg.TypeName then
-            failwithf "Jacobian with type %A was specified for expression of type %A"
-                eg.TypeName expr.TypeName
-        if eg.Shape.[1] .<> expr.NElems then
-            printfn "expr=\n%A" expr
-            printfn "eg=\n%A" eg
-            failwithf "Jacobian with %A wrt elements was specified for expression with %A elements"
-                (Expr.shapeOf eg).[1] (ShapeSpec.nElem (Expr.shapeOf expr))
-
-        // TODO: get op derivative
+    /// Computes the derivatives of all arguments of an expression given the derivative of the expression.
+    let rec private reverseDiffStep (expr: BaseExpr) (eg: BaseExpr) : Map<string, XChDeriv> =    
+        // TODO: get single-channel op derivative
         failwith "TODO"
         
-    /// computes the Jacobians of the arguments of a multi-channel op given the Jacobians
-    /// w.r.t. all channels of the multi-channel op
-    and private multiChannelDiffStep (mcOp: MultiChannelOpUsageT) (eg: Map<Channel, Expr>) : List<Expr * Expr> =
-        // TODO: get op derivative
+    /// Computes the derivatives of all arguments of a multi-channel op given the derivatives
+    /// w.r.t. all channels of the multi-channel op.
+    and private multiChannelDiffStep (mcOp: BaseMultiChannelExpr) (eg: Map<Channel, BaseExpr>) : Map<string, XChDeriv> =
+        // TODO: get multi-channel op derivative
         failwith "TODO"
 
-    /// computes the derivatives of the specified expression w.r.t. all variables occuring in it
-    and computeWithRootJacobian (rootJacobian: Expr) (rootExpr: Expr) : DerivT =
+    /// Computes the derivatives of the specified expression w.r.t. all variables occuring in it.
+    and computeWithRootJacobian (rootJacobian: XChDeriv) (rootExpr: BaseXChExpr) : DerivT =
 
         // build expression info and unify common subexpressions
-        let exprInfo = ExprInfoT [rootExpr]
+        let exprInfo = BaseXChExprGroup [rootExpr]
         let rootExpr = List.exactlyOne exprInfo.Exprs
 
         /// map from an expression to the sum of incoming Jacobians
-        let incomingJacobian = Dictionary<Expr, Expr> (HashIdentity.Reference)
+        let incomingJacobian = Dictionary<BaseXChExpr, XChDeriv> (HashIdentity.Reference)
         /// map from an expression to the set of dependants that transmitted Jacobian to the expression
-        let receivedJacobiansFrom = Dictionary<Expr, HashSet<Expr>> (HashIdentity.Reference)
+        let receivedJacobiansFrom = Dictionary<BaseExprCh, HashSet<BaseXChExpr>> (HashIdentity.Reference)
         /// expressions that have received Jacobians from all their dependants
-        let exprsWithFullJacobian = Queue<Expr> ()
+        let exprsWithFullJacobian = Queue<BaseXChExpr> ()
 
-        let multiChannelOpJacobians = 
-            Dictionary<MultiChannelOpUsageT, Dictionary<Channel, Expr>> (HashIdentity.Structural) 
-        let multiChannelOpsWithFullJacobians = Queue<MultiChannelOpUsageT> ()
+        //let multiChannelOpJacobians = 
+        //    Dictionary<BaseMultiChannelExpr, Dictionary<string, Expr>> (HashIdentity.Structural) 
+        //let multiChannelOpsWithFullJacobians = Queue<BaseMultiChannelExpr> ()
 
         /// adds the specified Jacobian coming from `source` to `target`
-        let transmitJacobian source target jacobian =
+        let transmitJacobian (source: BaseXChExpr) (target: BaseExprCh) (jacobian: BaseExpr) =
             let neededSources = exprInfo.Dependants target |> Set.ofSeq
 
             // add jacobian
-            match incomingJacobian.TryFind target with
-            | Some j -> incomingJacobian.[target] <- j + jacobian
-            | None -> incomingJacobian.[target] <- jacobian
+            let targetExpr = BaseExprCh.asBaseXChExpr target
+            incomingJacobian.[targetExpr] <- 
+                match incomingJacobian.TryFind targetExpr, target with
+                | None, BaseExprCh.Only _ -> 
+                    SingleChDeriv jacobian
+                | Some (SingleChDeriv j), BaseExprCh.Only _ -> 
+                    SingleChDeriv (add j jacobian)
+                | None, BaseExprCh.Ch (ch, _) -> 
+                    MultiChDeriv (Map [ch, jacobian])
+                | Some (MultiChDeriv js), BaseExprCh.Ch (ch, _) ->
+                    match js |> Map.tryFind ch with
+                    | Some j -> MultiChDeriv (js |> Map.add ch (add j jacobian))
+                    | None -> MultiChDeriv (js |> Map.add ch jacobian)
+                | _, _ -> failwith "Invalid single-/multi-channel combination for derivative."
 
             // add to received set
             if not (receivedJacobiansFrom.ContainsKey target) then
-                receivedJacobiansFrom.[target] <- HashSet<Expr> (HashIdentity.Structural)
-            match source with
-            | Choice1Of2 exprSource -> 
-                if receivedJacobiansFrom.[target].Contains exprSource then
-                    failwithf "Jacobian from %A to %A was already transmitted" exprSource target
-                if not (neededSources.Contains exprSource) then
-                    failwithf "%A received Jacobian from non-dependant %A" target exprSource
-                receivedJacobiansFrom.[target].Add exprSource |> ignore
-            | Choice2Of2 mcopSource ->
-                neededSources
-                |> Seq.filter (function 
-                               | Nary (Channel (op, channel), es) when (op, es) = mcopSource -> true
-                               | _ -> false)
-                |> Seq.iter (fun src -> receivedJacobiansFrom.[target].Add src |> ignore)
+                receivedJacobiansFrom.[target] <- HashSet<_> (HashIdentity.Structural)
+            if receivedJacobiansFrom.[target].Contains source then
+                failwithf "Derivative from %A to %A was transmitted more than once." source target
+            if not (neededSources.Contains source) then
+                failwithf "%A received derivative from non-dependant %A." target source
+            receivedJacobiansFrom.[target].Add source |> ignore
 
-            // check if target has received all Jacobians
+            // check if target has received all derivatives
+            // TODO: iterate over all channel for a multi-channel expression and check that derivatives
+            //       for all channels have been received.
             let receivedSources = receivedJacobiansFrom.[target] |> Set.ofSeq
             if receivedSources = neededSources then exprsWithFullJacobian.Enqueue target
 

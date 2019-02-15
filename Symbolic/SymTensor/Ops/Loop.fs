@@ -118,7 +118,8 @@ type Loop = {
     static member internal noLift length vars channels xs =
         BaseMultiChannelExpr {Loop.Length=length; Vars=vars; Channels=channels; Xs=xs} 
 
-    static member internal withLift length vars channels xs =       
+    static member internal withLift (length: SizeSpec) (vars: Map<Var, Loop.Input>) 
+                                    (channels: Map<string, Loop.Value>) (xs: BaseExpr list) =       
         let mutable args = xs
         let mutable vars = vars
 
@@ -133,10 +134,12 @@ type Loop = {
 
         /// adds a constant variable, its required argument and returns the associated VarSpecT
         let addConstVar (expr: BaseExpr) =
-            match vars |> Map.tryFindKey (fun vs lv ->
-                                           match lv with
-                                           | Loop.ConstArg argIdx when args.[argIdx] = expr -> true
-                                           | _ -> false) with
+            let var = 
+                vars |> Map.tryFindKey (fun vs lv ->
+                    match lv with
+                    | Loop.ConstArg argIdx when args.[argIdx] = expr -> true
+                    | _ -> false) 
+            match var with
             | Some vs -> vs
             | None ->
                 let rec genName i =
@@ -152,27 +155,33 @@ type Loop = {
         let loopVarSet = vars |> Map.toSeq |> Seq.map (fun (vs, _) -> vs) |> Set.ofSeq
         let lifted = Dictionary<BaseExpr, BaseExpr> ()
 
-        let rec lift expr =
-            match lifted.TryFind expr with
-            | Some rep -> rep
-            | None ->
-                let exprVars = expr.Vars
-                let dependsOnVars = not (Set.isEmpty exprVars)
-                let dependsOnLoopVars = Set.intersect exprVars loopVarSet |> Set.isEmpty |> not
-                let rep =
-                    if dependsOnVars && not dependsOnLoopVars then
-                        //if not (dependsOnLoopVars expr) then
-                        let vs = addConstVar expr
-                        BaseExpr {VarArg.Var=vs} 
-                    else
-                        expr.MapArgs lift
-                lifted.[expr] <- rep
-                rep
+        let rec lift (xChExpr: BaseXChExpr) : BaseXChExpr =
+            match xChExpr with
+            | BaseXChExpr.SingleCh expr ->
+                match lifted.TryFind expr with
+                | Some rep -> rep |> BaseXChExpr.SingleCh
+                | None ->
+                    let exprVars = expr.Vars
+                    let dependsOnVars = not (Set.isEmpty exprVars)
+                    let dependsOnLoopVars = Set.intersect exprVars loopVarSet |> Set.isEmpty |> not
+                    let rep =
+                        if dependsOnVars && not dependsOnLoopVars then
+                            //if not (dependsOnLoopVars expr) then
+                            let vs = addConstVar expr
+                            BaseExpr {VarArg.Var=vs} 
+                        else
+                            expr |> BaseExpr.mapArgs lift
+                    lifted.[expr] <- rep
+                    rep |> BaseXChExpr.SingleCh
+            | BaseXChExpr.MultiCh mChExpr ->
+                mChExpr |> BaseMultiChannelExpr.mapArgs lift |> BaseXChExpr.MultiCh            
                 
         // lift constants out of loop
         let liftedChannels = 
             channels 
-            |> Map.map (fun ch lv -> {lv with Loop.Value.Expr = lift lv.Expr})
+            |> Map.map (fun ch lv -> {
+                lv with Loop.Value.Expr = lv.Expr |> BaseXChExpr.SingleCh |> lift |> BaseXChExpr.singleCh
+            })
         BaseMultiChannelExpr {Loop.Length=length; Vars=vars; Channels=liftedChannels; Xs=args} 
        
 

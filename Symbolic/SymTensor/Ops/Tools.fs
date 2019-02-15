@@ -37,15 +37,16 @@ module Check =
                     failwithf "Dynamic range start must be of type int64.")
 
 
-/// Helper functions for working with arguments of ops.
-module Args =
-    
+
+/// Helper functions for working with argument values (of any type) of ops.
+module ArgValue =
+   
     let leaf = Map.empty
 
     let unary x = Map ["X", x]
-    let unaryX (am: Map<string, _>) = am.["X"]
+    let unaryX (am: Map<string, _>) = am.["X"] 
 
-    let binary x y = Map ["X", x; "Y", y]
+    let binary x y = Map ["X", Arg.Expr x; "Y", Arg.Expr y]
     let binaryX (am: Map<string, _>) = am.["X"]
     let binaryY (am: Map<string, _>) = am.["Y"]
 
@@ -56,11 +57,31 @@ module Args =
             am 
             |> Map.toList 
             |> List.choose (fun (s,v) -> 
-                s |> Int32.tryParse |> Option.map (fun i -> i,v))
+                s |> Int32.tryParse |> Option.map (fun i -> i, v))
             |> List.sortBy fst 
         if [0 .. xs.Length-1] <> List.map fst xs then
             failwithf "Cannot convert argument map to argument list: %A" am
         xs |> List.map snd
+
+
+/// Helper functions for working with arguments of ops.
+module Args =
+
+    let leaf: ArgsMap = ArgValue.leaf 
+
+    let unary x : ArgsMap = ArgValue.unary (Arg.Expr x)
+    let unaryX (am: ArgsMap) = am |> ArgValue.unaryX |> Arg.expr
+
+    let binary x y : ArgsMap = Map ["X", Arg.Expr x; "Y", Arg.Expr y]
+    let binaryX (am: ArgsMap) = am |> ArgValue.binaryX |> Arg.expr
+    let binaryY (am: ArgsMap) = am |> ArgValue.binaryY |> Arg.expr
+
+    let nary xs : ArgsMap =
+        xs |> List.map Arg.Expr |> ArgValue.nary
+    let naryXs (am: ArgsMap) =
+        am 
+        |> ArgValue.naryXs
+        |> List.map Arg.expr
 
 
 /// Helper functions for ops.

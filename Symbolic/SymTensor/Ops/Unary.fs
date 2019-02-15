@@ -16,7 +16,7 @@ type UnaryPlus = { X: BaseExpr } with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (Args.unaryX env.Args).UnaryPlus ()      
+        member this.Eval env = (ArgValue.unaryX env.Args).UnaryPlus ()      
 
 
 /// Negation.
@@ -29,7 +29,7 @@ type Negate = { X: BaseExpr } with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (Args.unaryX env.Args).UnaryMinus ()       
+        member this.Eval env = (ArgValue.unaryX env.Args).UnaryMinus ()       
 
 
 /// Absolute value.
@@ -42,7 +42,7 @@ type Abs = { X: BaseExpr } with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (Args.unaryX env.Args).Abs ()       
+        member this.Eval env = (ArgValue.unaryX env.Args).Abs ()       
 
     
 /// Sign.
@@ -55,7 +55,7 @@ type SignT = { X: BaseExpr } with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (Args.unaryX env.Args).Sgn ()       
+        member this.Eval env = (ArgValue.unaryX env.Args).Sgn ()       
 
 
 /// Logarithm to base exp.
@@ -68,7 +68,7 @@ type Log = { X: BaseExpr } with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (Args.unaryX env.Args).Log ()       
+        member this.Eval env = (ArgValue.unaryX env.Args).Log ()       
 
 
 /// Logarithm to base 10.
@@ -81,7 +81,7 @@ type Log10 = { X: BaseExpr } with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (Args.unaryX env.Args).Log10 ()       
+        member this.Eval env = (ArgValue.unaryX env.Args).Log10 ()       
 
 
 /// Exponential function.
@@ -94,7 +94,7 @@ type Exp = { X: BaseExpr } with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (Args.unaryX env.Args).Exp ()       
+        member this.Eval env = (ArgValue.unaryX env.Args).Exp ()       
 
 
 /// Sine.
@@ -107,7 +107,7 @@ type Sin = { X: BaseExpr } with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (Args.unaryX env.Args).Sin ()       
+        member this.Eval env = (ArgValue.unaryX env.Args).Sin ()       
 
 
 /// Cosine.
@@ -120,7 +120,7 @@ type Cos = { X: BaseExpr } with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (Args.unaryX env.Args).Cos ()       
+        member this.Eval env = (ArgValue.unaryX env.Args).Cos ()       
 
 
 /// Tangent.
@@ -133,7 +133,7 @@ type Tan = { X: BaseExpr } with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (Args.unaryX env.Args).Tan ()       
+        member this.Eval env = (ArgValue.unaryX env.Args).Tan ()       
 
 
 /// Inverse sine.
@@ -146,8 +146,7 @@ type Asin = { X: BaseExpr } with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-
-        member this.Eval env = (Args.unaryX env.Args).Asin ()       
+        member this.Eval env = (ArgValue.unaryX env.Args).Asin ()       
 
 
 /// Inverse cosine.
@@ -160,7 +159,7 @@ type Acos = { X: BaseExpr } with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (Args.unaryX env.Args).Acos ()       
+        member this.Eval env = (ArgValue.unaryX env.Args).Acos ()       
 
 
 /// Inverse tangent.
@@ -173,7 +172,7 @@ type Atan = { X: BaseExpr } with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (Args.unaryX env.Args).Atan ()       
+        member this.Eval env = (ArgValue.unaryX env.Args).Atan ()       
 
 
 /// Hyperbolic sine.
@@ -186,7 +185,8 @@ type Sinh = { X: BaseExpr } with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (Args.unaryX env.Args).Sinh ()       
+        member this.Eval env = (ArgValue.unaryX env.Args).Sinh ()       
+
 
 /// Hyperbolic cosine.
 type Cosh = { X: BaseExpr } with
@@ -198,7 +198,8 @@ type Cosh = { X: BaseExpr } with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (Args.unaryX env.Args).Cosh ()       
+        member this.Eval env = (ArgValue.unaryX env.Args).Cosh ()       
+
 
 /// Hyperbolic tangent.
 type Tanh = { X: BaseExpr } with
@@ -210,8 +211,9 @@ type Tanh = { X: BaseExpr } with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (Args.unaryX env.Args).Tanh ()       
+        member this.Eval env = (ArgValue.unaryX env.Args).Tanh ()       
         
+
 /// Square root.
 type Sqrt = { X: BaseExpr } with
     interface IOp with      
@@ -222,7 +224,8 @@ type Sqrt = { X: BaseExpr } with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (Args.unaryX env.Args).Sqrt ()       
+        member this.Eval env = (ArgValue.unaryX env.Args).Sqrt ()       
+
 
 /// Round towards positive infinity.
 type Ceiling = { X: BaseExpr } with
@@ -234,7 +237,8 @@ type Ceiling = { X: BaseExpr } with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (Args.unaryX env.Args).Ceiling ()       
+        member this.Eval env = (ArgValue.unaryX env.Args).Ceiling ()       
+
 
 /// Round towards negative infinity.
 type Floor = { X: BaseExpr } with
@@ -246,7 +250,8 @@ type Floor = { X: BaseExpr } with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (Args.unaryX env.Args).Floor ()       
+        member this.Eval env = (ArgValue.unaryX env.Args).Floor ()       
+
 
 /// Round towards nearest integer.
 type Round = { X: BaseExpr } with
@@ -258,7 +263,8 @@ type Round = { X: BaseExpr } with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (Args.unaryX env.Args).Round ()       
+        member this.Eval env = (ArgValue.unaryX env.Args).Round ()       
+
 
 /// Round towards zeros.
 type Truncate = { X: BaseExpr } with
@@ -270,7 +276,8 @@ type Truncate = { X: BaseExpr } with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (Args.unaryX env.Args).Truncate ()       
+        member this.Eval env = (ArgValue.unaryX env.Args).Truncate ()       
+
 
 /// (Batched) matrix inverse.
 type Invert = { X: BaseExpr } with
@@ -286,7 +293,7 @@ type Invert = { X: BaseExpr } with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (Args.unaryX env.Args).Invert ()
+        member this.Eval env = (ArgValue.unaryX env.Args).Invert ()
 
 
 /// Logical not.
@@ -299,7 +306,8 @@ type Not = { X: BaseExpr } with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = ~~~~(Args.unaryX env.Args :?> Tensor<bool>) :> ITensor       
+        member this.Eval env = ~~~~(ArgValue.unaryX env.Args :?> Tensor<bool>) :> ITensor       
+
 
 /// Reshape
 type Reshape = { X: BaseExpr; Shape: ShapeSpec } with
@@ -317,7 +325,8 @@ type Reshape = { X: BaseExpr; Shape: ShapeSpec } with
         member this.CanEvalAllSymSizes = 
             ShapeSpec.canEval this.Shape
         member this.Eval env =
-            (Args.unaryX env.Args) |> ITensor.reshape (ShapeSpec.eval this.Shape)       
+            (ArgValue.unaryX env.Args) |> ITensor.reshape (ShapeSpec.eval this.Shape)       
+
 
 /// Broadcast.
 type DoBroadcast = { X: BaseExpr; Shape: ShapeSpec } with
@@ -341,7 +350,7 @@ type DoBroadcast = { X: BaseExpr; Shape: ShapeSpec } with
             { this with Shape = SymSizeEnv.substShape env this.Shape } :> _
         member this.CanEvalAllSymSizes = 
             ShapeSpec.canEval this.Shape
-        member this.Eval env = (Args.unaryX env.Args) |> ITensor.broadcastTo (ShapeSpec.eval this.Shape)      
+        member this.Eval env = (ArgValue.unaryX env.Args) |> ITensor.broadcastTo (ShapeSpec.eval this.Shape)      
 
 
 /// Permute the axes.
@@ -359,7 +368,7 @@ type PermuteAxes = {X: BaseExpr; Permutation: int list} with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (Args.unaryX env.Args) |> ITensor.permuteAxes this.Permutation
+        member this.Eval env = (ArgValue.unaryX env.Args) |> ITensor.permuteAxes this.Permutation
 
 
 /// Read a slice from a tensor.
@@ -378,10 +387,10 @@ type Subtensor = {X: BaseExpr; Range: SimpleRangesSpec} with
             let xArgs = Args.unary this.X 
             let dynArgs = 
                 SimpleRangesSpec.dynElems dynPrefix this.Range
-                |> Map.map (fun _ v -> v :?> BaseExpr)
+                |> Map.map (fun _ v -> v :?> BaseExpr |> Arg.Expr)
             Map.join xArgs dynArgs
         member this.ReplaceArgs args = 
-            let dynArgs = args |> Map.map (fun _ v -> v :> IDynElem)
+            let dynArgs = args |> Map.map (fun _ v -> v |> Arg.expr :> IDynElem)
             let range = this.Range |> SimpleRangesSpec.replaceDynElems dynPrefix dynArgs               
             {this with X=Args.unaryX args; Range=range} :> _
         member this.SubstSymSizes env = {this with Range = SymSizeEnv.substRange env this.Range} :> _
@@ -396,7 +405,7 @@ type Subtensor = {X: BaseExpr; Range: SimpleRangesSpec} with
                 this.Range 
                 |> SimpleRangesSpec.resolveDynElems dynPrefix dynVals 
                 |> SimpleRangesSpec.eval
-            (Args.unaryX env.Args).[range]
+            (ArgValue.unaryX env.Args).[range]
 
 
 /// Reverses the tensor in the specified dimension.
@@ -409,7 +418,7 @@ type ReverseAxis = {X: BaseExpr; Axis: int} with
         member this.ReplaceArgs args = {this with X = Args.unaryX args} :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (Args.unaryX env.Args) |> ITensor.reverseAxis this.Axis
+        member this.Eval env = (ArgValue.unaryX env.Args) |> ITensor.reverseAxis this.Axis
 
 
 /// Extract the diagonal(s) along the given axes.
@@ -429,7 +438,7 @@ type Diag = {X: BaseExpr; Axis1: int; Axis2: int} with
         member this.ReplaceArgs args = {this with X = Args.unaryX args} :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (Args.unaryX env.Args).DiagAxis this.Axis1 this.Axis2
+        member this.Eval env = (ArgValue.unaryX env.Args).DiagAxis this.Axis1 this.Axis2
 
 
 /// Build a matrix with the specified diagonal.
@@ -448,7 +457,7 @@ type DiagMat = {X: BaseExpr; Axis1: int; Axis2: int} with
         member this.ReplaceArgs args = {this with X = Args.unaryX args} :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (Args.unaryX env.Args).DiagMatAxis this.Axis1 this.Axis2
+        member this.Eval env = (ArgValue.unaryX env.Args).DiagMatAxis this.Axis1 this.Axis2
 
 
 /// Sum over specified axis.
@@ -461,7 +470,7 @@ type SumAxis = {X: BaseExpr; Axis: int} with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (Args.unaryX env.Args).SumAxis this.Axis 
+        member this.Eval env = (ArgValue.unaryX env.Args).SumAxis this.Axis 
 
 
 /// Product over specified axis.
@@ -474,7 +483,7 @@ type ProductAxis = {X: BaseExpr; Axis: int} with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (Args.unaryX env.Args).ProductAxis this.Axis
+        member this.Eval env = (ArgValue.unaryX env.Args).ProductAxis this.Axis
 
 
 /// Maximum over specified axis.
@@ -487,7 +496,7 @@ type MaxAxis = {X: BaseExpr; Axis: int} with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (Args.unaryX env.Args).MaxAxis this.Axis
+        member this.Eval env = (ArgValue.unaryX env.Args).MaxAxis this.Axis
 
 
 /// Minimum over specified axis.
@@ -500,7 +509,7 @@ type MinAxis = {X: BaseExpr; Axis: int} with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (Args.unaryX env.Args).MinAxis this.Axis
+        member this.Eval env = (ArgValue.unaryX env.Args).MinAxis this.Axis
 
 
 /// Maximum over specified axis.
@@ -513,7 +522,7 @@ type ArgMaxAxis = {X: BaseExpr; Axis: int} with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (Args.unaryX env.Args).ArgMaxAxis this.Axis
+        member this.Eval env = (ArgValue.unaryX env.Args).ArgMaxAxis this.Axis
 
 
 /// Minimum over specified axis.
@@ -526,7 +535,7 @@ type ArgMinAxis = {X: BaseExpr; Axis: int} with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (Args.unaryX env.Args).ArgMinAxis this.Axis
+        member this.Eval env = (ArgValue.unaryX env.Args).ArgMinAxis this.Axis
 
 
 /// Select elements according to the specified index tensors
@@ -554,16 +563,19 @@ type Gather = {X: BaseExpr; Indices: BaseExpr option list} with
         member this.TypeName = this.X.TypeName
         member this.Shape = (this.Indices |> List.pick id).Shape
         member this.Args = 
-            let idxArgs = this.Indices |> listToMap                
+            let idxArgs = this.Indices |> List.map (Option.map Arg.Expr) |> listToMap                
             let xArgs = Args.unary this.X
             Map.join idxArgs xArgs
         member this.ReplaceArgs args =                
-            {this with X=Args.unaryX args; Indices=mapToList this.Indices.Length args} :> _
+            {this with 
+                X = Args.unaryX args
+                Indices = mapToList this.Indices.Length args |> List.map (Option.map Arg.expr)
+            } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env = 
             let vIndices = env.Args |> mapToList this.Indices.Length
-            (Args.unaryX env.Args).Gather vIndices 
+            (ArgValue.unaryX env.Args).Gather vIndices 
 
 
 /// Disperses elements according to the specified index tensors.
@@ -584,16 +596,19 @@ type Scatter = {X: BaseExpr; Indices: BaseExpr option list; Shape: ShapeSpec} wi
         member this.TypeName = this.X.TypeName
         member this.Shape = this.Shape
         member this.Args = 
-            let idxArgs = this.Indices |> listToMap                
+            let idxArgs = this.Indices |> List.map (Option.map Arg.Expr) |> listToMap                
             let xArgs = Args.unary this.X
             Map.join idxArgs xArgs
         member this.ReplaceArgs args =                
-            {this with X=Args.unaryX args; Indices=mapToList this.Indices.Length args} :> _
+            {this with 
+                X = Args.unaryX args
+                Indices = mapToList this.Indices.Length args |> List.map (Option.map Arg.expr)
+            } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env = 
             let vIndices = env.Args |> mapToList this.Indices.Length
-            (Args.unaryX env.Args).Scatter vIndices (ShapeSpec.eval this.Shape)
+            (ArgValue.unaryX env.Args).Scatter vIndices (ShapeSpec.eval this.Shape)
 
 
 /// Store value to variable.
@@ -616,7 +631,7 @@ type Store = {X: BaseExpr; Var: Var} with
         member this.CanEvalAllSymSizes = ShapeSpec.canEval this.Var.Shape
         member this.Eval env = 
             let tv = env.VarEnv |> VarEnv.get this.Var 
-            let v = Args.unaryX env.Args                
+            let v = ArgValue.unaryX env.Args                
             tv.CopyFrom (v.Transfer tv.Dev)
             v.ZerosOfSameType v.Dev [0L]
 
@@ -631,7 +646,7 @@ type AssumeZeroDeriv = { X: BaseExpr } with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = Args.unaryX env.Args
+        member this.Eval env = ArgValue.unaryX env.Args
     
 
 /// Sets the Jacobian of its argument to zero when calculating derivatives.
@@ -647,12 +662,15 @@ type AssumeDeriv = {Deriv: BaseExpr; X: BaseExpr} with
         member this.TypeName = this.X.TypeName
         member this.Shape = this.X.Shape
         member this.Args =                 
-            Map.join (Args.unary this.X) (Map ["Deriv", this.Deriv])                
+            Map.join (Args.unary this.X) (Map ["Deriv", Arg.Expr this.Deriv])                
         member this.ReplaceArgs args = 
-            {this with Deriv=args.["Deriv"]; X=Args.unaryX args} :> _
+            {this with 
+                Deriv = args.["Deriv"] |> Arg.expr
+                X = Args.unaryX args
+            } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = Args.unaryX env.Args
+        member this.Eval env = ArgValue.unaryX env.Args
     
 
 /// Annotation (no influence on value).
@@ -665,7 +683,7 @@ type Annotated = {Label: System.IComparable; X: BaseExpr} with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = Args.unaryX env.Args                  
+        member this.Eval env = ArgValue.unaryX env.Args                  
 
     
 /// Prints the value together with the given label.
@@ -679,7 +697,7 @@ type Print = {Label: string; X: BaseExpr} with
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env = 
-            let v = Args.unaryX env.Args
+            let v = ArgValue.unaryX env.Args
             printfn "%s=\n%A\n" this.Label v
             v                            
     
@@ -695,7 +713,7 @@ type Dump = {Dataset: string; X: BaseExpr} with
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env = 
-            let v = Args.unaryX env.Args
+            let v = ArgValue.unaryX env.Args
             Dump.dumpValue this.Dataset v
             v                            
 
@@ -712,7 +730,7 @@ type CheckFinite = {Label: string; X: BaseExpr} with
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env = 
-            let v = Args.unaryX env.Args
+            let v = ArgValue.unaryX env.Args
             if not (v.AllFinite ()) then
                 printfn "Infinity or NaN encountered in %s with value:\n%A" this.Label v
                 failwithf "Infinity or NaN encountered in %s." this.Label
@@ -728,15 +746,13 @@ type Channel = {Channel: string; X: BaseMultiChannelExpr} with
                             this.X.Channels this.Channel 
         member this.TypeName = this.X.TypeNames.[this.Channel]
         member this.Shape = this.X.Shapes.[this.Channel]
-        member this.Args = Map.empty
-        member this.ReplaceArgs args = this :> _
+        member this.Args = ArgValue.unary (Arg.Channel (this.Channel, this.X))
+        member this.ReplaceArgs args = 
+            let channel, x = ArgValue.unaryX args |> Arg.channel
+            {this with Channel=channel; X=x} :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = 
-            let v = Args.unaryX env.MultiChannelArgs
-            v.[this.Channel]
-    interface IMultiChannelArgsOp with
-        member this.MultiChannelArgs = Args.unary this.X
-        member this.ReplaceMultiChannelArgs args = {this with X=Args.unaryX args} :> _
+        member this.Eval env = ArgValue.unaryX env.Args
+
 
 

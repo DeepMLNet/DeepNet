@@ -7,11 +7,51 @@ open Tensor.Backend
 open System
 
     
+/// Argument of an op.
+[<RequireQualifiedAccess>]
+type Arg =
+    /// Argument using single-channel expression.
+    | Expr of expr:BaseExpr
+    /// Argument using the specified channel of a multi-channel expression.
+    | Channel of channel:string * expr:BaseMultiChannelExpr
+    with
+        /// Extracts the expression from a single-channel argument.
+        static member expr (arg: Arg) =
+            match arg with
+            | Arg.Expr expr -> expr
+            | _ -> failwithf "Expected single-channel argument but got %A." arg
+        
+        /// Extract the channel and multi-channel expression from a multi-channel argument.
+        static member channel (arg: Arg) =
+            match arg with
+            | Arg.Channel (channel, expr) -> (channel, expr)
+            | _ -> failwithf "Expected multi-channel argument but got %A." arg
+            
+        /// Return argument expression as BaseXChExpr.
+        static member asXChExpr (arg: Arg) =
+            match arg with
+            | Arg.Expr expr -> BaseXChExpr.SingleCh expr
+            | Arg.Channel (_, expr) -> BaseXChExpr.MultiCh expr
+
+        static member asBaseExprCh (arg: Arg) =
+            match arg with
+            | Arg.Expr expr -> BaseExprCh.Only expr
+            | Arg.Channel (channel, expr) -> BaseExprCh.Ch (channel, expr)
+
+        /// Apply mapping function with this argument converted to a BaseXChExpr.
+        static member mapAsXChExpr (fn: BaseXChExpr -> BaseXChExpr) (arg: Arg) =
+            match arg with
+            | Arg.Expr expr -> BaseXChExpr.SingleCh expr |> fn |> BaseXChExpr.singleCh |> Arg.Expr
+            | Arg.Channel (ch, expr) -> 
+                let mapped = BaseXChExpr.MultiCh expr |> fn |> BaseXChExpr.multiCh
+                Arg.Channel (ch, mapped)
+
+
 /// Map containing argument expression by name.
-type ArgsMap = Map<string, BaseExpr>
+type ArgsMap = Map<string, Arg>
 
 /// Map containing argument expression by name for multi-channel arguments.
-type MultiChannelArgsMap = Map<string, string * BaseMultiChannelExpr>
+//type MultiChannelArgsMap = Map<string, string * BaseMultiChannelExpr>
 
 
 /// Information necessary to evaluate an expression.
@@ -23,8 +63,8 @@ type EvalEnv = {
     Dev:    ITensorDevice
     /// Argument values.
     Args:   Map<string, ITensor>
-    /// Multi-channel argument values.
-    MultiChannelArgs:   Map<string, Map<string, ITensor>>
+    ///// Multi-channel argument values.
+    //MultiChannelArgs:   Map<string, Map<string, ITensor>>
 }
 
 
@@ -59,13 +99,13 @@ type IBaseOp =
     abstract CanEvalAllSymSizes: bool
 
 
-/// Operation that uses multi-channel expressions as its arguments.
-type IMultiChannelArgsOp = 
-    /// Returns the multi-channel arguments of this op.
-    abstract MultiChannelArgs: MultiChannelArgsMap
+///// Operation that uses multi-channel expressions as its arguments.
+//type IMultiChannelArgsOp = 
+//    /// Returns the multi-channel arguments of this op.
+//    abstract MultiChannelArgs: MultiChannelArgsMap
 
-    /// Replaces the multi-channel arguments of this op.
-    abstract ReplaceMultiChannelArgs: MultiChannelArgsMap -> IMultiChannelArgsOp
+//    /// Replaces the multi-channel arguments of this op.
+//    abstract ReplaceMultiChannelArgs: MultiChannelArgsMap -> IMultiChannelArgsOp
 
 
 /// A mathematical operation in an expression with a single output value.
@@ -147,13 +187,6 @@ type OpExtenderAttribute () =
     inherit System.Attribute()
 
 
-/// A single-channel or multi-channel expression.
-type IExpr = 
-    inherit System.IComparable
-    inherit System.IComparable<IExpr>
-    inherit System.IEquatable<IExpr>
-
-
 module internal ExprTools =
     /// Returns all variables contained in an op and its arguments.
     let extractVars (op: IBaseOp) =
@@ -161,39 +194,36 @@ module internal ExprTools =
             match op with
             | :? IVarContainingOp as op -> op.Vars
             | _ -> Set.empty
-        let argVars =
-            op.Args |> Map.toSeq |> Seq.map (fun (_, arg) -> arg.Vars) |> Set.unionMany
-        let mcArgVars =
-            match op with
-            | :? IMultiChannelArgsOp as op ->
-                op.MultiChannelArgs |> Map.toSeq |> Seq.map (fun (_, mcArg) -> mcArg.Vars) |> Set.unionMany
-            | _ -> Set.empty
-        Set.unionMany [opVars; argVars; mcArgVars]
+        let argVars = 
+            op.Args
+            |> Map.toSeq
+            |> Seq.map (fun (_, arg) -> 
+                match arg with
+                | Arg.Expr argExpr -> argExpr.Vars
+                | Arg.Channel (_, argMCExpr) -> argMCExpr.Vars)
+            |> Set.unionMany
+        Set.union opVars argVars
 
     /// Returns true, if all symbolic sizes of the op and its arguments can be evaluated to numeric values.
     let canEvalAllSymSizes (op: IBaseOp) =
-        let argsEvalable = 
-            op.Args |> Map.forall (fun _ arg -> arg.CanEvalAllSymSizes)
-        let mcArgsEvalable = 
-            match op with
-            | :? IMultiChannelArgsOp as op ->
-                op.MultiChannelArgs |> Map.forall (fun _ mcArg -> mcArg.CanEvalAllSymSizes)
-            | _ -> true
-        argsEvalable && mcArgsEvalable && op.CanEvalAllSymSizes
+        let argsEvalable =
+            op.Args
+            |> Map.forall (fun _ arg ->
+                match arg with
+                | Arg.Expr argExpr -> argExpr.CanEvalAllSymSizes
+                | Arg.Channel (_, argMCExpr) -> argMCExpr.CanEvalAllSymSizes)
+        argsEvalable && op.CanEvalAllSymSizes
 
     /// Recursively substitues all symbolic sizes within the given op and its arguments.
     let substSymSizes (env: SymSizeEnv) (op: IBaseOp) =
         let op = op.SubstSymSizes env
-        let subsArgs = op.Args |> Map.map (fun _ arg -> arg.SubstSymSizes env)
-        let op = op.ReplaceArgs subsArgs
-        let op =
-            match op with
-            | :? IMultiChannelArgsOp as op ->
-                let subsArgs = 
-                    op.MultiChannelArgs |> Map.map (fun _ mcArg -> mcArg.SubstSymSizes env)
-                op.ReplaceMultiChannelArgs subsArgs :?> IBaseOp
-            | _ -> op
-        op
+        let subsArgs = 
+            op.Args 
+            |> Map.map (fun _ arg -> 
+                match arg with
+                | Arg.Expr argExpr -> Arg.Expr (argExpr.SubstSymSizes env)
+                | Arg.Channel (argCh, argMCExpr) -> Arg.Channel (argCh, argMCExpr.SubstSymSizes env))
+        op.ReplaceArgs subsArgs
 
 
 /// Base for single-channel expressions.
@@ -203,10 +233,10 @@ type BaseExpr (op: IOp) =
     let _vars = lazy (ExprTools.extractVars op)
     let _canEvalAllSymSizes = lazy (ExprTools.canEvalAllSymSizes op)
 
-    interface IExpr
     interface IDynElem
 
     member this.Op = op
+    member this.Args = op.Args
     member this.TypeName = op.TypeName   
     member this.DataType = this.TypeName.Type
     member this.Shape = op.Shape
@@ -217,34 +247,27 @@ type BaseExpr (op: IOp) =
     member this.SubstSymSizes (env: SymSizeEnv) =
         ExprTools.substSymSizes env op :?> IOp |> BaseExpr
 
-    member this.MapArgs (fn: BaseExpr -> BaseExpr) =
-        op.Args
-        |> Map.map (fun _ arg -> fn arg)
-        |> op.ReplaceArgs :?> IOp
+    static member mapArgs (fn: BaseXChExpr -> BaseXChExpr) (expr: BaseExpr) =
+        expr.Op.Args
+        |> Map.map (fun _ arg -> arg |> Arg.mapAsXChExpr fn)
+        |> expr.Op.ReplaceArgs :?> IOp
         |> BaseExpr
 
-    interface System.IEquatable<IExpr> with
-        member this.Equals other = 
-            match other with
-            | :? BaseExpr as other -> this.Op.Equals other.Op
-            | _ -> false
+    interface System.IEquatable<BaseExpr> with
+        member this.Equals other = this.Op.Equals other.Op
 
     override this.Equals other =
         match other with
-        | :? IExpr as other -> (this :> System.IEquatable<_>).Equals other
+        | :? BaseExpr as other -> (this :> System.IEquatable<_>).Equals other
         | _ -> false
 
-    interface System.IComparable<IExpr> with
-        member this.CompareTo other =
-            match other with
-            | :? BaseExpr as other -> compare this.Op other.Op
-            | :? BaseMultiChannelExpr -> 1
-            | _ -> failwithf "Cannot compare BaseExpr to type %A." (other.GetType())
+    interface System.IComparable<BaseExpr> with
+        member this.CompareTo other = compare this.Op other.Op
 
     interface System.IComparable with
         member this.CompareTo other =
             match other with
-            | :? IExpr as other -> (this :> System.IComparable<_>).CompareTo other
+            | :? BaseExpr as other -> (this :> System.IComparable<_>).CompareTo other
             | _ -> failwithf "Cannot compare BaseExpr to type %A." (other.GetType())
 
     override this.GetHashCode() =
@@ -259,6 +282,7 @@ type BaseMultiChannelExpr (op: IMultiChannelOp) =
     let _canEvalAllSymSizes = lazy (ExprTools.canEvalAllSymSizes op)
 
     member this.Op = op
+    member this.Args = op.Args
     member this.TypeNames = op.TypeNames
     member this.DataTypes = this.TypeNames |> Map.map (fun _ tn -> tn.Type)
     member this.Shapes = op.Shapes
@@ -270,32 +294,77 @@ type BaseMultiChannelExpr (op: IMultiChannelOp) =
     member this.SubstSymSizes (env: SymSizeEnv) =
         ExprTools.substSymSizes env this.Op :?> IMultiChannelOp |> BaseMultiChannelExpr
 
-    interface IExpr
+    static member mapArgs (fn: BaseXChExpr -> BaseXChExpr) (expr: BaseMultiChannelExpr) =
+        expr.Op.Args
+        |> Map.map (fun _ arg -> arg |> Arg.mapAsXChExpr fn)
+        |> expr.Op.ReplaceArgs :?> IMultiChannelOp
+        |> BaseMultiChannelExpr
 
-    interface System.IEquatable<IExpr> with
-        member this.Equals other = 
-            match other with
-            | :? BaseMultiChannelExpr as other -> this.Op.Equals other.Op
-            | _ -> false
+    interface System.IEquatable<BaseMultiChannelExpr> with
+        member this.Equals other = this.Op.Equals other.Op
 
     override this.Equals other =
         match other with
-        | :? IExpr as other -> (this :> System.IEquatable<_>).Equals other
+        | :? BaseMultiChannelExpr as other -> (this :> System.IEquatable<_>).Equals other
         | _ -> false
 
-    interface System.IComparable<IExpr> with
-        member this.CompareTo other =
-            match other with
-            | :? BaseMultiChannelExpr as other -> compare this.Op other.Op
-            | :? BaseExpr -> -1
-            | _ -> failwithf "Cannot compate MultiChannelExpr to type %A." (other.GetType())
+    interface System.IComparable<BaseMultiChannelExpr> with
+        member this.CompareTo other = compare this.Op other.Op
 
     interface System.IComparable with
         member this.CompareTo other =
             match other with
-            | :? IExpr as other -> (this :> System.IComparable<_>).CompareTo other
-            | _ -> failwithf "Cannot compare MultiChannelExpr to type %A." (other.GetType())
+            | :? BaseMultiChannelExpr as other -> (this :> System.IComparable<_>).CompareTo other
+            | _ -> failwithf "Cannot compare BaseMultiChannelExpr to type %A." (other.GetType())
 
     override this.GetHashCode() =
         hash this.Op
+
+
+/// A single-channel or multi-channel expression.
+[<RequireQualifiedAccess>]
+type BaseXChExpr =
+    | SingleCh of BaseExpr
+    | MultiCh of BaseMultiChannelExpr
+    with
+
+        static member singleCh (xExpr: BaseXChExpr) =   
+            match xExpr with
+            | BaseXChExpr.SingleCh expr -> expr
+            | _ -> failwithf "Expected single-channel expression but got %A." xExpr
+
+        static member multiCh (xExpr: BaseXChExpr) =   
+            match xExpr with
+            | BaseXChExpr.MultiCh expr -> expr
+            | _ -> failwithf "Expected multi-channel expression but got %A." xExpr
+
+        member this.Args = 
+            match this with
+            | SingleCh scExpr -> scExpr.Args
+            | MultiCh mcExpr -> mcExpr.Args
+
+        member this.Vars = 
+            match this with
+            | SingleCh scExpr -> scExpr.Vars
+            | MultiCh mcExpr -> mcExpr.Vars
+
+        static member mapArgs (fn: BaseXChExpr -> BaseXChExpr) (expr: BaseXChExpr) =
+            match expr with
+            | SingleCh scExpr -> 
+                scExpr |> BaseExpr.mapArgs fn |> SingleCh
+            | MultiCh mcExpr -> 
+                mcExpr |> BaseMultiChannelExpr.mapArgs fn |> MultiCh
+                
+
+[<RequireQualifiedAccess>]
+type BaseExprCh = 
+    | Only of expr:BaseExpr
+    | Ch of channel:string * expr:BaseMultiChannelExpr
+    with 
+
+        static member asBaseXChExpr (exprCh: BaseExprCh) =
+            match exprCh with
+            | Only expr -> BaseXChExpr.SingleCh expr
+            | Ch (_, expr) -> BaseXChExpr.MultiCh expr
+
 
