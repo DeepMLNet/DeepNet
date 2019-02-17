@@ -27,7 +27,7 @@ type BaseXChExprGroup (exprs: BaseXChExpr list) =
         let addDependant node dependant =
             if not (dependants.ContainsKey node) then
                 dependants.[node] <- HashSet<BaseXChExpr> (HashIdentity.Reference)
-            dependants.[node].Add dependant |> ignore
+            dependants.[node].Add dependant |> ignore 
         let rec doBuild expr =
             if not (processed.Contains expr) then
                 // update dependants recursively

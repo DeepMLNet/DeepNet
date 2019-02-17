@@ -226,35 +226,46 @@ module internal ExprTools =
         op.ReplaceArgs subsArgs
 
 
+
 /// Base for single-channel expressions.
-type BaseExpr (op: IOp) =
+/// BaseExpr is reference-unique, i.e. all expressions that are structurally equal 
+/// are also reference equal.
+type BaseExpr private (op: IOp) =
     do op.Check()
-        
+
+    let _typeName = lazy (op.TypeName)
+    let _shape = lazy (op.Shape)
     let _vars = lazy (ExprTools.extractVars op)
     let _canEvalAllSymSizes = lazy (ExprTools.canEvalAllSymSizes op)
+    let _hash = lazy (hash op)
+
+    static let uniqueExprs = new ConcurrentWeakDict<IOp, BaseExpr> (BaseExpr)
+
+    /// Creates an expression for the specified op.
+    static member ofOp (op: IOp) = uniqueExprs.[op]
 
     interface IDynElem
 
     member this.Op = op
     member this.Args = op.Args
-    member this.TypeName = op.TypeName   
+    member this.TypeName = _typeName.Force()  
     member this.DataType = this.TypeName.Type
-    member this.Shape = op.Shape
+    member this.Shape = _shape.Force()
     member this.NDims = List.length this.Shape
     member this.NElems = List.fold (*) SizeSpec.one this.Shape
     member this.Vars = _vars.Force()
     member this.CanEvalAllSymSizes = _canEvalAllSymSizes.Force()
     member this.SubstSymSizes (env: SymSizeEnv) =
-        ExprTools.substSymSizes env op :?> IOp |> BaseExpr
+        ExprTools.substSymSizes env op :?> IOp |> BaseExpr.ofOp
 
     static member mapArgs (fn: BaseXChExpr -> BaseXChExpr) (expr: BaseExpr) =
         expr.Op.Args
         |> Map.map (fun _ arg -> arg |> Arg.mapAsXChExpr fn)
         |> expr.Op.ReplaceArgs :?> IOp
-        |> BaseExpr
+        |> BaseExpr.ofOp
 
     interface System.IEquatable<BaseExpr> with
-        member this.Equals other = this.Op.Equals other.Op
+        member this.Equals other = Object.ReferenceEquals(this, other)
 
     override this.Equals other =
         match other with
@@ -270,22 +281,30 @@ type BaseExpr (op: IOp) =
             | :? BaseExpr as other -> (this :> System.IComparable<_>).CompareTo other
             | _ -> failwithf "Cannot compare BaseExpr to type %A." (other.GetType())
 
-    override this.GetHashCode() =
-        hash this.Op
+    override this.GetHashCode() = _hash.Force ()
 
 
 /// Base for multi-channel expressions.
-type BaseMultiChannelExpr (op: IMultiChannelOp) =   
+type BaseMultiChannelExpr private (op: IMultiChannelOp) =   
     do op.Check()
-        
+
+    let _typeNames = lazy (op.TypeNames)
+    let _shapes = lazy (op.Shapes)      
     let _vars = lazy (ExprTools.extractVars op)
     let _canEvalAllSymSizes = lazy (ExprTools.canEvalAllSymSizes op)
+    let _hash = lazy (hash op)
+
+    static let uniqueExprs = 
+        new ConcurrentWeakDict<IMultiChannelOp, BaseMultiChannelExpr> (BaseMultiChannelExpr)
+
+    /// Creates a multi-channel expression for the specified multi-channel op.
+    static member ofOp (op: IMultiChannelOp) = uniqueExprs.[op]
 
     member this.Op = op
     member this.Args = op.Args
-    member this.TypeNames = op.TypeNames
+    member this.TypeNames = _typeNames.Force()
     member this.DataTypes = this.TypeNames |> Map.map (fun _ tn -> tn.Type)
-    member this.Shapes = op.Shapes
+    member this.Shapes = _shapes.Force()
     member this.NDims = this.Shapes |> Map.map (fun _ s -> List.length s)
     member this.NElems = this.Shapes |> Map.map (fun _ s -> List.fold (*) SizeSpec.one s)
     member this.Channels = op.Channels
@@ -298,10 +317,10 @@ type BaseMultiChannelExpr (op: IMultiChannelOp) =
         expr.Op.Args
         |> Map.map (fun _ arg -> arg |> Arg.mapAsXChExpr fn)
         |> expr.Op.ReplaceArgs :?> IMultiChannelOp
-        |> BaseMultiChannelExpr
+        |> BaseMultiChannelExpr.ofOp
 
     interface System.IEquatable<BaseMultiChannelExpr> with
-        member this.Equals other = this.Op.Equals other.Op
+        member this.Equals other = Object.ReferenceEquals (this, other)
 
     override this.Equals other =
         match other with
@@ -317,8 +336,7 @@ type BaseMultiChannelExpr (op: IMultiChannelOp) =
             | :? BaseMultiChannelExpr as other -> (this :> System.IComparable<_>).CompareTo other
             | _ -> failwithf "Cannot compare BaseMultiChannelExpr to type %A." (other.GetType())
 
-    override this.GetHashCode() =
-        hash this.Op
+    override this.GetHashCode() = _hash.Force ()
 
 
 /// A single-channel or multi-channel expression.

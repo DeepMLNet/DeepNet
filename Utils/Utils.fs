@@ -575,3 +575,40 @@ module internal Exception =
         Printf.kprintf (fun msg -> raise (IndexOutOfRangeException msg)) fmt
 
 
+
+/// A concurrent dictionary containing weak references to objects.
+type ConcurrentWeakDict<'K, 'V> when 'K: equality and 'V: not struct (create: 'K -> 'V) =
+    let mutex = obj ()
+    let mutable store = new Dictionary<'K, WeakReference<'V>> ()
+    
+    /// Creates or returns the already existing value for the specified key.
+    member this.Item
+        with get (k: 'K) =
+            lock mutex (fun () ->
+                let value = 
+                    match store.TryGetValue k with
+                    | true, weakValue ->
+                        match weakValue.TryGetTarget () with
+                        | true, v -> Some v
+                        | false, _ -> None
+                    | false, _ -> None
+
+                match value with 
+                | Some value -> value
+                | None ->
+                    let value = create k
+                    store.[k] <- WeakReference<'V> value
+                    value                
+            )
+
+    /// Removes entries for values that have been garbage collected.
+    member this.Clean () =
+        lock mutex (fun () ->
+            let newStore = new Dictionary<'K, WeakReference<'V>> ()
+            for KeyValue(k, wv) in store do
+                match wv.TryGetTarget () with
+                | true, _ -> newStore.[k] <- wv
+                | false, _ -> ()
+            store <- newStore
+        )
+
