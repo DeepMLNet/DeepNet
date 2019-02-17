@@ -6,27 +6,27 @@ open DeepNet.Utils
 /// Provides information about a set of expressions (dependencies, channel usage).
 type BaseXChExprGroup (exprs: BaseXChExpr list) =
     
-    /// expression cache
-    let knownExprs = Dictionary<BaseXChExpr, BaseXChExpr> () 
+    ///// expression cache
+    //let knownExprs = Dictionary<BaseXChExpr, BaseXChExpr> () 
 
-    // rebuilt expression so that equal subtrees point to the same object instance
-    let exprs =
-        let rec doUnify expr =
-            match knownExprs.TryFind expr with
-            | Some knownExpr -> knownExpr
-            | None ->
-                let unifiedExpr = expr |> BaseXChExpr.mapArgs doUnify
-                knownExprs.[expr] <- unifiedExpr
-                unifiedExpr
-        exprs |> List.map doUnify 
+    //// rebuilt expression so that equal subtrees point to the same object instance
+    //let exprs =
+    //    let rec doUnify expr =
+    //        match knownExprs.TryFind expr with
+    //        | Some knownExpr -> knownExpr
+    //        | None ->
+    //            let unifiedExpr = expr |> BaseXChExpr.mapArgs doUnify
+    //            knownExprs.[expr] <- unifiedExpr
+    //            unifiedExpr
+    //    exprs |> List.map doUnify 
     
     // build sets of dependants for each subexpression
     let dependants = 
-        let processed = HashSet<BaseXChExpr> (HashIdentity.Reference)
-        let dependants = Dictionary<BaseExprCh, HashSet<BaseXChExpr>> (HashIdentity.Reference)              
+        let processed = HashSet<BaseXChExpr> ()
+        let dependants = Dictionary<BaseExprCh, HashSet<BaseXChExpr>> ()              
         let addDependant node dependant =
             if not (dependants.ContainsKey node) then
-                dependants.[node] <- HashSet<BaseXChExpr> (HashIdentity.Reference)
+                dependants.[node] <- HashSet<_> ()
             dependants.[node].Add dependant |> ignore 
         let rec doBuild expr =
             if not (processed.Contains expr) then
@@ -43,11 +43,11 @@ type BaseXChExprGroup (exprs: BaseXChExpr list) =
 
     // build sets of used channels
     let usedChannels = lazy (
-        let processed = HashSet<BaseXChExpr> (HashIdentity.Reference)
-        let usedChannels = Dictionary<BaseMultiChannelExpr, HashSet<string>> (HashIdentity.Structural)      
+        let processed = HashSet<BaseXChExpr> ()
+        let usedChannels = Dictionary<BaseMultiChannelExpr, HashSet<string>> ()      
         let addUsedChannel key channel =
             if not (usedChannels.ContainsKey key) then
-                usedChannels.[key] <- HashSet<string> (HashIdentity.Structural)
+                usedChannels.[key] <- HashSet<string> ()
             usedChannels.[key].Add channel |> ignore
         let rec doBuild (expr: BaseXChExpr) =
             if not (processed.Contains expr) then
@@ -77,12 +77,12 @@ type BaseXChExprGroup (exprs: BaseXChExpr list) =
         | Some deps -> deps :> IReadOnlyCollection<_>
         | None -> HashSet<_> () :> IReadOnlyCollection<_>
 
-    /// Returns all expressions that depend on expr.
-    /// Comparison is done based on structural equality.
-    member this.DependantsStructural expr =
-        match knownExprs.TryFind expr with
-        | Some expr -> this.Dependants expr
-        | None -> HashSet<_> () :> IReadOnlyCollection<_>
+    ///// Returns all expressions that depend on expr.
+    ///// Comparison is done based on structural equality.
+    //member this.DependantsStructural expr =
+    //    match knownExprs.TryFind expr with
+    //    | Some expr -> this.Dependants expr
+    //    | None -> HashSet<_> () :> IReadOnlyCollection<_>
 
     /// Returns the list of used channles for the multi-channel op
     /// with the specified arguments.

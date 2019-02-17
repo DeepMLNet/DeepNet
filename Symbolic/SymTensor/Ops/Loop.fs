@@ -116,7 +116,7 @@ type Loop = {
             failwith "TODO"
 
     static member internal noLift length vars channels xs =
-        BaseMultiChannelExpr {Loop.Length=length; Vars=vars; Channels=channels; Xs=xs} 
+        BaseMultiChannelExpr.ofOp {Loop.Length=length; Vars=vars; Channels=channels; Xs=xs} 
 
     static member internal withLift (length: SizeSpec) (vars: Map<Var, Loop.Input>) 
                                     (channels: Map<string, Loop.Value>) (xs: BaseExpr list) =       
@@ -168,7 +168,7 @@ type Loop = {
                         if dependsOnVars && not dependsOnLoopVars then
                             //if not (dependsOnLoopVars expr) then
                             let vs = addConstVar expr
-                            BaseExpr {VarArg.Var=vs} 
+                            BaseExpr.ofOp {VarArg.Var=vs} 
                         else
                             expr |> BaseExpr.mapArgs lift
                     lifted.[expr] <- rep
@@ -182,7 +182,7 @@ type Loop = {
             |> Map.map (fun ch lv -> {
                 lv with Loop.Value.Expr = lv.Expr |> BaseXChExpr.SingleCh |> lift |> BaseXChExpr.singleCh
             })
-        BaseMultiChannelExpr {Loop.Length=length; Vars=vars; Channels=liftedChannels; Xs=args} 
+        BaseMultiChannelExpr.ofOp {Loop.Length=length; Vars=vars; Channels=liftedChannels; Xs=args} 
        
 
  
