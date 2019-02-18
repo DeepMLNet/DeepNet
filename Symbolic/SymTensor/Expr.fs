@@ -382,17 +382,26 @@ type Expr (baseExpr: BaseExpr) =
     static member zerosLike (expr: Expr) = 
         Expr.zerosOfType expr.DataType expr.Shape
 
+    /// Identity matrix of given size and type.
+    static member identityOfType typ size =
+        Expr {Identity.Size=size; Type=TypeName.ofTypeInst typ}
+
+    /// Identity matrix of given size.
+    [<RequiresExplicitTypeArguments>]
+    static member identity<'T> size = 
+        Expr.identityOfType typeof<'T> size
+
     /// Computes the inverse of a matrix.
     /// If the input has more than two dimensions, the inverses
     /// along the last two dimensions are returned.
     /// The inverse of a singular matrix is undefinied.
     /// No error is raised in that case.
     static member invert (x: Expr) =
-        {Invert.X=x.BaseExprCh} |> Expr
+        Expr {Invert.X=x.BaseExprCh}
 
     /// Reverses the tensor in the specified dimension.
     static member reverseAxis axis (x: Expr) =
-        {ReverseAxis.Axis=axis; X=x.BaseExprCh} |> Expr  
+        Expr {ReverseAxis.Axis=axis; X=x.BaseExprCh} 
 
     /// Concatenates the sequence of tensors in the specified dimension.
     static member concat dim (es: Expr seq) =
@@ -432,7 +441,7 @@ type Expr (baseExpr: BaseExpr) =
     /// Extracts the diagonal along the given axes.
     static member diagAxis ax1 ax2 (x: Expr) = 
         let ax1, ax2 = if ax1 < ax2 then ax1, ax2 else ax2, ax1
-        {Diag.Axis1=ax1; Axis2=ax2; Diag.X=x.BaseExprCh} |> Expr
+        Expr {Diag.Axis1=ax1; Axis2=ax2; Diag.X=x.BaseExprCh} 
                              
     /// Extracts the diagonal of a matrix.
     /// If the expression has more than two dimensions, the diagonals
@@ -445,7 +454,7 @@ type Expr (baseExpr: BaseExpr) =
     /// Creates a diagonal matrix by duplicating the given dimension.
     static member diagMatAxis ax1 ax2 (x: Expr) = 
         let ax1, ax2 = if ax1 < ax2 then ax1, ax2 else ax2, ax1
-        {DiagMat.Axis1=ax1; Axis2=ax2; X=x.BaseExprCh} |> Expr
+        Expr {DiagMat.Axis1=ax1; Axis2=ax2; X=x.BaseExprCh} 
 
     /// Creates a matrix with the given vector on its diagonal. 
     /// All other elements are zeros.
@@ -458,7 +467,7 @@ type Expr (baseExpr: BaseExpr) =
 
     /// summation over given dimension
     static member sumAxis (axis: int) (x: Expr) = 
-        {SumAxis.Axis=axis; X=x.BaseExprCh} |> Expr
+        Expr {SumAxis.Axis=axis; X=x.BaseExprCh} 
 
     /// summation over given dimension, while keeping the axis with one (broadcastable) element
     static member sumKeepingAxis (axis: int) (x: Expr) =
@@ -483,7 +492,7 @@ type Expr (baseExpr: BaseExpr) =
     
     /// product over given dimension
     static member productAxis (axis: int) (x: Expr) = 
-        {ProductAxis.Axis=axis; X=x.BaseExprCh} |> Expr
+        Expr {ProductAxis.Axis=axis; X=x.BaseExprCh} 
 
     /// product over given dimension, while keeping the axis with one (broadcastable) element
     static member productKeepingAxis (axis: int) (x: Expr) =
@@ -495,7 +504,7 @@ type Expr (baseExpr: BaseExpr) =
 
     /// Maximum over given dimension.
     static member maxAxis (axis: int) (x: Expr) = 
-        {MaxAxis.Axis=axis; X=x.BaseExprCh} |> Expr
+        Expr {MaxAxis.Axis=axis; X=x.BaseExprCh} 
 
     /// Maximum over given dimension, while keeping the axis with one (broadcastable) element.
     static member maxKeepingAxis (axis: int) (x: Expr) =
@@ -507,7 +516,7 @@ type Expr (baseExpr: BaseExpr) =
 
     /// Minimum over given dimension.
     static member minAxis (axis: int) (x: Expr) = 
-        {MinAxis.Axis=axis; X=x.BaseExprCh} |> Expr
+        Expr {MinAxis.Axis=axis; X=x.BaseExprCh} 
 
     /// Minimum over given dimension, while keeping the axis with one (broadcastable) element.
     static member minKeepingAxis (axis: int) (x: Expr) =
@@ -519,7 +528,7 @@ type Expr (baseExpr: BaseExpr) =
 
     /// Index of maximum over given dimension.
     static member argMaxAxis (axis: int) (x: Expr) = 
-        {ArgMaxAxis.Axis=axis; X=x.BaseExprCh} |> Expr
+        Expr {ArgMaxAxis.Axis=axis; X=x.BaseExprCh} 
 
     /// Index of maximum over given dimension, while keeping the axis with one (broadcastable) element.
     static member argMaxKeepingAxis (axis: int) (x: Expr) =
@@ -527,7 +536,7 @@ type Expr (baseExpr: BaseExpr) =
 
     /// Index of minimum over given dimension.
     static member argMinAxis (axis: int) (x: Expr) = 
-        {MinAxis.Axis=axis; X=x.BaseExprCh} |> Expr
+        Expr {MinAxis.Axis=axis; X=x.BaseExprCh} 
 
     /// Index of minimum over given dimension, while keeping the axis with one (broadcastable) element.
     static member argMinKeepingAxis (axis: int) (x: Expr) =
@@ -548,38 +557,38 @@ type Expr (baseExpr: BaseExpr) =
             | _ -> failwith "unbalanced idxs"
         let bcIndices = rebuild indices bcSomeIndices
         let bcIndices = bcIndices |> List.map (Option.map Expr.baseExprCh)
-        {Gather.Indices=bcIndices; X=x.BaseExprCh} |> Expr
+        Expr {Gather.Indices=bcIndices; X=x.BaseExprCh} 
 
     /// Disperses elements according to the specified index tensors.
     static member scatter (indices: Expr option list) (trgtShp: ShapeSpec) (x: Expr) =
         let indices = indices |> List.map (Option.map (Expr.broadcastToShape x.Shape))
         let indices = indices |> List.map (Option.map Expr.baseExprCh)
-        {Scatter.Indices=indices; Shape=trgtShp; X=x.BaseExprCh} |> Expr
+        Expr {Scatter.Indices=indices; Shape=trgtShp; X=x.BaseExprCh} 
 
     /// Nullifies the Jacobian of its argument when calculating derivatives.
     static member assumeZeroDeriv (x: Expr) =
-        {AssumeZeroDeriv.X=x.BaseExprCh} |> Expr
+        Expr {AssumeZeroDeriv.X=x.BaseExprCh} 
 
     /// Assumes the specified Jacobian when calculating derivatives.
     static member assumeDeriv (deriv: Expr) (x: Expr) =
-        {AssumeDeriv.Deriv=deriv.BaseExprCh; X=x.BaseExprCh} |> Expr
+        Expr {AssumeDeriv.Deriv=deriv.BaseExprCh; X=x.BaseExprCh} 
 
     /// Annotated expression (no influence on value).
     static member annotate label (x: Expr) = 
-        {Annotated.Label=label; X=x.BaseExprCh} |> Expr
+        Expr {Annotated.Label=label; X=x.BaseExprCh} 
 
     /// Print the result with the given label when evaluated.
     static member print (label: string) (x: Expr) =
-        {Print.Label=label; X=x.BaseExprCh} |> Expr
+        Expr {Print.Label=label; X=x.BaseExprCh} 
 
     /// Dumps the result into the given dataset in the active HDF5 dump file.
     static member dump (dataset: string) (x: Expr) =
-        {Dump.Dataset=dataset; X=x.BaseExprCh} |> Expr
+        Expr {Dump.Dataset=dataset; X=x.BaseExprCh} 
 
     /// If the value contains NaNs or infinities, outputs their location and 
     /// stops the computation.
     static member checkFinite (label: string) (x: Expr) =
-        {CheckFinite.Label=label; X=x.BaseExprCh} |> Expr
+        Expr {CheckFinite.Label=label; X=x.BaseExprCh} 
 
     /// Dot product.
     /// Behavior depends on the dimensionality of the arguments.
@@ -598,28 +607,28 @@ type Expr (baseExpr: BaseExpr) =
         | 2, 1 -> 
             // matrix-vector dot product
             let bm = b |> Expr.reshape (ShapeSpec.padRight sb)
-            {Dot.X=a.BaseExprCh; Y=bm.BaseExprCh} |> Expr |> Expr.reshape [sa.[0]]
+            Expr {Dot.X=a.BaseExprCh; Y=bm.BaseExprCh} |> Expr.reshape [sa.[0]]
         | 2, 2 -> 
             // matrix-matrix dot product
-            {Dot.X=a.BaseExprCh; Y=b.BaseExprCh} |> Expr
+            Expr {Dot.X=a.BaseExprCh; Y=b.BaseExprCh} 
         | na, nb when na = nb -> 
             // batched matrix-matrix dot product
             let bsa, bsb = ShapeSpec.broadcastToSameInDims [0 .. na-3] false sa sb
             let ba = a |> Expr.broadcast bsa
             let bb = b |> Expr.broadcast bsb    
-            {Dot.X=ba.BaseExprCh; Y=bb.BaseExprCh} |> Expr
+            Expr {Dot.X=ba.BaseExprCh; Y=bb.BaseExprCh} 
         | na, nb when na = nb + 1 ->
             // batched matrix-vector dot product
             let psb = ShapeSpec.padRight sb
             let bsa, bsb = ShapeSpec.broadcastToSameInDims [0 .. na-3] false sa psb
             let ba = a |> Expr.broadcast bsa
             let bb = b |> Expr.reshape psb |> Expr.broadcast bsb    
-            {Dot.X=ba.BaseExprCh; Y=bb.BaseExprCh} |> Expr |> Expr.reshape bsa.[0 .. na-2]
+            Expr {Dot.X=ba.BaseExprCh; Y=bb.BaseExprCh} |> Expr.reshape bsa.[0 .. na-2]
         | _ -> failwithf "Cannot compute dot product between tensors of shapes %A and %A." sa sb  
 
     /// Tensor product.
     static member tensorProduct (x: Expr) (y: Expr) =
-        {TensorProduct.X=x.BaseExprCh; Y=y.BaseExprCh} |> Expr
+        Expr {TensorProduct.X=x.BaseExprCh; Y=y.BaseExprCh} 
 
    /// Elementwise uses elements from `ifTrue` if `cond` is true for that element, otherwise elements from `ifFalse`.
     static member ifThenElse (cond: Expr) (ifTrue: Expr) (ifFalse: Expr) =
@@ -637,24 +646,24 @@ type Expr (baseExpr: BaseExpr) =
     /// Discards the results of all arguments.
     static member discard (xs: Expr list) =
         let xs = xs |> List.map Expr.baseExprCh
-        {Discard.Xs=xs} |> Expr
+        Expr {Discard.Xs=xs} 
 
     /// Build tensor from numeric ranges.
     static member internal buildTensor shape ranges (xs: Expr list) =
         let xs = xs |> List.map Expr.baseExprCh
-        {BuildTensor.Shape=shape; Ranges=ranges; Xs=xs} |> Expr
+        Expr {BuildTensor.Shape=shape; Ranges=ranges; Xs=xs} 
     
     /// Calculates a tensor elementwise using the given element expression and result shape.
     static member elements shape elemExpr (xs: Expr list) =
         let xs = xs |> List.map Expr.baseExprCh
-        {Elements.Shape=shape; ElemExpr=elemExpr; Xs=xs} |> Expr
+        Expr {Elements.Shape=shape; ElemExpr=elemExpr; Xs=xs} 
 
     /// Element-wise n-dimensional interpolation using the specified interpolator.
     /// The interpolator is created using the Interpolator.create function.
     static member interpolate interpolator xs =
         let xs = Expr.broadcastToSameMany xs
         let xs = xs |> List.map Expr.baseExprCh
-        {Interpolate.Interpolator=interpolator; Xs=xs} |> Expr
+        Expr {Interpolate.Interpolator=interpolator; Xs=xs} 
 
     /// Element-wise one-dimensional interpolation using the specified interpolator.
     /// The interpolator is created using the Interpolator.create function.

@@ -32,6 +32,11 @@ module Expr =
         | :? VarArg as this -> Some this.Var
         | _ -> None
 
+    let varArg expr = 
+        match expr with
+        | VarArg v -> v
+        | _ -> failwithf "Not an expression consisting solely of a variable"
+
     let (|UnaryPlus|_|) (expr: Expr) =
         match expr.Op with
         | :? UnaryPlus as this -> Some (Expr this.X)

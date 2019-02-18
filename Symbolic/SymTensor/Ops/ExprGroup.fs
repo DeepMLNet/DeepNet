@@ -4,7 +4,7 @@ open DeepNet.Utils
 
 
 /// Provides information about a set of expressions (dependencies, channel usage).
-type BaseXChExprGroup (exprs: BaseExpr list) =
+type BaseExprGroup (exprs: BaseExpr list) =
        
     // build sets of dependants for each subexpression
     let dependants = 
