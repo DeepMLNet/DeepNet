@@ -785,23 +785,19 @@ type CheckFinite = {Label: string; X: BaseExprCh} with
             v |> Ch.only                            
 
 
-///// Accesses the specified channel of a multi-channnel expression.
-//type Channel = {Channel: string; X: BaseMultiChannelExpr} with
-//    interface IOp with      
-//        member this.Check () = 
-//            if not (this.X.Channels |> List.contains this.Channel) then
-//                failwithf "Multi-channel expression with channels %A does not have channel %A." 
-//                            this.X.Channels this.Channel 
-//        member this.Channels = Ch.onlyOne
-//        member this.TypeName = this.X.TypeNames.[this.Channel]
-//        member this.Shape = this.X.Shapes.[this.Channel]
-//        member this.Args = ArgValue.unary (Arg.Channel (this.Channel, this.X))
-//        member this.ReplaceArgs args = 
-//            let channel, x = ArgValue.unaryX args |> Arg.channel
-//            {this with Channel=channel; X=x} :> _
-//        member this.SubstSymSizes env = this :> _
-//        member this.CanEvalAllSymSizes = true
-//        member this.Eval env = ArgValue.unaryX env.Args
+/// Returns the specified channel of a multi-channnel as its only channel.
+type Channel = {X: BaseExprCh} with
+    interface IOp with      
+        member this.Check () = ()
+        member this.Channels = Ch.onlyOne
+        member this.TypeNames = this.X.TypeName |> Ch.only
+        member this.Shapes = this.X.Shape |> Ch.only
+        member this.Args = Args.unary this.X
+        member this.ReplaceArgs args = {this with X=Args.unaryX args} :> _
+        member this.SubstSymSizes env = this :> _
+        member this.CanEvalAllSymSizes = true
+        member this.Eval env = 
+            ArgValue.unaryX env.Args |> Ch.only
 
 
 

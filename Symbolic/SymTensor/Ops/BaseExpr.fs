@@ -133,6 +133,8 @@ type OpExtenderAttribute () =
 /// are also reference equal.
 type BaseExpr private (op: IOp) =   
     do op.Check()
+    do if op.Channels.Count > 1 && op.Channels.Contains Ch.Only then
+        failwith "Multiple channel op must not provide Ch.Only channel."
 
     let _singleCh = op.Channels = Set [Ch.Only]
     let _hash = lazy (hash op)

@@ -28,6 +28,12 @@ type Expr (baseExpr: BaseExpr) =
     new (op: IOp) =
         Expr (BaseExpr.ofOp op)
 
+    new (exprCh: BaseExprCh) =
+        match exprCh with
+        | BaseExprCh (Ch.Only, baseExpr) -> Expr baseExpr
+        | BaseExprCh (Ch.Custom chName, baseExpr) ->
+            Expr {Channel.X=baseExpr.[chName]}
+
     member this.BaseExpr = baseExpr
     static member baseExpr (expr: Expr) = expr.BaseExpr
 
