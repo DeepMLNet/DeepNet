@@ -286,6 +286,9 @@ type BaseExpr private (op: IOp) =
 
     override this.GetHashCode() = _hash.Force ()
 
+    override this.Finalize () =
+        uniqueExprs.Finalized op
+
 
 /// Base for multi-channel expressions.
 type BaseMultiChannelExpr private (op: IMultiChannelOp) =   
@@ -343,6 +346,9 @@ type BaseMultiChannelExpr private (op: IMultiChannelOp) =
             | _ -> failwithf "Cannot compare BaseMultiChannelExpr to type %A." (other.GetType())
 
     override this.GetHashCode() = _hash.Force ()
+
+    override this.Finalize () =
+        uniqueExprs.Finalized op
 
 
 /// A single-channel or multi-channel expression.

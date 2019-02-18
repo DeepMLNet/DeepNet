@@ -578,8 +578,12 @@ module internal Exception =
 
 /// A concurrent dictionary containing weak references to objects.
 type ConcurrentWeakDict<'K, 'V> when 'K: equality and 'V: not struct (create: 'K -> 'V) =
+    /// Number of dead references that triggers cleanup.
+    let deadLimit = 1024
+
     let mutex = obj ()
     let mutable store = new Dictionary<'K, WeakReference<'V>> ()
+    let mutable toRemove = new Queue<'K> ()
     
     /// Creates or returns the already existing value for the specified key.
     member this.Item
@@ -602,13 +606,27 @@ type ConcurrentWeakDict<'K, 'V> when 'K: equality and 'V: not struct (create: 'K
             )
 
     /// Removes entries for values that have been garbage collected.
-    member this.Clean () =
+    member private this.Clean () =
         lock mutex (fun () ->
-            let newStore = new Dictionary<'K, WeakReference<'V>> ()
-            for KeyValue(k, wv) in store do
-                match wv.TryGetTarget () with
-                | true, _ -> newStore.[k] <- wv
-                | false, _ -> ()
-            store <- newStore
+            while toRemove.Count > 0 do
+                let k = toRemove.Dequeue()
+                match store.TryGetValue k with
+                | true, weakValue ->
+                    match weakValue.TryGetTarget () with
+                    | false, _ -> store.Remove k |> ignore
+                    | _ -> ()
+                | _ -> ()
         )
 
+    /// Should be called if the value for the specified key gets finalized.
+    member this.Finalized (k: 'K) =
+        let deadCount = 
+            lock mutex (fun () ->
+                toRemove.Enqueue k
+                toRemove.Count
+            )
+        if deadCount > deadLimit then
+            this.Clean ()
+        
+
+    
