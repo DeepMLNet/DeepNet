@@ -221,8 +221,8 @@ module internal ExprTools =
             op.Args 
             |> Map.map (fun _ arg -> 
                 match arg with
-                | Arg.Expr argExpr -> Arg.Expr (argExpr.SubstSymSizes env)
-                | Arg.Channel (argCh, argMCExpr) -> Arg.Channel (argCh, argMCExpr.SubstSymSizes env))
+                | Arg.Expr argExpr -> Arg.Expr (argExpr |> BaseExpr.substSymSizes env)
+                | Arg.Channel (argCh, argMCExpr) -> Arg.Channel (argCh, argMCExpr |> BaseMultiChannelExpr.substSymSizes env))
         op.ReplaceArgs subsArgs
 
 
@@ -255,8 +255,11 @@ type BaseExpr private (op: IOp) =
     member this.NElems = List.fold (*) SizeSpec.one this.Shape
     member this.Vars = _vars.Force()
     member this.CanEvalAllSymSizes = _canEvalAllSymSizes.Force()
-    member this.SubstSymSizes (env: SymSizeEnv) =
-        ExprTools.substSymSizes env op :?> IOp |> BaseExpr.ofOp
+
+    static member substSymSizes (env: SymSizeEnv) (expr: BaseExpr) =
+        ExprTools.substSymSizes env expr.Op 
+        :?> IOp 
+        |> BaseExpr.ofOp
 
     static member mapArgs (fn: BaseXChExpr -> BaseXChExpr) (expr: BaseExpr) =
         expr.Op.Args
@@ -310,8 +313,11 @@ type BaseMultiChannelExpr private (op: IMultiChannelOp) =
     member this.Channels = op.Channels
     member this.Vars = _vars.Force()
     member this.CanEvalAllSymSizes = _canEvalAllSymSizes.Force()
-    member this.SubstSymSizes (env: SymSizeEnv) =
-        ExprTools.substSymSizes env this.Op :?> IMultiChannelOp |> BaseMultiChannelExpr
+
+    static member substSymSizes (env: SymSizeEnv) (expr: BaseMultiChannelExpr) =
+        ExprTools.substSymSizes env expr.Op 
+        :?> IMultiChannelOp 
+        |> BaseMultiChannelExpr.ofOp
 
     static member mapArgs (fn: BaseXChExpr -> BaseXChExpr) (expr: BaseMultiChannelExpr) =
         expr.Op.Args

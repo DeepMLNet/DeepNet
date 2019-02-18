@@ -102,7 +102,7 @@ type Loop = {
                             vs, li)
                         |> Map.ofSeq
                 Channels = this.Channels
-                            |> Map.map (fun ch lv -> {lv with Expr = lv.Expr.SubstSymSizes env})
+                            |> Map.map (fun ch lv -> {lv with Expr = lv.Expr |> BaseExpr.substSymSizes env})
             } :> _
         member this.CanEvalAllSymSizes = 
             (SizeSpec.canEval this.Length) &&
