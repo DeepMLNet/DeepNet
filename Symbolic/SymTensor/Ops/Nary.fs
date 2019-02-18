@@ -6,20 +6,21 @@ open Tensor
 
 
 /// Discards the results of all arguments.
-type Discard = {Xs: BaseExpr list} with
+type Discard = {Xs: BaseExprCh list} with
     interface IOp with       
         member this.Check () = ()
-        member this.TypeName = TypeName.ofType<int32>
-        member this.Shape = ShapeSpec.emptyVector
+        member this.Channels = Ch.onlyOne
+        member this.TypeNames = TypeName.ofType<int32> |> Ch.only
+        member this.Shapes = ShapeSpec.emptyVector |> Ch.only
         member this.Args = Args.nary this.Xs
         member this.ReplaceArgs args = {this with Xs=Args.naryXs args} :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = HostTensor.zeros<int32> [0L] :> ITensor
+        member this.Eval env = HostTensor.zeros<int32> [0L] :> ITensor |> Ch.only
 
 
 /// Build tensor using numeric ranges.
-type BuildTensor = {Shape: ShapeSpec; Ranges: BaseRangesSpec list; Xs: BaseExpr list} with
+type BuildTensor = {Shape: ShapeSpec; Ranges: BaseRangesSpec list; Xs: BaseExprCh list} with
     interface IOp with       
         member this.Check () = 
             Check.sameType this.Xs
@@ -40,8 +41,9 @@ type BuildTensor = {Shape: ShapeSpec; Ranges: BaseRangesSpec list; Xs: BaseExpr 
                             failwithf "BuildTensor range %A is invalid for shape %A." rng shp
                         | _, _ -> ()
             | None -> ()       
-        member this.TypeName = this.Xs.Head.TypeName
-        member this.Shape = this.Shape
+        member this.Channels = Ch.onlyOne
+        member this.TypeNames = this.Xs.Head.TypeName |> Ch.only
+        member this.Shapes = this.Shape |> Ch.only
         member this.Args = Args.nary this.Xs
         member this.ReplaceArgs args = {this with Xs=Args.naryXs args} :> _
         member this.SubstSymSizes env = 
@@ -58,19 +60,21 @@ type BuildTensor = {Shape: ShapeSpec; Ranges: BaseRangesSpec list; Xs: BaseExpr 
                 let aryRng = rng |> List.map (fun (first, last) -> 
                     Rng.Rng (Some (SizeSpec.eval first), Some (SizeSpec.eval last)))
                 trgt.[aryRng] <- e 
-            trgt
+            trgt |> Ch.only
 
 
 /// Elementwise calculated tensor.
-type Elements = {Shape: ShapeSpec; ElemExpr: Elem.Expr; Xs: BaseExpr list} with
+type Elements = {Shape: ShapeSpec; ElemExpr: Elem.Expr; Xs: BaseExprCh list} with
+    // TODO: introduce multi-channel element-wise calculation op.
     interface IOp with       
         member this.Check () = 
             let tns = this.Xs |> List.map (fun x -> x.TypeName)
             let ss = this.Xs |> List.map (fun x -> x.Shape)
             Elem.Expr.check this.ElemExpr |> ignore
-            Elem.Expr.checkCompatibility this.ElemExpr ss tns this.Shape   
-        member this.TypeName = Elem.Expr.typeName this.ElemExpr
-        member this.Shape = this.Shape
+            Elem.Expr.checkCompatibility this.ElemExpr ss tns this.Shape  
+        member this.Channels = Ch.onlyOne            
+        member this.TypeNames = Elem.Expr.typeName this.ElemExpr |> Ch.only
+        member this.Shapes = this.Shape |> Ch.only
         member this.Args = Args.nary this.Xs
         member this.ReplaceArgs args = {this with Xs=Args.naryXs args} :> _
         member this.SubstSymSizes env = 
@@ -84,10 +88,11 @@ type Elements = {Shape: ShapeSpec; ElemExpr: Elem.Expr; Xs: BaseExpr list} with
             let esv = ArgValue.naryXs env.Args
             let nResShape = ShapeSpec.eval this.Shape
             Elem.Interpreter.evalUntyped this.ElemExpr esv nResShape 
+            |> Ch.only
 
 
 /// Elementwise interpolation using a value table.
-type Interpolate = {Interpolator: Interpolator; Xs: BaseExpr list} with
+type Interpolate = {Interpolator: Interpolator; Xs: BaseExprCh list} with
     interface IOp with       
         member this.Check () = 
             Check.sameType this.Xs
@@ -108,15 +113,16 @@ type Interpolate = {Interpolator: Interpolator; Xs: BaseExpr list} with
                 if not (ShapeSpec.equalWithoutBroadcastability x.Shape this.Xs.Head.Shape) then
                     failwithf "All arguments to interpolator must have equal shape but got shapes %A and %A."
                                 this.Xs.Head.Shape x.Shape
-        member this.TypeName = this.Xs.Head.TypeName
-        member this.Shape = this.Xs.Head.Shape
+        member this.Channels = Ch.onlyOne
+        member this.TypeNames = this.Xs.Head.TypeName |> Ch.only
+        member this.Shapes = this.Xs.Head.Shape |> Ch.only
         member this.Args = Args.nary this.Xs
         member this.ReplaceArgs args = {this with Xs=Args.naryXs args} :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env = 
             let esv = ArgValue.naryXs env.Args
-            Interpolator.interpolateUntyped this.Interpolator esv
+            Interpolator.interpolateUntyped this.Interpolator esv |> Ch.only
 
 
 

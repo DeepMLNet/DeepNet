@@ -43,7 +43,9 @@ type Input =
 type Value = {
     /// the expression to compute the loop channel;
     /// it may only use variables defined in LoopSpecT.Vars
-    Expr:       BaseExpr
+    Expr:       BaseExprCh
     /// the dimension to concatenate the results along to produce the loop output
     SliceDim:   int
 }
+
+

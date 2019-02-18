@@ -4,26 +4,12 @@ open DeepNet.Utils
 
 
 /// Provides information about a set of expressions (dependencies, channel usage).
-type BaseXChExprGroup (exprs: BaseXChExpr list) =
-    
-    ///// expression cache
-    //let knownExprs = Dictionary<BaseXChExpr, BaseXChExpr> () 
-
-    //// rebuilt expression so that equal subtrees point to the same object instance
-    //let exprs =
-    //    let rec doUnify expr =
-    //        match knownExprs.TryFind expr with
-    //        | Some knownExpr -> knownExpr
-    //        | None ->
-    //            let unifiedExpr = expr |> BaseXChExpr.mapArgs doUnify
-    //            knownExprs.[expr] <- unifiedExpr
-    //            unifiedExpr
-    //    exprs |> List.map doUnify 
-    
+type BaseXChExprGroup (exprs: BaseExpr list) =
+       
     // build sets of dependants for each subexpression
     let dependants = 
-        let processed = HashSet<BaseXChExpr> ()
-        let dependants = Dictionary<BaseExprCh, HashSet<BaseXChExpr>> ()              
+        let processed = HashSet<BaseExpr> ()
+        let dependants = Dictionary<BaseExprCh, HashSet<BaseExpr>> ()              
         let addDependant node dependant =
             if not (dependants.ContainsKey node) then
                 dependants.[node] <- HashSet<_> ()
@@ -32,9 +18,9 @@ type BaseXChExprGroup (exprs: BaseXChExpr list) =
             if not (processed.Contains expr) then
                 // update dependants recursively
                 for KeyValue(_, arg) in expr.Args do
-                    addDependant (Arg.asBaseExprCh arg) expr
+                    addDependant arg expr
                 for KeyValue(_, arg) in expr.Args do
-                    doBuild (Arg.asXChExpr arg)
+                    doBuild arg.Expr
                 processed.Add expr |> ignore
 
         for expr in exprs do
@@ -43,22 +29,20 @@ type BaseXChExprGroup (exprs: BaseXChExpr list) =
 
     // build sets of used channels
     let usedChannels = lazy (
-        let processed = HashSet<BaseXChExpr> ()
-        let usedChannels = Dictionary<BaseMultiChannelExpr, HashSet<string>> ()      
+        let processed = HashSet<BaseExpr> ()
+        let usedChannels = Dictionary<BaseExpr, HashSet<Ch>> ()      
         let addUsedChannel key channel =
             if not (usedChannels.ContainsKey key) then
-                usedChannels.[key] <- HashSet<string> ()
+                usedChannels.[key] <- HashSet<Ch> ()
             usedChannels.[key].Add channel |> ignore
-        let rec doBuild (expr: BaseXChExpr) =
+        let rec doBuild (expr: BaseExpr) =
             if not (processed.Contains expr) then
                 // update used channel info
-                for KeyValue(_, arg) in expr.Args do
-                    match arg with
-                    | Arg.Channel (argCh, argMCExpr) -> addUsedChannel argMCExpr argCh
-                    | _ -> ()
+                for KeyValue(_, BaseExprCh(argCh, argExpr)) in expr.Args do
+                    addUsedChannel argExpr argCh
 
                 for KeyValue(_, argExpr) in expr.Args do
-                    doBuild (Arg.asXChExpr argExpr)
+                    doBuild argExpr.Expr
                 processed.Add expr |> ignore
 
         for expr in exprs do
@@ -67,7 +51,6 @@ type BaseXChExprGroup (exprs: BaseXChExpr list) =
     )
 
     /// Contained expressions.
-    /// It is ensured that equal sub-expression are the same object instance.
     member this.Exprs = exprs
 
     /// Returns all expressions that depend on expr.
@@ -77,16 +60,9 @@ type BaseXChExprGroup (exprs: BaseXChExpr list) =
         | Some deps -> deps :> IReadOnlyCollection<_>
         | None -> HashSet<_> () :> IReadOnlyCollection<_>
 
-    ///// Returns all expressions that depend on expr.
-    ///// Comparison is done based on structural equality.
-    //member this.DependantsStructural expr =
-    //    match knownExprs.TryFind expr with
-    //    | Some expr -> this.Dependants expr
-    //    | None -> HashSet<_> () :> IReadOnlyCollection<_>
-
     /// Returns the list of used channles for the multi-channel op
     /// with the specified arguments.
-    member this.UsedChannels (mcExpr: BaseMultiChannelExpr) =
+    member this.UsedChannels (mcExpr: BaseExpr) =
         match usedChannels.Force().TryFind mcExpr with
         | Some chnls -> chnls |> Set.ofSeq
         | None -> Set.empty

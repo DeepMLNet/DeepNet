@@ -3,258 +3,279 @@
 open DeepNet.Utils
 open SymTensor
 open Tensor
-open OpTools
 
 
 /// Addition.
-type Add = { X: BaseExpr; Y: BaseExpr } with
+type Add = { X: BaseExprCh; Y: BaseExprCh } with
     interface IOp with       
         member this.Check () = Check.sameType [this.X; this.Y]; Check.sameShape [this.X; this.Y]
-        member this.TypeName = this.X.TypeName
-        member this.Shape = this.X.Shape
+        member this.Channels = Ch.onlyOne
+        member this.TypeNames = this.X.TypeName |> Ch.only
+        member this.Shapes = this.X.Shape |> Ch.only
         member this.Args = Args.binary this.X this.Y
         member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (ArgValue.binaryX env.Args).Add (ArgValue.binaryY env.Args)      
+        member this.Eval env = (ArgValue.binaryX env.Args).Add (ArgValue.binaryY env.Args) |> Ch.only
 
 
 /// Subtraction.
-type Subtract = { X: BaseExpr; Y: BaseExpr } with
+type Subtract = { X: BaseExprCh; Y: BaseExprCh } with
     interface IOp with       
         member this.Check () = Check.sameType [this.X; this.Y]; Check.sameShape [this.X; this.Y]
-        member this.TypeName = this.X.TypeName
-        member this.Shape = this.X.Shape
+        member this.Channels = Ch.onlyOne
+        member this.TypeNames = this.X.TypeName |> Ch.only
+        member this.Shapes = this.X.Shape |> Ch.only
         member this.Args = Args.binary this.X this.Y
         member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (ArgValue.binaryX env.Args).Subtract (ArgValue.binaryY env.Args)       
+        member this.Eval env = (ArgValue.binaryX env.Args).Subtract (ArgValue.binaryY env.Args) |> Ch.only
 
 
 /// Multiplication.
-type Multiply = { X: BaseExpr; Y: BaseExpr } with
+type Multiply = { X: BaseExprCh; Y: BaseExprCh } with
     interface IOp with       
         member this.Check () = Check.sameType [this.X; this.Y]; Check.sameShape [this.X; this.Y]
-        member this.TypeName = this.X.TypeName
-        member this.Shape = this.X.Shape
+        member this.Channels = Ch.onlyOne
+        member this.TypeNames = this.X.TypeName |> Ch.only
+        member this.Shapes = this.X.Shape |> Ch.only
         member this.Args = Args.binary this.X this.Y
         member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (ArgValue.binaryX env.Args).Multiply (ArgValue.binaryY env.Args)      
+        member this.Eval env = (ArgValue.binaryX env.Args).Multiply (ArgValue.binaryY env.Args) |> Ch.only
 
 
 /// Division.
-type Divide = { X: BaseExpr; Y: BaseExpr } with
+type Divide = { X: BaseExprCh; Y: BaseExprCh } with
     interface IOp with       
         member this.Check () = Check.sameType [this.X; this.Y]; Check.sameShape [this.X; this.Y]
-        member this.TypeName = this.X.TypeName
-        member this.Shape = this.X.Shape
+        member this.Channels = Ch.onlyOne
+        member this.TypeNames = this.X.TypeName |> Ch.only
+        member this.Shapes = this.X.Shape |> Ch.only
         member this.Args = Args.binary this.X this.Y
         member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (ArgValue.binaryX env.Args).Divide (ArgValue.binaryY env.Args)       
+        member this.Eval env = (ArgValue.binaryX env.Args).Divide (ArgValue.binaryY env.Args) |> Ch.only      
 
 
 /// Exponentiation.
-type Pow = { X: BaseExpr; Y: BaseExpr } with
+type Pow = { X: BaseExprCh; Y: BaseExprCh } with
     interface IOp with       
         member this.Check () = Check.sameType [this.X; this.Y]; Check.sameShape [this.X; this.Y]
-        member this.TypeName = this.X.TypeName
-        member this.Shape = this.X.Shape
+        member this.Channels = Ch.onlyOne
+        member this.TypeNames = this.X.TypeName |> Ch.only
+        member this.Shapes = this.X.Shape |> Ch.only
         member this.Args = Args.binary this.X this.Y
         member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (ArgValue.binaryX env.Args).Pow (ArgValue.binaryY env.Args)       
+        member this.Eval env = (ArgValue.binaryX env.Args).Pow (ArgValue.binaryY env.Args) |> Ch.only
 
 
 /// Modulo.
-type Modulo = { X: BaseExpr; Y: BaseExpr } with
+type Modulo = { X: BaseExprCh; Y: BaseExprCh } with
     interface IOp with       
         member this.Check () = Check.sameType [this.X; this.Y]; Check.sameShape [this.X; this.Y]
-        member this.TypeName = this.X.TypeName
-        member this.Shape = this.X.Shape
+        member this.Channels = Ch.onlyOne
+        member this.TypeNames = this.X.TypeName |> Ch.only
+        member this.Shapes = this.X.Shape |> Ch.only
         member this.Args = Args.binary this.X this.Y
         member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (ArgValue.binaryX env.Args).Modulo (ArgValue.binaryY env.Args)       
+        member this.Eval env = (ArgValue.binaryX env.Args).Modulo (ArgValue.binaryY env.Args) |> Ch.only       
 
 
 /// Elementwise maximum.
-type MaxElemwise = { X: BaseExpr; Y: BaseExpr } with
+type MaxElemwise = { X: BaseExprCh; Y: BaseExprCh } with
     interface IOp with       
         member this.Check () = Check.sameType [this.X; this.Y]; Check.sameShape [this.X; this.Y]
-        member this.TypeName = this.X.TypeName
-        member this.Shape = this.X.Shape
+        member this.Channels = Ch.onlyOne
+        member this.TypeNames = this.X.TypeName |> Ch.only
+        member this.Shapes = this.X.Shape |> Ch.only
         member this.Args = Args.binary this.X this.Y
         member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (ArgValue.binaryX env.Args).MaxElemwise (ArgValue.binaryY env.Args)       
+        member this.Eval env = (ArgValue.binaryX env.Args).MaxElemwise (ArgValue.binaryY env.Args) |> Ch.only
 
 
 /// Elementwise minimum.
-type MinElemwise = { X: BaseExpr; Y: BaseExpr } with
+type MinElemwise = { X: BaseExprCh; Y: BaseExprCh } with
     interface IOp with       
         member this.Check () = Check.sameType [this.X; this.Y]; Check.sameShape [this.X; this.Y]
-        member this.TypeName = this.X.TypeName
-        member this.Shape = this.X.Shape
+        member this.Channels = Ch.onlyOne
+        member this.TypeNames = this.X.TypeName |> Ch.only
+        member this.Shapes = this.X.Shape |> Ch.only
         member this.Args = Args.binary this.X this.Y
         member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (ArgValue.binaryX env.Args).MinElemwise (ArgValue.binaryY env.Args)       
+        member this.Eval env = (ArgValue.binaryX env.Args).MinElemwise (ArgValue.binaryY env.Args) |> Ch.only       
 
 
 /// Element-wise if-then-else.
-type IfThenElse = {Cond: BaseExpr; IfTrue: BaseExpr; IfFalse: BaseExpr} with
+type IfThenElse = {Cond: BaseExprCh; IfTrue: BaseExprCh; IfFalse: BaseExprCh} with
     interface IOp with       
         member this.Check () = 
             Check.sameType [this.IfTrue; this.IfFalse]
             Check.bool [this.Cond]
             Check.sameShape [this.Cond; this.IfTrue; this.IfFalse]
-        member this.TypeName = this.IfTrue.TypeName
-        member this.Shape = this.IfTrue.Shape
+        member this.Channels = Ch.onlyOne
+        member this.TypeNames = this.IfTrue.TypeName |> Ch.only
+        member this.Shapes = this.IfTrue.Shape |> Ch.only
         member this.Args = 
-            Map ["Cond", Arg.Expr this.Cond
-                 "IfTrue", Arg.Expr this.IfTrue
-                 "IfFalse", Arg.Expr this.IfFalse]
+            Map [Arg.Custom "Cond", this.Cond
+                 Arg.Custom "IfTrue", this.IfTrue
+                 Arg.Custom "IfFalse", this.IfFalse]
         member this.ReplaceArgs args = 
-            {this with Cond=Arg.expr args.["Cond"]
-                       IfTrue=Arg.expr args.["IfTrue"]
-                       IfFalse=Arg.expr args.["IfFalse"]} :> _
+            {this with Cond=args.[Arg.Custom "Cond"]
+                       IfTrue=args.[Arg.Custom "IfTrue"]
+                       IfFalse=args.[Arg.Custom "IfFalse"]} :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env = 
-            env.Args.["IfTrue"].IfThenElse env.Args.["IfFalse"] env.Args.["Cond"]
+            env.Args.[Arg.Custom "IfTrue"].IfThenElse env.Args.[Arg.Custom "IfFalse"] env.Args.[Arg.Custom "Cond"]
+            |> Ch.only
 
 
 /// Logical And.
-type And = { X: BaseExpr; Y: BaseExpr } with
+type And = { X: BaseExprCh; Y: BaseExprCh } with
     interface IOp with       
         member this.Check () = Check.bool [this.X; this.Y]; Check.sameShape [this.X; this.Y]
-        member this.TypeName = this.X.TypeName
-        member this.Shape = this.X.Shape
+        member this.Channels = Ch.onlyOne
+        member this.TypeNames = this.X.TypeName |> Ch.only
+        member this.Shapes = this.X.Shape |> Ch.only
         member this.Args = Args.binary this.X this.Y
         member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env = 
             (ArgValue.binaryX env.Args :?> Tensor<bool>) &&&& (ArgValue.binaryY env.Args :?> Tensor<bool>) :> ITensor       
+            |> Ch.only
 
 
 /// Logical Or.
-type Or = { X: BaseExpr; Y: BaseExpr } with
+type Or = { X: BaseExprCh; Y: BaseExprCh } with
     interface IOp with       
         member this.Check () = Check.bool [this.X; this.Y]; Check.sameShape [this.X; this.Y]
-        member this.TypeName = this.X.TypeName
-        member this.Shape = this.X.Shape
+        member this.Channels = Ch.onlyOne
+        member this.TypeNames = this.X.TypeName |> Ch.only
+        member this.Shapes = this.X.Shape |> Ch.only
         member this.Args = Args.binary this.X this.Y
         member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env = 
             (ArgValue.binaryX env.Args :?> Tensor<bool>) |||| (ArgValue.binaryY env.Args :?> Tensor<bool>) :> ITensor       
+            |> Ch.only
 
 
 /// Logical Xor.
-type Xor = { X: BaseExpr; Y: BaseExpr } with
+type Xor = { X: BaseExprCh; Y: BaseExprCh } with
     interface IOp with       
         member this.Check () = Check.bool [this.X; this.Y]; Check.sameShape [this.X; this.Y]
-        member this.TypeName = this.X.TypeName
-        member this.Shape = this.X.Shape
+        member this.Channels = Ch.onlyOne
+        member this.TypeNames = this.X.TypeName |> Ch.only
+        member this.Shapes = this.X.Shape |> Ch.only
         member this.Args = Args.binary this.X this.Y
         member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env = 
             (ArgValue.binaryX env.Args :?> Tensor<bool>) ^^^^ (ArgValue.binaryY env.Args :?> Tensor<bool>) :> ITensor       
+             |> Ch.only
 
 
 /// Equal.
-type Equal = { X: BaseExpr; Y: BaseExpr } with
+type Equal = { X: BaseExprCh; Y: BaseExprCh } with
     interface IOp with       
         member this.Check () = Check.sameType [this.X; this.Y]; Check.sameShape [this.X; this.Y]
-        member this.TypeName = TypeName.ofType<bool>
-        member this.Shape = this.X.Shape
+        member this.Channels = Ch.onlyOne
+        member this.TypeNames = TypeName.ofType<bool> |> Ch.only
+        member this.Shapes = this.X.Shape |> Ch.only
         member this.Args = Args.binary this.X this.Y
         member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (ArgValue.binaryX env.Args).Equal (ArgValue.binaryY env.Args)       
+        member this.Eval env = (ArgValue.binaryX env.Args).Equal (ArgValue.binaryY env.Args) |> Ch.only       
 
 
 /// Not equal.
-type NotEqual = { X: BaseExpr; Y: BaseExpr } with
+type NotEqual = { X: BaseExprCh; Y: BaseExprCh } with
     interface IOp with       
         member this.Check () = Check.sameType [this.X; this.Y]; Check.sameShape [this.X; this.Y]
-        member this.TypeName = TypeName.ofType<bool>
-        member this.Shape = this.X.Shape
+        member this.Channels = Ch.onlyOne
+        member this.TypeNames = TypeName.ofType<bool> |> Ch.only
+        member this.Shapes = this.X.Shape |> Ch.only
         member this.Args = Args.binary this.X this.Y
         member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (ArgValue.binaryX env.Args).NotEqual (ArgValue.binaryY env.Args)       
+        member this.Eval env = (ArgValue.binaryX env.Args).NotEqual (ArgValue.binaryY env.Args) |> Ch.only       
 
 
 /// Less than.
-type Less = { X: BaseExpr; Y: BaseExpr } with
+type Less = { X: BaseExprCh; Y: BaseExprCh } with
     interface IOp with       
         member this.Check () = Check.sameType [this.X; this.Y]; Check.sameShape [this.X; this.Y]
-        member this.TypeName = TypeName.ofType<bool>
-        member this.Shape = this.X.Shape
+        member this.Channels = Ch.onlyOne
+        member this.TypeNames = TypeName.ofType<bool> |> Ch.only
+        member this.Shapes = this.X.Shape |> Ch.only
         member this.Args = Args.binary this.X this.Y
         member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (ArgValue.binaryX env.Args).Less (ArgValue.binaryY env.Args)       
+        member this.Eval env = (ArgValue.binaryX env.Args).Less (ArgValue.binaryY env.Args) |> Ch.only       
 
 
 /// Less then or equal.
-type LessOrEqual = { X: BaseExpr; Y: BaseExpr } with
+type LessOrEqual = { X: BaseExprCh; Y: BaseExprCh } with
     interface IOp with       
         member this.Check () = Check.sameType [this.X; this.Y]; Check.sameShape [this.X; this.Y]
-        member this.TypeName = TypeName.ofType<bool>
-        member this.Shape = this.X.Shape
+        member this.Channels = Ch.onlyOne
+        member this.TypeNames = TypeName.ofType<bool> |> Ch.only
+        member this.Shapes = this.X.Shape |> Ch.only
         member this.Args = Args.binary this.X this.Y
         member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (ArgValue.binaryX env.Args).LessOrEqual (ArgValue.binaryY env.Args)       
+        member this.Eval env = (ArgValue.binaryX env.Args).LessOrEqual (ArgValue.binaryY env.Args) |> Ch.only       
 
 
 /// Greater than.
-type Greater = { X: BaseExpr; Y: BaseExpr } with
+type Greater = { X: BaseExprCh; Y: BaseExprCh } with
     interface IOp with       
         member this.Check () = Check.sameType [this.X; this.Y]; Check.sameShape [this.X; this.Y]
-        member this.TypeName = TypeName.ofType<bool>
-        member this.Shape = this.X.Shape
+        member this.Channels = Ch.onlyOne
+        member this.TypeNames = TypeName.ofType<bool> |> Ch.only
+        member this.Shapes = this.X.Shape |> Ch.only
         member this.Args = Args.binary this.X this.Y
         member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (ArgValue.binaryX env.Args).Greater (ArgValue.binaryY env.Args)       
+        member this.Eval env = (ArgValue.binaryX env.Args).Greater (ArgValue.binaryY env.Args) |> Ch.only       
 
 
 /// Greater than or equal.
-type GreaterOrEqual = { X: BaseExpr; Y: BaseExpr } with
+type GreaterOrEqual = { X: BaseExprCh; Y: BaseExprCh } with
     interface IOp with       
         member this.Check () = Check.sameType [this.X; this.Y]; Check.sameShape [this.X; this.Y]
-        member this.TypeName = TypeName.ofType<bool>
-        member this.Shape = this.X.Shape
+        member this.Channels = Ch.onlyOne
+        member this.TypeNames = TypeName.ofType<bool> |> Ch.only
+        member this.Shapes = this.X.Shape |> Ch.only
         member this.Args = Args.binary this.X this.Y
         member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (ArgValue.binaryX env.Args).GreaterOrEqual (ArgValue.binaryY env.Args)       
+        member this.Eval env = (ArgValue.binaryX env.Args).GreaterOrEqual (ArgValue.binaryY env.Args) |> Ch.only
 
 
 /// Dot product.
-type Dot = { X: BaseExpr; Y: BaseExpr } with
+type Dot = { X: BaseExprCh; Y: BaseExprCh } with
     interface IOp with       
         member this.Check () = 
             Check.sameType [this.X; this.Y]
@@ -268,57 +289,61 @@ type Dot = { X: BaseExpr; Y: BaseExpr } with
                     [0 .. na-3] |> List.exists (fun n -> sa.[n] .<> sb.[n]) then
                         failwithf "Incompatible shapes for batched dot product: %A and %A." sa sb
             | _ -> failwithf "Cannot compute dot product between tensors of shapes %A and %A." sa sb  
-        member this.TypeName = this.X.TypeName
-        member this.Shape =
+        member this.Channels = Ch.onlyOne
+        member this.TypeNames = this.X.TypeName |> Ch.only
+        member this.Shapes =
             let sa, sb = this.X.Shape, this.Y.Shape
             match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
             | 2, 2 -> ShapeSpec.matrix sa.[0] sb.[1]
             | na, nb when na=nb -> sa.[0 .. na-2] @ [sb.[nb-1]]
             | _ -> failwithf "Invalid dot product shapes: %A and %A." sa sb
+            |> Ch.only
         member this.Args = Args.binary this.X this.Y
         member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (ArgValue.binaryX env.Args).Dot (ArgValue.binaryY env.Args)       
+        member this.Eval env = (ArgValue.binaryX env.Args).Dot (ArgValue.binaryY env.Args) |> Ch.only     
 
 
 /// Tensor product.
-type TensorProduct = { X: BaseExpr; Y: BaseExpr } with
+type TensorProduct = { X: BaseExprCh; Y: BaseExprCh } with
     interface IOp with       
         member this.Check () = 
             Check.sameType [this.X; this.Y]
             let sa, sb = this.X.Shape, this.Y.Shape
             if ShapeSpec.nDim sa <> ShapeSpec.nDim sb then
                 failwithf "Cannot compute tensor product between tensors of shapes %A and %A." sa sb
-        member this.TypeName = this.X.TypeName
-        member this.Shape = 
-            List.map2 (*) this.X.Shape this.Y.Shape
+        member this.Channels = Ch.onlyOne
+        member this.TypeNames = this.X.TypeName |> Ch.only
+        member this.Shapes = 
+            List.map2 (*) this.X.Shape this.Y.Shape |> Ch.only
         member this.Args = Args.binary this.X this.Y
         member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = (ArgValue.binaryX env.Args).TensorProduct (ArgValue.binaryY env.Args)       
+        member this.Eval env = (ArgValue.binaryX env.Args).TensorProduct (ArgValue.binaryY env.Args) |> Ch.only      
 
 
 /// Replace a slice of a tensor with another tensor.
-type SetSubtensor = {X: BaseExpr; Y: BaseExpr; Range: SimpleRangesSpec} with
+type SetSubtensor = {X: BaseExprCh; Y: BaseExprCh; Range: SimpleRangesSpec} with
     interface IOp with      
         member this.Check () = 
             Check.sameType [this.X; this.Y]
             Check.range this.Range this.X
             if this.X.NDims <> this.Y.NDims then
                 failwith "Source and target of SetSubtensor must be of same dimensionality."
-        member this.TypeName = this.X.TypeName
-        member this.Shape = this.X.Shape           
+        member this.Channels = Ch.onlyOne
+        member this.TypeNames = this.X.TypeName |> Ch.only
+        member this.Shapes = this.X.Shape |> Ch.only
         member this.Args = 
             let xyArgs = Args.binary this.X this.Y
             let dynArgs = 
-                SimpleRangesSpec.dynElems dynPrefix this.Range
-                |> Map.map (fun _ v -> v :?> BaseExpr |> Arg.Expr)
+                SimpleRangesSpecArgs.toArgs this.Range
+                |> Map.map (fun _ v -> v :?> BaseExprCh)
             Map.join xyArgs dynArgs
         member this.ReplaceArgs args = 
-            let dynArgs = args |> Map.map (fun _ v -> v |> Arg.expr :> IDynElem)
-            let range = this.Range |> SimpleRangesSpec.replaceDynElems dynPrefix dynArgs               
+            let dynArgs = args |> Map.map (fun _ v -> v :> IDynElem)
+            let range = this.Range |> SimpleRangesSpecArgs.replaceFromArgs dynArgs               
             {this with X=Args.binaryX args; Y=Args.binaryY args; Range=range} :> _
         member this.SubstSymSizes env = {this with Range = SymSizeEnv.substRange env this.Range} :> _
         member this.CanEvalAllSymSizes = SimpleRangesSpec.canEvalSymbols this.Range
@@ -326,13 +351,17 @@ type SetSubtensor = {X: BaseExpr; Y: BaseExpr; Range: SimpleRangesSpec} with
             // TODO: dynamic range is always copied to host
             let dynVals = 
                 env.Args 
-                |> Map.filter (fun k _ -> k.StartsWith dynPrefix)
+                |> Map.filter (fun arg _ -> 
+                    match arg with
+                    | Arg.N _ -> true
+                    | _ -> false)
                 |> Map.map (fun _ v -> Tensor.value (v :?> Tensor<int64>) |> SizeSpec.fix)
             let range = 
                 this.Range 
-                |> SimpleRangesSpec.resolveDynElems dynPrefix dynVals 
+                |> SimpleRangesSpecArgs.resolveDynElems dynVals 
                 |> SimpleRangesSpec.eval
             let trgt = ArgValue.binaryX env.Args |> ITensor.copy
             trgt.[range] <- ArgValue.binaryY env.Args
-            trgt
+            trgt |> Ch.only
+
 

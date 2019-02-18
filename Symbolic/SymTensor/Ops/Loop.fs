@@ -15,14 +15,17 @@ type Loop = {
     /// specifies the values of the loop channels
     Channels:   Map<string, Loop.Value>
     /// inputs
-    Xs:         BaseExpr list
+    Xs:         BaseExprCh list
 } with
-    interface IMultiChannelOp with       
+    member private this.ChMap =
+        this.Channels |> Map.mapKeyValue (fun ch lv -> Ch.Custom ch, lv)
+
+    interface IOp with       
         member this.Check () =
             // check that all variables are defined
             let usedVars =
                 Map.toSeq this.Channels
-                |> Seq.map (fun (_, lv) -> lv.Expr.Vars)
+                |> Seq.map (fun (_, lv) -> lv.Expr.Expr.Vars)
                 |> Set.unionMany
             let specifiedVars = 
                 Map.toSeq this.Vars
@@ -80,11 +83,11 @@ type Loop = {
                     if not (ShapeSpec.equalWithoutBroadcastability vs.Shape []) then
                         failwithf "Iteration index variable %A must be scalar." vs
         member this.Channels = 
-            this.Channels |> Map.toList |> List.map fst
+            this.ChMap |> Map.toSeq |> Seq.map fst |> Set.ofSeq
         member this.TypeNames = 
-            this.Channels |> Map.map (fun _ lv -> lv.Expr.TypeName)
+            this.ChMap |> Map.map (fun _ lv -> lv.Expr.TypeName)
         member this.Shapes = 
-            this.Channels |> Map.map (fun ch lv ->
+            this.ChMap |> Map.map (fun ch lv ->
                 lv.Expr.Shape |> ShapeSpec.insertAxis lv.SliceDim this.Length)
         member this.Args = Args.nary this.Xs
         member this.ReplaceArgs args = {this with Xs=Args.naryXs args} :> _
@@ -102,7 +105,7 @@ type Loop = {
                             vs, li)
                         |> Map.ofSeq
                 Channels = this.Channels
-                            |> Map.map (fun ch lv -> {lv with Expr = lv.Expr |> BaseExpr.substSymSizes env})
+                            |> Map.map (fun ch lv -> {lv with Expr = lv.Expr |> BaseExprCh.map (BaseExpr.substSymSizes env)})
             } :> _
         member this.CanEvalAllSymSizes = 
             (SizeSpec.canEval this.Length) &&
@@ -111,20 +114,20 @@ type Loop = {
                 match li with
                 | Loop.PreviousChannel pc -> SizeSpec.canEval pc.Delay
                 | _ -> true)) &&
-            (this.Channels |> Map.toSeq |> Seq.forall (fun (ch, lv) -> lv.Expr.CanEvalAllSymSizes))    
+            (this.Channels |> Map.toSeq |> Seq.forall (fun (ch, lv) -> lv.Expr.Expr.CanEvalAllSymSizes))    
         member this.Eval env = 
             failwith "TODO"
 
     static member internal noLift length vars channels xs =
-        BaseMultiChannelExpr.ofOp {Loop.Length=length; Vars=vars; Channels=channels; Xs=xs} 
+        BaseExpr.ofOp {Loop.Length=length; Vars=vars; Channels=channels; Xs=xs} 
 
     static member internal withLift (length: SizeSpec) (vars: Map<Var, Loop.Input>) 
-                                    (channels: Map<string, Loop.Value>) (xs: BaseExpr list) =       
+                                    (channels: Map<string, Loop.Value>) (xs: BaseExprCh list) =       
         let mutable args = xs
         let mutable vars = vars
 
         /// adds an argument and returns its index
-        let addArg (expr: BaseExpr) =
+        let addArg (expr: BaseExprCh) =
             match args |> List.tryFindIndex ((=) expr) with
             | Some argIdx -> argIdx
             | None ->
@@ -133,7 +136,7 @@ type Loop = {
                 argIdx
 
         /// adds a constant variable, its required argument and returns the associated VarSpecT
-        let addConstVar (expr: BaseExpr) =
+        let addConstVar (expr: BaseExprCh) =
             let var = 
                 vars |> Map.tryFindKey (fun vs lv ->
                     match lv with
@@ -153,36 +156,33 @@ type Loop = {
                 vs
 
         let loopVarSet = vars |> Map.toSeq |> Seq.map (fun (vs, _) -> vs) |> Set.ofSeq
-        let lifted = Dictionary<BaseExpr, BaseExpr> ()
+        let lifted = Dictionary<BaseExprCh, BaseExprCh> ()
 
-        let rec lift (xChExpr: BaseXChExpr) : BaseXChExpr =
-            match xChExpr with
-            | BaseXChExpr.SingleCh expr ->
-                match lifted.TryFind expr with
-                | Some rep -> rep |> BaseXChExpr.SingleCh
-                | None ->
-                    let exprVars = expr.Vars
-                    let dependsOnVars = not (Set.isEmpty exprVars)
-                    let dependsOnLoopVars = Set.intersect exprVars loopVarSet |> Set.isEmpty |> not
-                    let rep =
-                        if dependsOnVars && not dependsOnLoopVars then
-                            //if not (dependsOnLoopVars expr) then
-                            let vs = addConstVar expr
-                            BaseExpr.ofOp {VarArg.Var=vs} 
-                        else
-                            expr |> BaseExpr.mapArgs lift
-                    lifted.[expr] <- rep
-                    rep |> BaseXChExpr.SingleCh
-            | BaseXChExpr.MultiCh mChExpr ->
-                mChExpr |> BaseMultiChannelExpr.mapArgs lift |> BaseXChExpr.MultiCh            
+        let rec lift (expr: BaseExprCh) : BaseExprCh =
+            match lifted.TryFind expr with
+            | Some rep -> rep 
+            | None ->
+                let exprVars = expr.Expr.Vars
+                let dependsOnVars = not (Set.isEmpty exprVars)
+                let dependsOnLoopVars = Set.intersect exprVars loopVarSet |> Set.isEmpty |> not
+                let rep =
+                    if dependsOnVars && not dependsOnLoopVars then
+                        //if not (dependsOnLoopVars expr) then
+                        let vs = addConstVar expr
+                        let repExpr = BaseExpr.ofOp {VarArg.Var=vs} 
+                        repExpr.OnlyCh
+                    else
+                        expr |> BaseExprCh.map (BaseExpr.mapArgs lift)
+                lifted.[expr] <- rep
+                rep 
                 
         // lift constants out of loop
         let liftedChannels = 
             channels 
             |> Map.map (fun ch lv -> {
-                lv with Loop.Value.Expr = lv.Expr |> BaseXChExpr.SingleCh |> lift |> BaseXChExpr.singleCh
+                lv with Loop.Value.Expr = lift lv.Expr 
             })
-        BaseMultiChannelExpr.ofOp {Loop.Length=length; Vars=vars; Channels=liftedChannels; Xs=args} 
+        BaseExpr.ofOp {Loop.Length=length; Vars=vars; Channels=liftedChannels; Xs=args} 
        
 
  

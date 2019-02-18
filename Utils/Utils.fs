@@ -74,6 +74,13 @@ module internal Map =
         |> Seq.map (|KeyValue|)
         |> Map.ofSeq    
 
+    /// Maps the key and value.
+    let mapKeyValue fn p =
+        p
+        |> Map.toSeq
+        |> Seq.map (fun (k, v) -> fn k v)
+        |> Map.ofSeq
+
 
 /// Functions for working with permutations.
 module internal Permutation =

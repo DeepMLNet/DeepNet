@@ -262,10 +262,10 @@ module Expr2 =
         | :? CheckFinite as this -> Some this
         | _ -> None
 
-    let (|Channel|_|) (expr: Expr) =
-        match expr.Op with
-        | :? Channel as this -> Some this
-        | _ -> None
+    //let (|Channel|_|) (expr: Expr) =
+    //    match expr.Op with
+    //    | :? Channel as this -> Some this
+    //    | _ -> None
 
     let (|Add|_|) (expr: Expr) =
         match expr.Op with

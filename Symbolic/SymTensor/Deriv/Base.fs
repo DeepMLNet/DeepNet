@@ -31,7 +31,7 @@ module DerivTypes =
 module Deriv = 
 
     let private add (x: BaseExpr) (y: BaseExpr) =
-        (x :?> Expr) + (y :?> Expr) :> BaseExpr
+        (Expr x) + (Expr y) |> Expr.baseExpr
 
     /// merges two derivative maps
     let private merge (aGrads: DerivT) (bGrads: DerivT) : DerivT =
@@ -51,7 +51,7 @@ module Deriv =
         {FunElems=expr.NElems; Jacobians=Map.empty}
 
     /// Computes the derivatives of all arguments of an expression given the derivative of the expression.
-    let rec private reverseDiffStep (expr: BaseExpr) (eg: BaseExpr) : Map<string, XChDeriv> =    
+    let rec private reverseDiffStep (expr: BaseExpr) (eg: BaseExpr) : Map<string, BaseExpr> =    
         // TODO: get single-channel op derivative
         failwith "TODO"
         
@@ -64,15 +64,17 @@ module Deriv =
     /// Computes the derivatives of the specified expression w.r.t. all variables occuring in it.
     and computeWithRootJacobian (rootJacobian: XChDeriv) (rootExpr: BaseXChExpr) : DerivT =
 
-        // build expression info and unify common subexpressions
+        // build expression info 
         let exprInfo = BaseXChExprGroup [rootExpr]
-        let rootExpr = List.exactlyOne exprInfo.Exprs
+        //let rootExpr = List.exactlyOne exprInfo.Exprs
 
-        /// map from an expression to the sum of incoming Jacobians
-        let incomingJacobian = Dictionary<BaseXChExpr, XChDeriv> (HashIdentity.Reference)
-        /// map from an expression to the set of dependants that transmitted Jacobian to the expression
-        let receivedJacobiansFrom = Dictionary<BaseExprCh, HashSet<BaseXChExpr>> (HashIdentity.Reference)
-        /// expressions that have received Jacobians from all their dependants
+        /// map from an expression to the sum of incoming Jacobians (for all its channels)
+        let incomingJacobian = Dictionary<BaseXChExpr, XChDeriv> ()
+        /// map from an expression (channel) to the set of dependants that transmitted Jacobian to the expression
+        let receivedJacobiansFrom = Dictionary<BaseExprCh, HashSet<BaseXChExpr>> ()
+        /// channels of multi-channel expression that have received Jacobian from all their dependants
+        let exprChannelsWithFullJacobian = Dictionary<BaseMultiChannelExpr, HashSet<string>> ()
+        /// expressions that have received Jacobians from all their dependants (for all channels)
         let exprsWithFullJacobian = Queue<BaseXChExpr> ()
 
         //let multiChannelOpJacobians = 
@@ -109,10 +111,17 @@ module Deriv =
             receivedJacobiansFrom.[target].Add source |> ignore
 
             // check if target has received all derivatives
-            // TODO: iterate over all channel for a multi-channel expression and check that derivatives
-            //       for all channels have been received.
             let receivedSources = receivedJacobiansFrom.[target] |> Set.ofSeq
-            if receivedSources = neededSources then exprsWithFullJacobian.Enqueue target
+            if receivedSources = neededSources then 
+                match target with
+                | BaseExprCh.Only target -> 
+                    exprsWithFullJacobian.Enqueue (BaseXChExpr.SingleCh target)
+                | BaseExprCh.Ch (ch, target) ->
+                    if not (exprChannelsWithFullJacobian.ContainsKey target) then
+                        exprChannelsWithFullJacobian.[target] <- HashSet<_> ()
+                    exprChannelsWithFullJacobian.[target].Add ch |> ignore
+                    if Set.ofSeq exprChannelsWithFullJacobian.[target] = Set.ofSeq target.Channels then
+                        exprsWithFullJacobian.Enqueue (BaseXChExpr.MultiCh target)
 
         let transmitJacobians src jacobians =
             jacobians
@@ -139,22 +148,28 @@ module Deriv =
 
         // process Jacobians in loop
         let mutable varJacs = Map.empty
-        while exprsWithFullJacobian.Count > 0 || multiChannelOpsWithFullJacobians.Count > 0 do
+        while exprsWithFullJacobian.Count > 0 do
 
-            if exprsWithFullJacobian.Count > 0 then
-                let expr = exprsWithFullJacobian.Dequeue ()
+            let expr = exprsWithFullJacobian.Dequeue ()
 
-                // propagate Jacobians
-                match expr with
-                | Nary (Channel (op, channel), es) ->
-                    transmitMultiChannelOpJacobian (op, es) channel incomingJacobian.[expr]
-                | _ ->
-                    reverseDiffStep expr incomingJacobian.[expr] |> transmitJacobians (Choice1Of2 expr)
+            // propagate Jacobians
+            match expr, incomingJacobian.[expr] with
+            | BaseXChExpr.SingleCh sChExpr, SingleChDeriv exprDeriv ->
+                let targets = sChExpr.Args
+                let argDerivs = reverseDiffStep sChExpr exprDeriv
+                for KeyValue(argName, argDeriv) in argDerivs do
+                    transmitJacobian expr targets.[argName] argDeriv
+                ()
+                // |> transmitJacobians (Choice1Of2 expr)
+            //| Nary (Channel (op, channel), es) ->
+            //    transmitMultiChannelOpJacobian (op, es) channel incomingJacobian.[expr]
+            //| _ ->
+            //    reverseDiffStep expr incomingJacobian.[expr] |> transmitJacobians (Choice1Of2 expr)
 
-                // extract variable Jacobians
-                match expr with
-                | Leaf (Var vs) -> varJacs <- varJacs |> Map.add vs incomingJacobian.[expr]
-                | _ -> ()
+            // extract variable Jacobians
+            match expr with
+            | Leaf (Var vs) -> varJacs <- varJacs |> Map.add vs incomingJacobian.[expr]
+            | _ -> ()
 
             if multiChannelOpsWithFullJacobians.Count > 0 then
                 let mcOp = multiChannelOpsWithFullJacobians.Dequeue ()

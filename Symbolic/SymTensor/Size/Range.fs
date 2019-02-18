@@ -191,30 +191,3 @@ module SimpleRangesSpec =
     let toBaseRangesSpec (shape: ShapeSpec) rs =
         (shape, rs) ||> List.map2 SimpleRangeSpec.toBaseRangeSpec
 
-    /// Returns a map of all dynamic elements within the specified range.
-    let dynElems (prefix: string) (srs: SimpleRangesSpec) =
-        srs 
-        |> List.indexed
-        |> List.choose (function
-                        | _, SimpleRangeSpec.SymStartSymEnd _  -> None
-                        | i, SimpleRangeSpec.DynStartSymSize (s, _) -> Some (sprintf "%s%d" prefix i, s))
-        |> Map.ofList
-
-    /// Replaces all dynamic elements within the specified range using the specified replacement map.
-    let replaceDynElems (prefix: string) (map: Map<string, IDynElem>) (srs: SimpleRangesSpec) : SimpleRangesSpec =
-        srs
-        |> List.indexed
-        |> List.map (function
-                     | _, (SimpleRangeSpec.SymStartSymEnd _ as r) -> r
-                     | i, SimpleRangeSpec.DynStartSymSize (s, elems) -> 
-                        SimpleRangeSpec.DynStartSymSize (map.[sprintf "%s%d" prefix i], elems))
-
-    /// Replaces all dynamic elements within the specified range using the specified replacement map.
-    let resolveDynElems (prefix: string) (map: Map<string, SizeSpec>) (srs: SimpleRangesSpec) : SimpleRangesSpec =
-        srs
-        |> List.indexed
-        |> List.map (function
-                     | _, (SimpleRangeSpec.SymStartSymEnd _ as r) -> r
-                     | i, SimpleRangeSpec.DynStartSymSize (s, elems) -> 
-                        let s = map.[sprintf "%s%d" prefix i]
-                        SimpleRangeSpec.SymStartSymEnd (s, Some (s + elems)))
