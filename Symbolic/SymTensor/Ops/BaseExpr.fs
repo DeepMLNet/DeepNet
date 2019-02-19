@@ -104,29 +104,6 @@ type IVarContainingOp =
     abstract Vars: Set<Var>
 
 
-/// Provides a derivative for an op.
-type IDerivableOp =    
-    /// Computes the derivative w.r.t. each argument given the derivative w.r.t. the op.
-    ///
-    /// `dOp` is the incoming derivative, i.e. the derivative with respect to this op.
-    /// Assuming that N is the number of elements of the function the derivative is being taken and
-    /// the output shape of this op is M1xM2x...xMD, the incoming derivative will be of shape
-    /// NxM1xM2x...xMD.
-    ///
-    /// The outgoing derivatives should be of shape NxK1xK2x...xKD where K1xK2x...xKD is the
-    /// shape of the respective argument.
-    abstract Deriv: dOp:Map<Ch, BaseExpr> -> Map<Arg, BaseExpr>
-
-
-
-
-/// Declares that the type is extending an op by implementing additional interfaces.
-/// The type's constructor is called with the op instance as argument.
-[<AttributeUsage(AttributeTargets.Class)>]
-type OpExtenderAttribute () =
-    inherit System.Attribute()
-
-
 
 /// Base for single-channel and multi-channel expressions.
 /// BaseExpr is reference-unique, i.e. all expressions that are structurally equal 
@@ -244,9 +221,9 @@ type BaseExpr private (op: IOp) =
     member this.Item
         with get (channel: Ch) = BaseExprCh.create channel this
 
-    /// Access to specified channel of this expression.
-    member this.Item
-        with get (channel: string) = this.[Ch.Custom channel]
+    ///// Access to specified channel of this expression.
+    //member this.Item
+    //    with get (channel: string) = this.[Ch.Custom channel]
 
     /// Access to the only channel of this expression.
     member this.OnlyCh =

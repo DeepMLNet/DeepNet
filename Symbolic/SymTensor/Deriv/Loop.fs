@@ -7,7 +7,7 @@ open SymTensor.Ops
 
 
 type internal LoopDerivT = {
-    Port:        string
+    Port:        Ch
     Slice:       RangesSpec
     ReverseAxis: int option
 }
@@ -22,9 +22,9 @@ type internal PortContentsT = {
 
 [<OpExtender>]
 type LoopDeriv(op: Loop) =
-    interface IDerivableMultiChannelOp with
+    interface IDerivableOp with
         member this.Deriv dOp =   
-            let env = MultiChannelDeriv.Env.make op dOp
+            let env = MultiChannelDerivTools.Env.make op dOp
             let dOutputs = env.DOp
             let originalArgs = env.Xs
             let spec = op
@@ -57,17 +57,23 @@ type LoopDeriv(op: Loop) =
                 let zeroExpr = Expr.zerosOfType channelType shp
                 addArg zeroExpr
 
+            /// Name of a channel.
+            let chName (ch: Ch) =
+                match ch with
+                | Ch.Only -> "__DEFAULT__"
+                | Ch.Custom name -> name
+
             /// map from variable representing a derivative to the loop input specification
             let varInputSpecs = Dictionary<Var, Loop.Input> ()
 
             /// map from a loop output to the variable representing its derivative
-            let dOutputVars = Dictionary<string, Var> ()
+            let dOutputVars = Dictionary<Ch, Var> ()
 
             /// map from a loop PreviousPort to the variables representing its derivative sources
             let dPreviousVars = Dictionary<Loop.PreviousChannel, Var> ()
 
             /// map from a loop port to the value it must contain
-            let portContents = Dictionary<string, PortContentsT> ()
+            let portContents = Dictionary<Ch, PortContentsT> ()
 
             /// map from argument index to the loop ports containing its derivative summands
             let argIdxDerivs = Dictionary<int, HashSet<LoopDerivT>> ()
@@ -90,7 +96,7 @@ type LoopDeriv(op: Loop) =
             for KeyValue (outPort, dExpr) in dOutputs do
                 // create variable for incoming Jacobian
                 let value = spec.Channels.[outPort]
-                let dName = sprintf "d_%s" outPort
+                let dName = sprintf "d_%s" (chName outPort)
                 let dVar =
                     Var.create dName value.Expr.DataType (funElems :: value.Expr.Shape)
                 dOutputVars.[outPort] <- dVar
@@ -117,15 +123,15 @@ type LoopDeriv(op: Loop) =
                     let dAccumVar = Var.create dAccumName liType (funElems :: liShape)
 
                     // create loop port exposing the step Jacobian plus the accumulated Jacobian w.r.t. ConstArg argIdx
-                    let dPortName = sprintf "dSum_ConstArg%d" argIdx
-                    if not (portContents.ContainsKey dPortName) then
-                        portContents.[dPortName] <- {DerivWrt=ResizeArray<_>(); ValueOf=Some dAccumVar; SliceDim=liDims+1}
-                    portContents.[dPortName].DerivWrt.Add usingVar
+                    let dPort = Ch.Custom (sprintf "dSum_ConstArg%d" argIdx)
+                    if not (portContents.ContainsKey dPort) then
+                        portContents.[dPort] <- {DerivWrt=ResizeArray<_>(); ValueOf=Some dAccumVar; SliceDim=liDims+1}
+                    portContents.[dPort].DerivWrt.Add usingVar
 
                     // create variable input specification:
                     // source is accumulated Jacobian w.r.t. ConstArg argIdx in previous derivative loop iteration
                     let dpp: Loop.PreviousChannel = {
-                        Channel    = dPortName
+                        Channel    = dPort
                         Delay      = SizeSpec.one
                         InitialArg = addZeroInitialArg (funElems :: usingVar.Shape) usingVar.Type (liDims+1) SizeSpec.one
                     }
@@ -137,17 +143,17 @@ type LoopDeriv(op: Loop) =
                         for d=0 to liDims-1 do yield RangeSpec.All  // derivative axes
                         yield RangeSpec.SymElem (spec.Length - 1L)  // sequence slice axis
                     ]
-                    argIdxDerivs.[argIdx].Add {Port=dPortName; Slice=slice; ReverseAxis=None} |> ignore
+                    argIdxDerivs.[argIdx].Add {Port=dPort; Slice=slice; ReverseAxis=None} |> ignore
 
                 | Loop.SequenceArgSlice {ArgIdx=argIdx; SliceDim=sliceDim} ->
                     // a sequence arg slice is an input variable and thus outputs a gradient
                     // it thus needs a loop port 
 
                     // create loop port exposing the step Jacobian w.r.t. the sequence slice
-                    let dPortName = sprintf "d_SeqArg%d_%d" argIdx sliceDim
-                    if not (portContents.ContainsKey dPortName) then
-                        portContents.[dPortName] <- {DerivWrt=ResizeArray<_>(); ValueOf=None; SliceDim=sliceDim+1}
-                    portContents.[dPortName].DerivWrt.Add usingVar
+                    let dPort = Ch.Custom (sprintf "d_SeqArg%d_%d" argIdx sliceDim)
+                    if not (portContents.ContainsKey dPort) then
+                        portContents.[dPort] <- {DerivWrt=ResizeArray<_>(); ValueOf=None; SliceDim=sliceDim+1}
+                    portContents.[dPort].DerivWrt.Add usingVar
                 
                     // set Jacobian w.r.t. input argument argIdx specification
                     let slice = [
@@ -156,15 +162,16 @@ type LoopDeriv(op: Loop) =
                         yield RangeSpec.All                                 // sequence slice axis
                         for d=sliceDim to liDims-1 do yield RangeSpec.All   // derivative axes
                     ]
-                    argIdxDerivs.[argIdx].Add {Port=dPortName; Slice=slice; ReverseAxis=Some (sliceDim+1)} |> ignore
+                    argIdxDerivs.[argIdx].Add {Port=dPort; Slice=slice; ReverseAxis=Some (sliceDim+1)} |> ignore
 
                 | Loop.PreviousChannel pp ->
                     // create loop port exposing the derivative w.r.t. the PreviousPort
-                    let dPortName = sprintf "d_%s[%A]" pp.Channel pp.Delay
+                    let dPortName = sprintf "d_%s[%A]" (chName pp.Channel) pp.Delay
+                    let dPort = Ch.Custom dPortName
                     let sliceDim = spec.Channels.[pp.Channel].SliceDim
-                    if not (portContents.ContainsKey dPortName) then                    
-                        portContents.Add (dPortName, {DerivWrt=ResizeArray<_>(); ValueOf=None; SliceDim=sliceDim+1})
-                    portContents.[dPortName].DerivWrt.Add usingVar
+                    if not (portContents.ContainsKey dPort) then                    
+                        portContents.Add (dPort, {DerivWrt=ResizeArray<_>(); ValueOf=None; SliceDim=sliceDim+1})
+                    portContents.[dPort].DerivWrt.Add usingVar
 
                     // create a variable for Jacobian coming from a PreviousPort in a (future) loop iteration
                     let dVar = Var.create dPortName liType (funElems :: liShape)
@@ -173,7 +180,7 @@ type LoopDeriv(op: Loop) =
                     // create corresponding variable input specification:
                     // source is Jacobian calculated w.r.t. the PreviousPort in previous derivative loop iteration
                     let dpp: Loop.PreviousChannel = {
-                        Channel    = dPortName
+                        Channel    = dPort
                         Delay      = pp.Delay
                         InitialArg = addZeroInitialArg (funElems :: usingVar.Shape) usingVar.Type (sliceDim+1) pp.Delay
                     }
@@ -189,7 +196,7 @@ type LoopDeriv(op: Loop) =
                             (Some (spec.Length - pp.Delay), Some (spec.Length - 1L))                
                         for d=sliceDim to liDims-1 do yield RangeSpec.All   // derivative axes
                     ]
-                    argIdxDerivs.[pp.InitialArg].Add {Port=dPortName; Slice=slice; ReverseAxis=Some (sliceDim+1)} |> ignore
+                    argIdxDerivs.[pp.InitialArg].Add {Port=dPort; Slice=slice; ReverseAxis=Some (sliceDim+1)} |> ignore
 
                                                
                 | Loop.IterationIndex 
@@ -221,10 +228,10 @@ type LoopDeriv(op: Loop) =
                     let incomingJacobian = incomingExpandedJacobian |> Expr.reshape [funElems; value.Expr.NElems]
 
                     // calculate Jacobians w.r.t. all variables
-                    let chDeriv = value.Expr |> computeWithRootJacobian incomingJacobian               
+                    let chDeriv = Deriv.computeWithRootDeriv incomingJacobian (Expr value.Expr)
                     chDeriv
                     )    
-                |> Seq.reduce merge
+                |> Seq.reduce Deriv.merge
 
             // go through portContents and create actual port contents
             let ports =
@@ -244,7 +251,7 @@ type LoopDeriv(op: Loop) =
                             | Some vs -> yield Expr.makeVar vs
                             | None -> ()
                         } |> Seq.reduce (+)
-                    let value: Loop.Value = {Expr=expr; SliceDim=sliceDim}
+                    let value: Loop.Value = {Expr=expr.BaseExprCh; SliceDim=sliceDim}
                     value)
 
             // create variable specification
@@ -297,8 +304,9 @@ type LoopDeriv(op: Loop) =
                 Length    = spec.Length
                 Vars      = Map.join originalVars varsFromDeriv
                 Channels  = ports
-                Xs        = "TODO"
+                Xs        = args |> List.ofSeq |> List.map (Expr.baseExprCh)
             }
+            let dLoopExpr = MultiChannelExpr dSpec
             //printfn "derivative loop spec is\n%A" dSpec
 
             // build derivatives w.r.t. our arguments
@@ -310,7 +318,7 @@ type LoopDeriv(op: Loop) =
                     let dExprExpanded =
                         loopDerivs
                         |> Seq.map (fun {Port=port; Slice=slice; ReverseAxis=reverseAxis} ->
-                            let loopOutput = Expr.loop dSpec port (List.ofSeq args)
+                            let loopOutput = dLoopExpr.[port]
                             let sliced = loopOutput.[slice]
                             match reverseAxis with
                             | Some ax -> sliced |> Expr.reverseAxis ax
@@ -323,7 +331,8 @@ type LoopDeriv(op: Loop) =
                     dExpr)
 
             // output mapping from original argument to its derivative
-            [for a=0 to originalArgs.Length-1 do
-                    yield originalArgs.[a], argIdxDerivExprs.[a]]
+            argIdxDerivExprs |> Map.mapKeyValue (fun i d -> Arg.N i, d)
+
+
         
    

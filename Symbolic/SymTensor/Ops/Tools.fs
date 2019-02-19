@@ -37,6 +37,7 @@ module Check =
                     failwithf "Dynamic range start must be of type int64.")
 
 
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Ch =
     let only x = Map [Ch.Only, x]
 

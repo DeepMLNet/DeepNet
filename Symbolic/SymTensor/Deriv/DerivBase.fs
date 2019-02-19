@@ -5,8 +5,23 @@ open DeepNet.Utils
 open SymTensor.Ops
 
 
+/// Provides a derivative for an op.
+type IDerivableOp =    
+    /// Computes the derivative w.r.t. each argument given the derivative w.r.t. the op.
+    ///
+    /// `dOp` is the incoming derivative, i.e. the derivative with respect to this op.
+    /// Assuming that N is the number of elements of the function the derivative is being taken and
+    /// the output shape of this op is M1xM2x...xMD, the incoming derivative will be of shape
+    /// NxM1xM2x...xMD.
+    ///
+    /// The outgoing derivatives should be of shape NxK1xK2x...xKD where K1xK2x...xKD is the
+    /// shape of the respective argument.
+    abstract Deriv: dOp:Map<Ch, Expr> -> Map<Arg, Expr>
+
+    
+
 /// Jacobians for each variable
-type Deriv = {
+type DerivT = {
     /// the number of elements of the function the derivative is taken of
     FunElems:   SizeSpec
     /// the Jacobians w.r.t. the variables occuring in the expression
@@ -14,46 +29,48 @@ type Deriv = {
 }
 
 
-    //type XChDeriv =
-    //    | SingleChDeriv of BaseExpr
-    //    | MultiChDeriv of Map<string, BaseExpr>
-
-
-    //type IncomingDeriv =
-    //    | FullDeriv of expr:BaseExpr
-    //    | ChDeriv of channel:string * expr:BaseMultiChannelExpr
-
 
 /// Derivative computation functions.
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Deriv = 
 
     let private add (x: BaseExprCh) (y: BaseExprCh) =
         (Expr x) + (Expr y) |> Expr.baseExprCh
 
-    /// merges two derivative maps
-    //let private merge (aGrads: DerivT) (bGrads: DerivT) : DerivT =
-    //    if aGrads.FunElems <> bGrads.FunElems then
-    //        failwithf "Cannot merge derivatives with different number of function elements: %A and %A."
-    //            aGrads.FunElems bGrads.FunElems
-    //    let jacs =
-    //        (aGrads.Jacobians, bGrads.Jacobians)
-    //        ||> Map.fold (fun m v vg -> 
-    //            match Map.tryFind v m with
-    //            | Some ovg -> m |> Map.add v (add vg ovg)
-    //            | None -> m |> Map.add v vg) 
-    //    {FunElems=aGrads.FunElems; Jacobians=jacs}
+    /// Merges two derivative maps by summing derivatives for variables they both have in common.
+    let merge (aGrads: DerivT) (bGrads: DerivT) : DerivT =
+        if aGrads.FunElems <> bGrads.FunElems then
+            failwithf "Cannot merge derivatives with different number of function elements: %A and %A."
+                aGrads.FunElems bGrads.FunElems
+        let jacs =
+            (aGrads.Jacobians, bGrads.Jacobians)
+            ||> Map.fold (fun m v vg -> 
+                match Map.tryFind v m with
+                | Some ovg -> m |> Map.add v (vg + ovg)
+                | None -> m |> Map.add v vg) 
+        {FunElems=aGrads.FunElems; Jacobians=jacs}
 
     ///// empty derivatives for expression
     //let private empty (expr: BaseExprCh) =
     //    {FunElems=expr.NElems; Jacobians=Map.empty}
 
     /// Computes the derivatives of all arguments of an expression given the derivative of the expression.
-    let private derivOp (expr: BaseExpr) (eg: Map<Ch, BaseExprCh>) : Map<BaseExprCh, BaseExprCh> =    
-        // TODO: get single-channel op derivative
-        failwith "TODO"        
+    let private derivOp (expr: BaseExpr) (dExpr: Map<Ch, BaseExprCh>) : Map<BaseExprCh, BaseExprCh> =    
+        let deriver = 
+            match OpExtender.tryGet<IDerivableOp> expr.Op with
+            | Some d -> d
+            | None -> failwithf "The op %A is not derivable." expr.Op
+        let dExpr = dExpr |> Map.map (fun _ e -> Expr e)
+        let dArgs = deriver.Deriv dExpr |> Map.map (fun _ e -> e.BaseExprCh)
+        let dArgExprs =
+            expr.Args
+            |> Map.toSeq
+            |> Seq.map (fun (arg, expr) -> expr, dArgs.[arg])
+            |> Map.ofSeq
+        dArgExprs
 
     /// Computes the derivatives of the specified expression w.r.t. all variables occuring in it.
-    let computeWithRootJacobian (rootJacobian: Map<Ch, BaseExprCh>) (rootExpr: BaseExpr) : Deriv =
+    let baseCompute (rootJacobian: Map<Ch, BaseExprCh>) (rootExpr: BaseExpr) : DerivT =
 
         // build expression info 
         let exprInfo = BaseExprGroup [rootExpr]
@@ -124,18 +141,25 @@ module Deriv =
             Jacobians = varJacs
         }    
 
-    /// computes the derivatives of the specified expression w.r.t. all variables occuring in it
-    let compute (rootExpr: Expr) : Deriv =
+
+    /// Computes the derivative expression w.r.t. all variables occuring in it using the specified
+    /// value for the derivative of the specified expression.
+    let computeWithRootDeriv (rootJac: Expr) (rootExpr: Expr) : DerivT =
+        let rootJac = Map [Ch.Only, rootJac.BaseExprCh]
+        let deriv = baseCompute rootJac rootExpr.BaseExpr
+        deriv
+
+    /// Computes the derivative expression w.r.t. all variables occuring in it.
+    let compute (rootExpr: Expr) : DerivT =
         if Debug.TraceCompile then printfn "Computing derivatives..."
         let sw = Stopwatch.StartNew()
-        let rootJacCh = rootExpr.Shape |> ShapeSpec.nElem |> Expr.identityOfType rootExpr.DataType
-        let rootJac = Map [Ch.Only, rootJacCh.BaseExprCh]
-        let deriv = computeWithRootJacobian rootJac rootExpr.BaseExpr
+        let rootJac = rootExpr.Shape |> ShapeSpec.nElem |> Expr.identityOfType rootExpr.DataType
+        let deriv = computeWithRootDeriv rootJac rootExpr
         if Debug.Timing then printfn "Computing derivatives took %A" sw.Elapsed
         deriv
 
     /// extracts the Jacobian of the given VarSpecT
-    let ofVarSpec var (deriv: Deriv) =
+    let ofVarSpec var (deriv: DerivT) =
         match deriv.Jacobians |> Map.tryFind var with
         | Some d -> d
         | None when Debug.FailIfVarNotInDerivative -> 

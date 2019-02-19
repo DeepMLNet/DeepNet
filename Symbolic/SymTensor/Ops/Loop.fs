@@ -13,12 +13,10 @@ type Loop = {
     /// i.e. LoopValueT.Expr
     Vars:       Map<Var, Loop.Input>   
     /// specifies the values of the loop channels
-    Channels:   Map<string, Loop.Value>
+    Channels:   Map<Ch, Loop.Value>
     /// inputs
     Xs:         BaseExprCh list
 } with
-    member private this.ChMap =
-        this.Channels |> Map.mapKeyValue (fun ch lv -> Ch.Custom ch, lv)
 
     interface IOp with       
         member this.Check () =
@@ -83,11 +81,11 @@ type Loop = {
                     if not (ShapeSpec.equalWithoutBroadcastability vs.Shape []) then
                         failwithf "Iteration index variable %A must be scalar." vs
         member this.Channels = 
-            this.ChMap |> Map.toSeq |> Seq.map fst |> Set.ofSeq
+            this.Channels |> Map.toSeq |> Seq.map fst |> Set.ofSeq
         member this.TypeNames = 
-            this.ChMap |> Map.map (fun _ lv -> lv.Expr.TypeName)
+            this.Channels |> Map.map (fun _ lv -> lv.Expr.TypeName)
         member this.Shapes = 
-            this.ChMap |> Map.map (fun ch lv ->
+            this.Channels |> Map.map (fun ch lv ->
                 lv.Expr.Shape |> ShapeSpec.insertAxis lv.SliceDim this.Length)
         member this.Args = Args.nary this.Xs
         member this.ReplaceArgs args = {this with Xs=Args.naryXs args} :> _
@@ -122,7 +120,7 @@ type Loop = {
         BaseExpr.ofOp {Loop.Length=length; Vars=vars; Channels=channels; Xs=xs} 
 
     static member internal withLift (length: SizeSpec) (vars: Map<Var, Loop.Input>) 
-                                    (channels: Map<string, Loop.Value>) (xs: BaseExprCh list) =       
+                                    (channels: Map<Ch, Loop.Value>) (xs: BaseExprCh list) =       
         let mutable args = xs
         let mutable vars = vars
 

@@ -17,7 +17,7 @@ type SequenceArgSlice = {
 /// references a loop channel of a previous iteration
 type PreviousChannel = {
     /// the channel to use
-    Channel:       string
+    Channel:       Ch
     /// the delay, must be at least one
     Delay:         SizeSpec
     /// the index of the argument specifying the initial values

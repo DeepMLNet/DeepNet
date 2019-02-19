@@ -1,4 +1,4 @@
-﻿namespace SymTensor.Deriv 
+﻿namespace SymTensor.Deriv
 
 open DeepNet.Utils
 open SymTensor
@@ -6,7 +6,7 @@ open SymTensor.Ops
 
 
 /// Internal derivative utils.
-module internal Deriv =
+module internal DerivTools =
 
     /// Expands the second dimension of the Jacobian into the shape of this expression.
     let expand (dOpJac: Expr) (expr: Expr) = 
@@ -20,45 +20,34 @@ module internal Deriv =
         dOp |> Expr.reshape [funElems; wrtElems]
 
     /// Returns a zero derivative for the specified argument.
-    let zeros (dOp: BaseExpr) (arg: BaseExpr) =
+    let zeros (dOp: Expr) (arg: Expr) =
         let shape = dOp.Shape.[0] :: arg.Shape
         Expr.zerosOfType arg.DataType shape
 
     /// Zero of same type as arg.
-    let zero (arg: BaseExpr) =
+    let zero (arg: Expr) =
         (convTo arg.DataType 0) |> Expr.scalar
 
     /// One of same type as arg.
-    let one (arg: BaseExpr) =
+    let one (arg: Expr) =
         (convTo arg.DataType 1) |> Expr.scalar
 
     /// Two of same type as arg.
-    let two (arg: BaseExpr) =
+    let two (arg: Expr) =
         (convTo arg.DataType 2) |> Expr.scalar
 
     /// Ten of same type as arg.
-    let ten (arg: BaseExpr) =
+    let ten (arg: Expr) =
         (convTo arg.DataType 10) |> Expr.scalar
 
-    let expr (dOp: BaseExpr) =
-        dOp :?> Expr
-
     /// Unary derivative result.
-    let unary x =
-        Args.unary (x :> BaseExpr)
-
-    let unaryExpr (dOp: BaseExpr) (f: Expr -> Expr) =
-        dOp |> expr |> f |> unary
-
+    let unary x = ArgValue.unary x
+    
     /// Binary derivative result.
-    let binary x y =
-        Args.binary (x :> BaseExpr) (y: BaseExpr)
+    let binary x y = ArgValue.binary x y
 
     /// N-ary derivative result.
-    let nary xs = 
-        xs 
-        |> List.map (fun x -> x :> BaseExpr)
-        |> Args.nary 
+    let nary xs = ArgValue.nary xs
 
     /// Environment with derivative helper values.
     type Env = {
@@ -71,48 +60,44 @@ module internal Deriv =
         member this.DOpJac =
             let wrtElems = this.DOp.Shape.[1..] |> ShapeSpec.nElem
             this.DOp |> Expr.reshape [this.FunElems; wrtElems]
-        member this.X = this.Op.Args |> Args.unaryX :?> Expr
-        member this.Y = this.Op.Args |> Args.binaryY :?> Expr
-        member this.Xs =
-            this.Op.Args
-            |> Args.naryXs
-            |> List.map (fun x -> x :?> Expr)
+        member this.Only = this.Op.Args |> Args.unaryX |> Expr
+        member this.X = this.Op.Args |> Args.binaryX |> Expr
+        member this.Y = this.Op.Args |> Args.binaryY |> Expr
+        member this.Xs = this.Op.Args |> Args.naryXs |> List.map Expr
         member this.Zeros arg = zeros this.DOp arg 
         member this.Zero = zero this.DOp
         member this.One = one this.DOp
         member this.Two = two this.DOp
         member this.Ten = ten this.DOp
         
-        static member make op (dOp: BaseExpr) = {
+        static member make op (dOp: Map<Ch, Expr>) = {
             Op = op
-            DOp = dOp :?> Expr
+            DOp = dOp.[Ch.Only]
         }
 
 
 
 
 /// Internal derivative utils for multi-channel ops.
-module internal MultiChannelDeriv =
+module internal MultiChannelDerivTools =
 
     /// Environment with derivative helper values.
     type Env = {
-        Op: IMultiChannelOp
-        DOp: Map<string, Expr>
+        Op: IOp
+        DOp: Map<Ch, Expr>
     } with
         member private this.DOpCh0 =
             this.DOp |> Map.toSeq |> Seq.head |> snd
         member this.Expr = MultiChannelExpr this.Op
         member this.FunElems = this.DOpCh0.Shape.[0]
-        member this.X = this.Op.Args |> Args.unaryX :?> Expr
-        member this.Y = this.Op.Args |> Args.binaryY :?> Expr
-        member this.Xs =
-            this.Op.Args
-            |> Args.naryXs
-            |> List.map (fun x -> x :?> Expr)
-        member this.Zeros arg = Deriv.zeros this.DOpCh0 arg 
+        member this.Only = this.Op.Args |> Args.unaryX |> Expr
+        member this.X = this.Op.Args |> Args.binaryX |> Expr
+        member this.Y = this.Op.Args |> Args.binaryY |> Expr
+        member this.Xs = this.Op.Args |> Args.naryXs |> List.map Expr
+        member this.Zeros arg = DerivTools.zeros this.DOpCh0 arg 
         
-        static member make op (dOp: Map<string, BaseExpr>) = {
+        static member make op (dOp: Map<Ch, Expr>) = {
             Op = op
-            DOp = dOp |> Map.map (fun _ be -> be :?> Expr)
+            DOp = dOp 
         }
 

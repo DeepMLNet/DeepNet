@@ -10,7 +10,7 @@ module private IfThenElseDeriv =
         let dOpZeros = Expr.zerosLike dOp
         let dX = Expr.ifThenElse (Expr.padLeft cond) dOp dOpZeros 
         let dY = Expr.ifThenElse (Expr.padLeft cond) dOpZeros dOp 
-        Deriv.binary dX dY
+        DerivTools.binary dX dY
 
 open IfThenElseDeriv
 
@@ -19,50 +19,50 @@ open IfThenElseDeriv
 type AddDeriv(op: Add) =
     interface IDerivableOp with      
         member this.Deriv dOp =
-            let env = Deriv.Env.make op dOp 
+            let env = DerivTools.Env.make op dOp 
             let dX = env.DOp 
             let dY = env.DOp 
-            Deriv.binary dX dY
+            DerivTools.binary dX dY
 
 
 [<OpExtender>]
 type SubtractDeriv(op: Subtract) =
     interface IDerivableOp with      
         member this.Deriv dOp =
-            let env = Deriv.Env.make op dOp 
+            let env = DerivTools.Env.make op dOp 
             let dX = env.DOp 
             let dY = -env.DOp 
-            Deriv.binary dX dY
+            DerivTools.binary dX dY
 
 
 [<OpExtender>]
 type MultiplyDeriv(op: Multiply) =
     interface IDerivableOp with      
         member this.Deriv dOp =
-            let env = Deriv.Env.make op dOp 
+            let env = DerivTools.Env.make op dOp 
             let dX = env.DOp * (Expr.padLeft env.Y)
             let dY = env.DOp * (Expr.padLeft env.X)
-            Deriv.binary dX dY
+            DerivTools.binary dX dY
 
 
 [<OpExtender>]
 type DivideDeriv(op: Divide) =
     interface IDerivableOp with      
         member this.Deriv dOp =
-            let env = Deriv.Env.make op dOp 
+            let env = DerivTools.Env.make op dOp 
             let dX = env.DOp * (Expr.padLeft env.Y)
             let dY = env.DOp * (Expr.padLeft env.X)
-            Deriv.binary dX dY
+            DerivTools.binary dX dY
 
 
 [<OpExtender>]
 type PowDeriv(op: Pow) =
     interface IDerivableOp with      
         member this.Deriv dOp =
-            let env = Deriv.Env.make op dOp 
+            let env = DerivTools.Env.make op dOp 
             let dX = env.DOp * Expr.padLeft (env.Y * env.X**(env.Y - env.One))
             let dY = env.DOp * Expr.padLeft (env.X**env.Y * log env.X)
-            Deriv.binary dX dY
+            DerivTools.binary dX dY
 
 
 [<OpExtender>]
@@ -70,113 +70,113 @@ type ModuloDeriv(op: Modulo) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             failwith "TODO: FIX"
-            let env = Deriv.Env.make op dOp 
+            let env = DerivTools.Env.make op dOp 
             let dX = env.DOp 
             let dY = env.DOp * Expr.padLeft (-truncate (env.X / env.Y))
-            Deriv.binary dX dY
+            DerivTools.binary dX dY
 
 
 [<OpExtender>]
 type MaxElemwiseDeriv(op: MaxElemwise) =
     interface IDerivableOp with      
         member this.Deriv dOp =
-            let env = Deriv.Env.make op dOp 
-            ifThenElseDeriv env.DOp ((op.X :?> Expr) >>>> (op.Y :?> Expr)) 
+            let env = DerivTools.Env.make op dOp 
+            ifThenElseDeriv env.DOp (env.X >>>> env.Y) 
             
 
 [<OpExtender>]
 type MinElemwiseDeriv(op: MinElemwise) =
     interface IDerivableOp with      
         member this.Deriv dOp =
-            let env = Deriv.Env.make op dOp 
-            ifThenElseDeriv env.DOp ((op.X :?> Expr) <<<< (op.Y :?> Expr)) 
+            let env = DerivTools.Env.make op dOp 
+            ifThenElseDeriv env.DOp (env.X <<<< env.Y) 
         
 
 [<OpExtender>]
 type IfThenElseDeriv(op: IfThenElse) =
     interface IDerivableOp with      
         member this.Deriv dOp =
-            let env = Deriv.Env.make op dOp 
-            ifThenElseDeriv env.DOp (op.Cond :?> Expr)
+            let env = DerivTools.Env.make op dOp 
+            ifThenElseDeriv env.DOp (Expr op.Cond)
         
 
 [<OpExtender>]
 type AndDeriv(op: And) =
     interface IDerivableOp with      
         member this.Deriv dOp =
-            let env = Deriv.Env.make op dOp 
-            Deriv.binary (env.Zeros op.X) (env.Zeros op.Y)
+            let env = DerivTools.Env.make op dOp 
+            DerivTools.binary (env.Zeros env.X) (env.Zeros env.Y)
 
 
 [<OpExtender>]
 type OrDeriv(op: Or) =
     interface IDerivableOp with      
         member this.Deriv dOp =
-            let env = Deriv.Env.make op dOp 
-            Deriv.binary (env.Zeros op.X) (env.Zeros op.Y)
+            let env = DerivTools.Env.make op dOp 
+            DerivTools.binary (env.Zeros env.X) (env.Zeros env.Y)
 
 
 [<OpExtender>]
 type XorDeriv(op: Xor) =
     interface IDerivableOp with      
         member this.Deriv dOp =
-            let env = Deriv.Env.make op dOp 
-            Deriv.binary (env.Zeros op.X) (env.Zeros op.Y)
+            let env = DerivTools.Env.make op dOp 
+            DerivTools.binary (env.Zeros env.X) (env.Zeros env.Y)
 
 
 [<OpExtender>]
 type EqualDeriv(op: Equal) =
     interface IDerivableOp with      
         member this.Deriv dOp =
-            let env = Deriv.Env.make op dOp 
-            Deriv.binary (env.Zeros op.X) (env.Zeros op.Y)
+            let env = DerivTools.Env.make op dOp 
+            DerivTools.binary (env.Zeros env.X) (env.Zeros env.Y)
 
 
 [<OpExtender>]
 type NotEqualDeriv(op: NotEqual) =
     interface IDerivableOp with      
         member this.Deriv dOp =
-            let env = Deriv.Env.make op dOp 
-            Deriv.binary (env.Zeros op.X) (env.Zeros op.Y)
+            let env = DerivTools.Env.make op dOp 
+            DerivTools.binary (env.Zeros env.X) (env.Zeros env.Y)
 
 
 [<OpExtender>]
 type LessDeriv(op: Less) =
     interface IDerivableOp with      
         member this.Deriv dOp =
-            let env = Deriv.Env.make op dOp 
-            Deriv.binary (env.Zeros op.X) (env.Zeros op.Y)
+            let env = DerivTools.Env.make op dOp 
+            DerivTools.binary (env.Zeros env.X) (env.Zeros env.Y)
 
 
 [<OpExtender>]
 type LessOrEqualDeriv(op: LessOrEqual) =
     interface IDerivableOp with      
         member this.Deriv dOp =
-            let env = Deriv.Env.make op dOp 
-            Deriv.binary (env.Zeros op.X) (env.Zeros op.Y)
+            let env = DerivTools.Env.make op dOp 
+            DerivTools.binary (env.Zeros env.X) (env.Zeros env.Y)
 
 
 [<OpExtender>]
 type GreaterDeriv(op: Greater) =
     interface IDerivableOp with      
         member this.Deriv dOp =
-            let env = Deriv.Env.make op dOp 
-            Deriv.binary (env.Zeros op.X) (env.Zeros op.Y)
+            let env = DerivTools.Env.make op dOp 
+            DerivTools.binary (env.Zeros env.X) (env.Zeros env.Y)
 
 
 [<OpExtender>]
 type GreaterOrEqualDeriv(op: GreaterOrEqual) =
     interface IDerivableOp with      
         member this.Deriv dOp =
-            let env = Deriv.Env.make op dOp 
-            Deriv.binary (env.Zeros op.X) (env.Zeros op.Y)
+            let env = DerivTools.Env.make op dOp 
+            DerivTools.binary (env.Zeros env.X) (env.Zeros env.Y)
 
 
 [<OpExtender>]
 type DotDeriv(op: Dot) =
     interface IDerivableOp with      
         member this.Deriv dOp =
-            let env = Deriv.Env.make op dOp 
+            let env = DerivTools.Env.make op dOp 
 
             /// Helper function that computes derivative of y = m .* x wrt x.
             let mxWrtX (m: Expr) x y dy =
@@ -204,26 +204,26 @@ type DotDeriv(op: Dot) =
             let xShp = Expr.shape env.X
             let nd = ShapeSpec.nDim xShp
             let batchShp = xShp.[0..nd-3]
-            let egT = env.DOp.T |> Deriv.collapse
+            let egT = env.DOp.T |> DerivTools.collapse
             let dXT = mxWrtX (env.Y.T) (env.X.T) (env.Expr.T) egT
             let dXJac = 
                 dXT 
                 |> Expr.reshape ([env.FunElems] @ batchShp @ [xShp.[nd-1]; xShp.[nd-2]]) 
                 |> Expr.transpose 
-                |> Deriv.collapse
+                |> DerivTools.collapse
 
             // Expand jacobians into derivative shape.
-            Deriv.binary (Deriv.expand dXJac env.X) (Deriv.expand dYJac env.Y)
+            DerivTools.binary (DerivTools.expand dXJac env.X) (DerivTools.expand dYJac env.Y)
 
 
 [<OpExtender>]
 type TensorProductDeriv(op: TensorProduct) =
     interface IDerivableOp with      
         member this.Deriv dOp =
-            //let env = Deriv.Env.make op dOp 
+            //let env = DerivTools.Env.make op dOp 
             //let dX = 
             //let dY = 
-            //Deriv.binary dX dY
+            //DerivTools.binary dX dY
             failwith "TODO: not implemented"
 
 
@@ -231,10 +231,10 @@ type TensorProductDeriv(op: TensorProduct) =
 type SetSubtensorDeriv(op: SetSubtensor) =
     interface IDerivableOp with      
         member this.Deriv dOp =
-            let env = Deriv.Env.make op dOp 
+            let env = DerivTools.Env.make op dOp 
             let dYExp = env.DOp.[SimpleRangeSpec.All :: op.Range]
             let zeros = Expr.zerosOfType dYExp.DataType dYExp.Shape
             let dXExp = Expr.setSubtensor env.DOp.[SimpleRangeSpec.All :: op.Range] zeros
-            Deriv.binary dXExp dYExp
+            DerivTools.binary dXExp dYExp
 
 

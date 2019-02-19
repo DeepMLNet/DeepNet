@@ -42,7 +42,7 @@ type MultiChannelExpr (baseExpr: BaseExpr) =
 
     /// Accesses the specified channel of this multi-channel expression.
     member this.Item 
-        with get (channel: string) = baseExpr.[channel]
+        with get (channel: Ch) = Expr baseExpr.[channel]
 
     /// A loop provides iterative evaluation of one or multiple expresisons.
     /// All variables occurs in the loop channel expressions must be defined as loop variables.
