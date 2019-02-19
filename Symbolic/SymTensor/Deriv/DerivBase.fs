@@ -133,7 +133,7 @@ module Deriv =
             // extract variable Jacobian
             match Expr expr with
             | Expr.VarArg vs ->
-                varJacs <- varJacs |> Map.add vs (Expr incomingJacobian.[expr].[Ch.Only])
+                varJacs <- varJacs |> Map.add vs (Expr incomingJacobian.[expr].[Ch.Default])
             | _ -> ()
 
         {
@@ -145,7 +145,7 @@ module Deriv =
     /// Computes the derivative expression w.r.t. all variables occuring in it using the specified
     /// value for the derivative of the specified expression.
     let computeWithRootDeriv (rootJac: Expr) (rootExpr: Expr) : DerivT =
-        let rootJac = Map [Ch.Only, rootJac.BaseExprCh]
+        let rootJac = Map [Ch.Default, rootJac.BaseExprCh]
         let deriv = baseCompute rootJac rootExpr.BaseExpr
         deriv
 

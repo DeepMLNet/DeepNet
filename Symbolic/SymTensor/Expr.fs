@@ -30,7 +30,7 @@ type Expr (baseExpr: BaseExpr) =
 
     new (exprCh: BaseExprCh) =
         match exprCh with
-        | BaseExprCh (Ch.Only, baseExpr) -> Expr baseExpr
+        | BaseExprCh (Ch.Default, baseExpr) -> Expr baseExpr
         | BaseExprCh (Ch.Custom chName, baseExpr) ->
             Expr {Channel.X=baseExpr.[Ch.Custom chName]}
 

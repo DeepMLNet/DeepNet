@@ -72,7 +72,7 @@ module internal DerivTools =
         
         static member make op (dOp: Map<Ch, Expr>) = {
             Op = op
-            DOp = dOp.[Ch.Only]
+            DOp = dOp.[Ch.Default]
         }
 
 

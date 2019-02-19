@@ -39,9 +39,9 @@ module Check =
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Ch =
-    let only x = Map [Ch.Only, x]
+    let only x = Map [Ch.Default, x]
 
-    let onlyOne = Set [Ch.Only]
+    let onlyOne = Set [Ch.Default]
 
 
 /// Helper functions for working with argument values (of any type) of ops.

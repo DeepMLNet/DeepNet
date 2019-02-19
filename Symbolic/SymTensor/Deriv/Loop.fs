@@ -60,7 +60,7 @@ type LoopDeriv(op: Loop) =
             /// Name of a channel.
             let chName (ch: Ch) =
                 match ch with
-                | Ch.Only -> "__DEFAULT__"
+                | Ch.Default -> "__DEFAULT__"
                 | Ch.Custom name -> name
 
             /// map from variable representing a derivative to the loop input specification

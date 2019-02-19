@@ -11,7 +11,7 @@ open Tensor.Backend
 [<RequireQualifiedAccess>]
 type Ch = 
     /// Only channel.
-    | Only
+    | Default
     /// Custom channel name.
     | Custom of string
 
@@ -110,10 +110,8 @@ type IVarContainingOp =
 /// are also reference equal.
 type BaseExpr private (op: IOp) =   
     do op.Check()
-    do if op.Channels.Count > 1 && op.Channels.Contains Ch.Only then
-        failwith "Multiple channel op must not provide Ch.Only channel."
 
-    let _singleCh = op.Channels = Set [Ch.Only]
+    let _singleCh = op.Channels = Set [Ch.Default]
     let _hash = lazy (hash op)
     let _typeNames = lazy (op.TypeNames)
     let _shapes = lazy (op.Shapes)      
@@ -228,7 +226,7 @@ type BaseExpr private (op: IOp) =
     /// Access to the only channel of this expression.
     member this.OnlyCh =
         checkSingleCh()
-        this.[Ch.Only]
+        this.[Ch.Default]
 
     interface System.IEquatable<BaseExpr> with
         member this.Equals other = Object.ReferenceEquals (this, other)
