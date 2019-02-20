@@ -102,3 +102,7 @@ type VarArg = { Var: Var } with
         member this.Vars =
             Set [this.Var]
 
+    interface IOpFormat with
+        member this.Text =
+            sprintf "%A" this.Var
+

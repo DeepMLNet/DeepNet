@@ -79,7 +79,11 @@ type Expr (baseExpr: BaseExpr) =
         expr.BaseExpr |> BaseExpr.substSymSizes env |> Expr
 
     /// Converts expression to string with specified approximate maximum length.
-    member this.ToString maxLength =
+    member this.ToString maxLength =     
+        let opStr =
+            match this.Op with
+            | :? IOpFormat as opFormat -> opFormat.Text
+            | _ -> this.Op.GetType().Name
         let args = this.Args
         let argSet = args |> Map.keys
         let argList, withLabel =
@@ -91,7 +95,7 @@ type Expr (baseExpr: BaseExpr) =
             | _ ->
                 argSet |> Set.toList |> List.sortBy (sprintf "%A"), true
         String.limited maxLength [
-            yield String.Formatter (fun _ -> sprintf "{%A}" this.Op)
+            yield String.Formatter (fun _ -> opStr)
             if not argList.IsEmpty then
                 yield String.Delim " ("
                 for i, arg in List.indexed argList do

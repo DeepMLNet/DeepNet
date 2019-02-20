@@ -104,6 +104,12 @@ type IVarContainingOp =
     abstract Vars: Set<Var>
 
 
+/// An op that has a custom print format.
+type IOpFormat =
+    /// Text to output for this op when expression is printed.
+    abstract Text: string
+
+
 
 /// Base for single-channel and multi-channel expressions.
 /// BaseExpr is reference-unique, i.e. all expressions that are structurally equal 
