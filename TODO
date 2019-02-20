@@ -1,8 +1,10 @@
 - next steps?
 
-- rename SymTensor -> Tensor.Expr?
+- rename SymTensor -> Tensor.Expr? => DONE
 - implement loging => Done
 - write first tests?
+	- find old test project
+
 - check if anything useful is left in UExpr
 - implement direct eval, i.e. formal host eval
 

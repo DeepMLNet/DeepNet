@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netcoreapp2.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <NoWarn>988</NoWarn>
+    <Platform>x64</Platform>
+    <Platforms>x64</Platforms>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Utils.fs" />  
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Tensor\Tensor\Tensor.fsproj" />
+    <ProjectReference Include="..\Tensor.Expr\Tensor.Expr.fsproj" />    
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="FsUnit.Xunit" Version="3.1.0" />
+    <PackageReference Include="xunit" Version="2.3.1" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.3.1" />
+    <DotNetCliToolReference Include="dotnet-xunit" Version="2.3.1" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.7.0" />
+  </ItemGroup>
+</Project>
