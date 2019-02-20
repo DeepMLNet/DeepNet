@@ -96,9 +96,9 @@ type LoopDeriv(op: Loop) =
             for KeyValue (outPort, dExpr) in dOutputs do
                 // create variable for incoming Jacobian
                 let value = spec.Channels.[outPort]
-                let dName = sprintf "d_%s" (chName outPort)
+                let dName = VarName (sprintf "d_%s" (chName outPort))
                 let dVar =
-                    Var.create dName value.Expr.DataType (funElems :: value.Expr.Shape)
+                    Var.make (dName, value.Expr.DataType, funElems :: value.Expr.Shape)
                 dOutputVars.[outPort] <- dVar
 
                 // create variable input specification:
@@ -119,8 +119,8 @@ type LoopDeriv(op: Loop) =
                 match li with
                 | Loop.ConstArg argIdx ->
                     // create a variable for the sum of the accumulated Jacobian so far
-                    let dAccumName = sprintf "dSum_ConstArg%d[-1]" argIdx
-                    let dAccumVar = Var.create dAccumName liType (funElems :: liShape)
+                    let dAccumName = VarName (sprintf "dSum_ConstArg%d[-1]" argIdx)
+                    let dAccumVar = Var.make (dAccumName, liType, funElems :: liShape)
 
                     // create loop port exposing the step Jacobian plus the accumulated Jacobian w.r.t. ConstArg argIdx
                     let dPort = Ch.Custom (sprintf "dSum_ConstArg%d" argIdx)
@@ -174,7 +174,7 @@ type LoopDeriv(op: Loop) =
                     portContents.[dPort].DerivWrt.Add usingVar
 
                     // create a variable for Jacobian coming from a PreviousPort in a (future) loop iteration
-                    let dVar = Var.create dPortName liType (funElems :: liShape)
+                    let dVar = Var.make (VarName dPortName, liType, funElems :: liShape)
                     dPreviousVars.[pp] <- dVar
 
                     // create corresponding variable input specification:

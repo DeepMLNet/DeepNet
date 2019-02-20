@@ -144,11 +144,11 @@ type Loop = {
             | Some vs -> vs
             | None ->
                 let rec genName i =
-                    let name = sprintf "CONST%d" i
+                    let name = VarName (sprintf "CONST%d" i)
                     match vars |> Map.tryFindKey (fun vs _ -> vs.Name = name) with
                     | Some _ -> genName (i + 1)
                     | None -> name
-                let vs = Var.ofNameShapeAndTypeName (genName 0) expr.Shape expr.TypeName
+                let vs = Var.make (genName 0, expr.TypeName, expr.Shape)
                 let lv = Loop.ConstArg (addArg expr)
                 vars <- vars |> Map.add vs lv
                 vs
@@ -160,7 +160,7 @@ type Loop = {
             match lifted.TryFind expr with
             | Some rep -> rep 
             | None ->
-                let exprVars = expr.Expr.Vars
+                let exprVars = expr.Expr.Vars 
                 let dependsOnVars = not (Set.isEmpty exprVars)
                 let dependsOnLoopVars = Set.intersect exprVars loopVarSet |> Set.isEmpty |> not
                 let rep =

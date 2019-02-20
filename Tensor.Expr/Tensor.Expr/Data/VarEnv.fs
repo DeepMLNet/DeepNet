@@ -6,13 +6,13 @@ open DeepNet.Utils
 
 
 /// Contains numeric values for variables.
-type VarEnv = Map<string, Var * ITensor>
+type VarEnv = Map<VarName, Var * ITensor>
 
 /// specification of variable storage locations
-type VarLocs = Map<string, ITensorDevice>
+type VarLocs = Map<VarName, ITensorDevice>
 
 /// specification of variable strides
-type VarStrides = Map<string, int64 list>
+type VarStrides = Map<VarName, int64 list>
 
 
 /// Functions for working with VarEnv.
@@ -21,7 +21,7 @@ module VarEnv =
     /// add variable value to environment
     let add (vs: Var) (value: #ITensor) (varEnv: VarEnv) : VarEnv =
         if TypeName.ofTypeInst value.DataType <> vs.TypeName then
-            failwithf "Variable %s is of type %A but specified value is of type %A."
+            failwithf "Variable %A is of type %A but specified value is of type %A."
                       vs.Name vs.TypeName (TypeName.ofTypeInst value.DataType)
         varEnv |> Map.add vs.Name (vs, value :> ITensor)
 
@@ -33,7 +33,7 @@ module VarEnv =
     let get (vs: Var) (varEnv: VarEnv) : #ITensor =
         match varEnv |> Map.tryFind vs.Name with
         | Some (vs, value) -> vs |> box |> unbox
-        | None -> failwithf "Variable %s is not present in the specified VarEnv." vs.Name
+        | None -> failwithf "Variable %A is not present in the specified VarEnv." vs.Name
 
     ///// add variable value to environment
     //let add (var: Expr) (value: #ITensor) (varEnv: VarEnv) : VarEnv =
@@ -105,7 +105,7 @@ module VarEnv =
             match ShapeSpec.tryEval ss with
             | Some ns when ITensor.shape value <> ns ->
                 failwithf "variable %A was expected to be of shape %A (%A) but a \
-                           value with shape %A waTensorded" vs.Name ns ss (ITensor.shape value)
+                           value with shape %A was provided" vs.Name ns ss (ITensor.shape value)
             | None -> failwithf "variable %A contains size symbols that cannot be evaluated" vs
             | _ -> ()
         )

@@ -108,6 +108,7 @@ type IVarContainingOp =
 /// Base for single-channel and multi-channel expressions.
 /// BaseExpr is reference-unique, i.e. all expressions that are structurally equal 
 /// are also reference equal.
+/// No conatined variables must have the same name but different types or shapes.
 type BaseExpr private (op: IOp) =   
     do op.Check()
 
@@ -116,17 +117,31 @@ type BaseExpr private (op: IOp) =
     let _typeNames = lazy (op.TypeNames)
     let _shapes = lazy (op.Shapes)      
 
-    let _vars = lazy (
-        let opVars =
+    let _varMap = 
+        let add (m: Map<VarName, Var>) (var: Var) =
+            match m |> Map.tryFind var.Name with
+            | Some otherVar when otherVar = var -> m
+            | Some otherVar ->
+                failwithf "Expression contains inconsistent variable %A with specifications %A and %A."
+                          var.Name var otherVar
+            | None -> m |> Map.add var.Name var
+        let merge (a: Map<VarName, Var>) b =
+            (a, Map.toSeq b)||> Seq.fold (fun m (varName, var) -> add m var)
+
+        let opVarSet =
             match op with
             | :? IVarContainingOp as op -> op.Vars
             | _ -> Set.empty
+        let opVars = (Map.empty, Set.toSeq opVarSet) ||> Seq.fold add
         let argVars = 
             op.Args
             |> Map.toSeq
-            |> Seq.map (fun (_, BaseExprCh (_, argExpr)) -> argExpr.Vars)
-            |> Set.unionMany
-        Set.union opVars argVars)
+            |> Seq.map (fun (_, BaseExprCh (_, argExpr)) -> argExpr.VarMap)
+
+        if Seq.isEmpty argVars then 
+            opVars
+        else
+            Seq.append argVars [opVars] |> Seq.reduce merge
 
     let _canEvalAllSymSizes = lazy (
         let argsEvalable =
@@ -190,8 +205,11 @@ type BaseExpr private (op: IOp) =
     /// True if the op of this expression is an op with a single output channel.
     static member isSingleChannel (expr: BaseExpr) = expr.IsSingleChannel
     
+    /// Returns all variables contained in an op and its arguments as a map from variable name to variable.
+    member private this.VarMap = _varMap
+
     /// Returns all variables contained in an op and its arguments.
-    member this.Vars = _vars.Force()
+    member this.Vars = this.VarMap |> Map.toSeq |> Seq.map snd |> Set.ofSeq
     /// Returns all variables contained in an op and its arguments.
     static member vars (expr: BaseExpr) = expr.Vars
 
@@ -218,10 +236,6 @@ type BaseExpr private (op: IOp) =
     /// Access to specified channel of this expression.
     member this.Item
         with get (channel: Ch) = BaseExprCh.create channel this
-
-    ///// Access to specified channel of this expression.
-    //member this.Item
-    //    with get (channel: string) = this.[Ch.Custom channel]
 
     /// Access to the only channel of this expression.
     member this.OnlyCh =

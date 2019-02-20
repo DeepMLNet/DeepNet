@@ -3,33 +3,53 @@
 open DeepNet.Utils
 
 
+/// Variable name.
+[<Struct; StructuredFormatDisplay("{Pretty}")>]
+type VarName = VarName of string with
+    member this.Pretty =
+        let (VarName name) = this
+        name
+
+
 /// Variable (a value that is passed in at runtime) specification.
 [<Struct; StructuredFormatDisplay("{Pretty}")>]
 type Var = {
     /// variable name
-    Name:      string
-    /// symbolic shape
-    Shape:     ShapeSpec
+    Name:      VarName
     /// data type
     TypeName:  TypeName
+    /// symbolic shape
+    Shape:     ShapeSpec
 } with
+
+    /// Create variable using name, shape and data type name.
+    static member make (name, typeName, shape) : Var =
+        {Name=name; TypeName=typeName; Shape=shape}
+
+    /// Create variable using name, shape and data type.
+    static member make (name, typ, shape) : Var =
+        {Name=name; TypeName=TypeName.ofTypeInst typ; Shape=shape}
+
+    /// Create variable using name, shape and data type.
+    static member make (name, typ, shape) : Var =
+        {Name=VarName name; TypeName=TypeName.ofTypeInst typ; Shape=shape}
+
+    /// Create variable from name and shape.
+    static member make<'T> (name, shape) : Var =
+        {Name=name; TypeName=TypeName.ofType<'T>; Shape=shape}
+
+    /// Create variable from name and shape.
+    static member make<'T> (name, shape) : Var = 
+        {Name=VarName name; TypeName=TypeName.ofType<'T>; Shape=shape}
 
     /// data type
     member this.Type = TypeName.getType this.TypeName
 
     /// pretty string representation
-    member this.Pretty = sprintf "%s<%s>%A" this.Name this.Type.Name this.Shape
+    member this.Pretty = sprintf "%A<%s>%A" this.Name this.Type.Name this.Shape
 
     /// numeric shape
     member this.NShape = this.Shape |> ShapeSpec.eval
-
-    /// Creates a variable specification using the specified name, type and symbolic shape.
-    static member create name typ shape : Var =
-        {Name=name; Shape=shape; TypeName=TypeName.ofTypeInst typ}
-
-    /// create variable specifation by name and shape and type
-    static member inline ofNameShapeAndTypeName name shape typeName : Var =
-        {Name=name; Shape=shape; TypeName=typeName}
 
     /// name of variable
     static member name (vs: Var) = vs.Name

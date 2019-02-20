@@ -5,7 +5,23 @@
 - write first tests?
 	- find old test project
 
+- it would make sense to write basic tests
+  i.e. create expression
+  derive expression
+  access channels of expression
+  try slicing
+  - no real basic tests exist yet, so we should write them
+
+- Interpolator should probably be moved to tensor
+
+
 - check if anything useful is left in UExpr
 - implement direct eval, i.e. formal host eval
 
+
+- how to handle variables from now on?
+- problem is that variables have been simple expressions before
+- but this makes referencing them a bit problematic
+- so make variables a separte thing that must be created and converted to an expression?
+- other problem was that two variables with same name but different shapes were treated as different variables
 
