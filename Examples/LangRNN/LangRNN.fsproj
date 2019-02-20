@@ -8,10 +8,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\ML\MLModels\MLModels.fsproj" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Compile Include="..\..\Utils\Utils.fs" Link="Utils.fs" />
     <Compile Include="Dataset.fs" />
     <Compile Include="RNN.fs" />

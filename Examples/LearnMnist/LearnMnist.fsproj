@@ -8,10 +8,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\ML\MLModels\MLModels.fsproj" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Compile Include="Program.fs" />
   </ItemGroup>
 
