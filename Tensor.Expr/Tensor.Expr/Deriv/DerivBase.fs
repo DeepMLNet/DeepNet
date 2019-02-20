@@ -20,26 +20,21 @@ type IDerivableOp =
 
     
 
-/// Jacobians for each variable
-type DerivT = {
+/// Jacobians for each variable occuring in an expression.
+type Deriv = {
     /// the number of elements of the function the derivative is taken of
     FunElems:   SizeSpec
     /// the Jacobians w.r.t. the variables occuring in the expression
     Jacobians:  Map<Var, Expr>
-}
+} with
 
+    static member private log = Log "Deriv"
 
-
-/// Derivative computation functions.
-[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module Deriv = 
-    let private log = Log "Deriv"
-
-    let private add (x: BaseExprCh) (y: BaseExprCh) =
+    static member private add (x: BaseExprCh) (y: BaseExprCh) =
         (Expr x) + (Expr y) |> Expr.baseExprCh
 
     /// Merges two derivative maps by summing derivatives for variables they both have in common.
-    let merge (aGrads: DerivT) (bGrads: DerivT) : DerivT =
+    static member merge (aGrads: Deriv) (bGrads: Deriv) : Deriv =
         if aGrads.FunElems <> bGrads.FunElems then
             failwithf "Cannot merge derivatives with different number of function elements: %A and %A."
                 aGrads.FunElems bGrads.FunElems
@@ -51,12 +46,8 @@ module Deriv =
                 | None -> m |> Map.add v vg) 
         {FunElems=aGrads.FunElems; Jacobians=jacs}
 
-    ///// empty derivatives for expression
-    //let private empty (expr: BaseExprCh) =
-    //    {FunElems=expr.NElems; Jacobians=Map.empty}
-
     /// Computes the derivatives of all arguments of an expression given the derivative of the expression.
-    let private derivOp (expr: BaseExpr) (dExpr: Map<Ch, BaseExprCh>) : Map<BaseExprCh, BaseExprCh> =    
+    static member private derivOp (expr: BaseExpr) (dExpr: Map<Ch, BaseExprCh>) : Map<BaseExprCh, BaseExprCh> =    
         let deriver = 
             match OpExtender.tryGet<IDerivableOp> expr.Op with
             | Some d -> d
@@ -71,7 +62,7 @@ module Deriv =
         dArgExprs
 
     /// Computes the derivatives of the specified expression w.r.t. all variables occuring in it.
-    let baseCompute (rootJacobian: Map<Ch, BaseExprCh>) (rootExpr: BaseExpr) : DerivT =
+    static member baseCompute (rootJacobian: Map<Ch, BaseExprCh>) (rootExpr: BaseExpr) : Deriv =
 
         // build expression info 
         let exprInfo = BaseExprGroup [rootExpr]
@@ -95,7 +86,7 @@ module Deriv =
                 | None -> Map [target.Channel, jacobian]
                 | Some js -> 
                     match js |> Map.tryFind target.Channel with
-                    | Some j -> js |> Map.add target.Channel (add j jacobian)
+                    | Some j -> js |> Map.add target.Channel (Deriv.add j jacobian)
                     | None -> js |> Map.add target.Channel jacobian
 
             // add to received set
@@ -127,7 +118,7 @@ module Deriv =
             let expr = exprsWithFullJacobian.Dequeue ()
 
             // propagate Jacobians
-            let argDerivs = derivOp expr incomingJacobian.[expr]
+            let argDerivs = Deriv.derivOp expr incomingJacobian.[expr]
             for KeyValue(arg, argDeriv) in argDerivs do
                 transmitJacobian expr arg argDeriv
 
@@ -145,32 +136,27 @@ module Deriv =
 
     /// Computes the derivative expression w.r.t. all variables occuring in it using the specified
     /// value for the derivative of the specified expression.
-    let computeWithRootDeriv (rootJac: Expr) (rootExpr: Expr) : DerivT =
+    static member computeWithRootDeriv (rootJac: Expr) (rootExpr: Expr) : Deriv =
         let rootJac = Map [Ch.Default, rootJac.BaseExprCh]
-        let deriv = baseCompute rootJac rootExpr.BaseExpr
+        let deriv = Deriv.baseCompute rootJac rootExpr.BaseExpr
         deriv
 
     /// Computes the derivative expression w.r.t. all variables occuring in it.
-    let compute (rootExpr: Expr) : DerivT =
-        log.Info "Comptuing derivatives..."
+    static member compute (rootExpr: Expr) : Deriv =
+        Deriv.log.Info "Comptuing derivatives..."
         let sw = Stopwatch.StartNew()
         let rootJac = rootExpr.Shape |> ShapeSpec.nElem |> Expr.identityOfType rootExpr.DataType
-        let deriv = computeWithRootDeriv rootJac rootExpr
-        log.Info "Computing derivatives took %A" sw.Elapsed
+        let deriv = Deriv.computeWithRootDeriv rootJac rootExpr
+        Deriv.log.Info "Computing derivatives took %A" sw.Elapsed
         deriv
 
-    /// extracts the Jacobian of the given VarSpecT
-    let ofVarSpec var (deriv: DerivT) =
-        match deriv.Jacobians |> Map.tryFind var with
-        | Some d -> d
-        | None when Debug.FailIfVarNotInDerivative -> 
-            failwithf "The variable %A is not present in the expression." var
-        | None -> 
-            let varExpr = Expr var
-            Expr.zerosOfType varExpr.DataType [deriv.FunElems; Expr.nElems varExpr]
-
-    /// extracts the Jacobian of the given variable
-    let ofVar var deriv =
-        ofVarSpec (Expr.varArg var) deriv                  
+    /// Returns the Jacobian of the specified variable.
+    member this.Item 
+        with get (var: Var) =
+            match this.Jacobians |> Map.tryFind var with
+            | Some d -> d
+            | None -> 
+                let varExpr = Expr var
+                Expr.zerosOfType varExpr.DataType [this.FunElems; Expr.nElems varExpr]
 
 

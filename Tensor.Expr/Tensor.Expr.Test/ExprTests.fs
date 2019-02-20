@@ -7,29 +7,33 @@ open DeepNet.Utils
 open Tensor.Utils
 open Tensor
 open Tensor.Expr
+open Utils
 
 
-let dumpExpr (expr: Expr) =
-    printfn "Expr: %s" (expr.ToString())
-    printfn "==== DataType:           %A" expr.DataType
-    printfn "==== Shape:              %A" expr.Shape
-    printfn "==== CanEvalAllSymSizes: %A" expr.CanEvalAllSymSizes
-    printfn "==== Vars:               %A" expr.Vars
-    printfn ""
+module Vars =
+    let a = Var.make<float32> ("a", [SizeSpec.fix 10L; SizeSpec.fix 20L])
+    let b = Var.make<float32> ("b", [SizeSpec.fix 10L; SizeSpec.fix 20L])
 
 
 [<Fact>]
 let ``Expr: a + b`` () =
-    let a = Var.make<float32> ("a", [SizeSpec.fix 10L; SizeSpec.fix 20L])
-    let b = Var.make<float32> ("b", [SizeSpec.fix 10L; SizeSpec.fix 20L])
-    let expr = Expr a + Expr b
     printfn "a+b:"
-    dumpExpr expr
-    
+    let expr = Expr Vars.a + Expr Vars.b
+    dumpExpr expr  
     assert (expr.DataType = typeof<float32>)
     assert (expr.Shape = [SizeSpec.fix 10L; SizeSpec.fix 20L])
     assert (expr.CanEvalAllSymSizes = true)
-    assert (expr.Vars = Set [a; b])
+    assert (expr.Vars = Set [Vars.a; Vars.b])
+
+[<Fact>]
+let ``Expr: sin a + cos b`` () =
+    printfn "sin a + cos b:"
+    let expr = sin (Expr Vars.a) + cos (Expr Vars.b)
+    dumpExpr expr  
+    assert (expr.DataType = typeof<float32>)
+    assert (expr.Shape = [SizeSpec.fix 10L; SizeSpec.fix 20L])
+    assert (expr.CanEvalAllSymSizes = true)
+    assert (expr.Vars = Set [Vars.a; Vars.b])
 
 
 

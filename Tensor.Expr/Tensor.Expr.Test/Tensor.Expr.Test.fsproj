@@ -7,8 +7,9 @@
     <Platforms>x64</Platforms>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Utils.fs" />
     <Compile Include="ExprTests.fs" />
-    <Compile Include="Utils.fs" />  
+    <Compile Include="DerivTests.fs" />  
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Tensor\Tensor\Tensor.fsproj" />

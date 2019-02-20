@@ -1,4 +1,4 @@
-﻿namespace Tensor.Expr.Deriv
+﻿namespace Tensor.Expr.DerivOps
 
 open DeepNet.Utils
 open Tensor.Expr
@@ -242,7 +242,7 @@ type LoopDeriv(op: Loop) =
                         seq {
                             // obtain Jacobians
                             for wrt in derivWrts do
-                                let wrtJacobian = portDerivs |> ofVarSpec wrt
+                                let wrtJacobian = portDerivs.[wrt]
                                 let wrtExpandedJacobian = wrtJacobian |> Expr.reshape (funElems :: wrt.Shape)
                                 yield wrtExpandedJacobian
                    

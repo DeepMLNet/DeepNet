@@ -1,4 +1,4 @@
-﻿namespace Tensor.Expr.Deriv
+﻿namespace Tensor.Expr.DerivOps
 
 open DeepNet.Utils
 open Tensor.Expr

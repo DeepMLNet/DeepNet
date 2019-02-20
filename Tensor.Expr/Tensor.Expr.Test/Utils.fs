@@ -13,6 +13,16 @@ open Tensor.Expr
 //open Optimizers
 
 
+let dumpExpr (expr: Expr) =
+    printfn "Expr: %s" (expr.ToString())
+    printfn "==== DataType:           %A" expr.DataType
+    printfn "==== Shape:              %A" expr.Shape
+    printfn "==== CanEvalAllSymSizes: %A" expr.CanEvalAllSymSizes
+    printfn "==== Vars:               %A" expr.Vars
+    printfn ""
+
+
+
 //let post device (x: Tensor<'T>) =
 //    if device = DevCuda then CudaTensor.transfer x
 //    else x 

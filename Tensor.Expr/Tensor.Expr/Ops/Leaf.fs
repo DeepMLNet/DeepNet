@@ -19,6 +19,10 @@ type Scalar = { Value: Const } with
         member this.CanEvalAllSymSizes = true
         member this.Eval env = this.Value.AsTensor env.Dev |> Ch.only
 
+    interface IOpFormat with
+        member this.Text =
+            sprintf "%A" this.Value
+
     
 /// Value of the specified size
 type SizeValue = { Value: SizeSpec } with
@@ -33,6 +37,10 @@ type SizeValue = { Value: SizeSpec } with
         member this.CanEvalAllSymSizes = SizeSpec.canEval this.Value
         member this.Eval env = 
             SizeSpec.eval this.Value |> Tensor.scalar env.Dev :> ITensor |> Ch.only     
+
+    interface IOpFormat with
+        member this.Text =
+            sprintf "%A" this.Value
 
 
 /// Identity matrix
@@ -49,6 +57,10 @@ type Identity = { Size: SizeSpec; Type: TypeName} with
         member this.Eval env = 
             (Generic<IdentityTyped<_>, IIdentityTyped> [this.Type.Type]).Eval this env
             |> Ch.only
+
+    interface IOpFormat with
+        member this.Text =
+            sprintf "Id<%A>(%A x %A)" this.Type this.Size this.Size
 
 and internal IIdentityTyped =
     abstract Eval: this:Identity -> env:EvalEnv -> ITensor
@@ -73,6 +85,11 @@ type Arange = { Size: SizeSpec; Type: TypeName} with
         member this.Eval env = 
             (Generic<ArangeTyped<_>, IArangeTyped> [this.Type.Type]).Eval this env  
             |> Ch.only
+
+    interface IOpFormat with
+        member this.Text =
+            sprintf "0 .. %A<%A>" this.Size this.Type
+
 
 and internal IArangeTyped =
     abstract Eval: this:Arange -> env:EvalEnv -> ITensor
