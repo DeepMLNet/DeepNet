@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netcoreapp2.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <NoWarn>988</NoWarn>
+    <Platform>x64</Platform>
+    <Platforms>x64</Platforms>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Tensor\Tensor\Tensor.fsproj" />
+    <ProjectReference Include="..\Tensor.Expr\Tensor.Expr.fsproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+</Project>

@@ -235,7 +235,7 @@ type BaseExpr private (op: IOp) =
 
     /// Access to specified channel of this expression.
     member this.Item
-        with get (channel: Ch) = BaseExprCh.create channel this
+        with get (channel: Ch) = BaseExprCh.make channel this
 
     /// Access to the only channel of this expression.
     member this.OnlyCh =
@@ -267,24 +267,30 @@ type BaseExpr private (op: IOp) =
 
 
 /// A channel of a multi-channel expression.
-type BaseExprCh = private BaseExprCh of channel:Ch * expr:BaseExpr with
+type BaseExprCh = private {
+    /// Channel
+    _Channel: Ch
+    /// Expression
+    _Expr: BaseExpr 
+} with
 
     interface IDynElem
 
-    static member internal create (channel: Ch) (expr: BaseExpr) = 
+    /// Create from specified channel and expression.
+    static member make (channel: Ch) (expr: BaseExpr) : BaseExprCh = 
         if not (expr.Channels.Contains channel) then
             failwithf "Expression %A does not provide channel %A." expr channel
-        BaseExprCh (channel, expr)
+        {_Channel=channel; _Expr=expr}
 
     /// Channel.
-    static member channel (BaseExprCh (channel, _)) = channel
+    member this.Channel = this._Channel
     /// Channel.
-    member this.Channel = BaseExprCh.channel this
+    static member channel (bec: BaseExprCh) = bec.Channel
 
     /// Expression.
-    static member expr (BaseExprCh (_, expr)) = expr
+    member this.Expr = this._Expr
     /// Expression.
-    member this.Expr = BaseExprCh.expr this
+    static member expr (bec: BaseExprCh) = bec.Expr
 
     /// Type name.
     member this.TypeName = this.Expr.TypeNames.[this.Channel]
@@ -312,13 +318,13 @@ type BaseExprCh = private BaseExprCh of channel:Ch * expr:BaseExpr with
     static member nElems (this: BaseExprCh) = this.NElems
 
     /// Apply mapping function to contained expression.
-    static member map (fn: BaseExpr -> BaseExpr) (BaseExprCh (channel, expr)) =
-        BaseExprCh (channel, fn expr)
+    static member map (fn: BaseExpr -> BaseExpr) (bec: BaseExprCh) =
+        BaseExprCh.make bec.Channel (fn bec.Expr)
     
 
 [<AutoOpen>]
 module BaseExprChRecognizier =
+    /// Decomposes a BaseExprCh into channel and expression.
     let (|BaseExprCh|) (arg: BaseExprCh) : Ch * BaseExpr =
-        match arg with
-        | BaseExprCh (channel, expr) -> (channel, expr)
+        arg.Channel, arg.Expr
 

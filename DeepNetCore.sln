@@ -26,6 +26,8 @@ Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Tensor.Sample.Internal", "T
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Tensor.Expr.Test", "Tensor.Expr\Tensor.Expr.Test\Tensor.Expr.Test.fsproj", "{F9D6856E-8675-4394-9C95-4B5EDC158C32}"
 EndProject
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Tensor.Expr.Hack", "Tensor.Expr\Tensor.Expr.Hack\Tensor.Expr.Hack.fsproj", "{D163FB40-E2B5-4D59-8FB5-7ADF567FDD21}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -60,6 +62,10 @@ Global
 		{F9D6856E-8675-4394-9C95-4B5EDC158C32}.Debug|x64.Build.0 = Debug|x64
 		{F9D6856E-8675-4394-9C95-4B5EDC158C32}.Release|x64.ActiveCfg = Release|x64
 		{F9D6856E-8675-4394-9C95-4B5EDC158C32}.Release|x64.Build.0 = Release|x64
+		{D163FB40-E2B5-4D59-8FB5-7ADF567FDD21}.Debug|x64.ActiveCfg = Debug|x64
+		{D163FB40-E2B5-4D59-8FB5-7ADF567FDD21}.Debug|x64.Build.0 = Debug|x64
+		{D163FB40-E2B5-4D59-8FB5-7ADF567FDD21}.Release|x64.ActiveCfg = Release|x64
+		{D163FB40-E2B5-4D59-8FB5-7ADF567FDD21}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -72,6 +78,7 @@ Global
 		{327EB2C2-E47D-4C09-AA27-18A2C9C74D66} = {99EB6FBC-381C-41A7-9378-A619A79751BD}
 		{21B1FB79-9B0B-45AF-8EC6-6F93B3EE9D69} = {99EB6FBC-381C-41A7-9378-A619A79751BD}
 		{F9D6856E-8675-4394-9C95-4B5EDC158C32} = {2C53BDC4-C10F-4442-909A-A9B83F09A849}
+		{D163FB40-E2B5-4D59-8FB5-7ADF567FDD21} = {2C53BDC4-C10F-4442-909A-A9B83F09A849}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {24E68C9B-C44E-4F57-9580-9751FC214DFF}
