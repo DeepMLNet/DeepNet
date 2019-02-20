@@ -6,6 +6,7 @@
     <ProjectReference Include="../../Tensor/Tensor/Tensor.fsproj" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\..\Utils\Log.fs" Link="Log.fs" />
     <Compile Include="../../Utils/Utils.fs" />
     <Compile Include="../../Utils/NativeLib.fs" />
     <Compile Include="../../Utils/DiskMap.fs" />

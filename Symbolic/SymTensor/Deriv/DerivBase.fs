@@ -33,6 +33,7 @@ type DerivT = {
 /// Derivative computation functions.
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Deriv = 
+    let private log = Log "Deriv"
 
     let private add (x: BaseExprCh) (y: BaseExprCh) =
         (Expr x) + (Expr y) |> Expr.baseExprCh
@@ -151,11 +152,11 @@ module Deriv =
 
     /// Computes the derivative expression w.r.t. all variables occuring in it.
     let compute (rootExpr: Expr) : DerivT =
-        if Debug.TraceCompile then printfn "Computing derivatives..."
+        log.Info "Comptuing derivatives..."
         let sw = Stopwatch.StartNew()
         let rootJac = rootExpr.Shape |> ShapeSpec.nElem |> Expr.identityOfType rootExpr.DataType
         let deriv = computeWithRootDeriv rootJac rootExpr
-        if Debug.Timing then printfn "Computing derivatives took %A" sw.Elapsed
+        log.Info "Computing derivatives took %A" sw.Elapsed
         deriv
 
     /// extracts the Jacobian of the given VarSpecT
@@ -163,7 +164,7 @@ module Deriv =
         match deriv.Jacobians |> Map.tryFind var with
         | Some d -> d
         | None when Debug.FailIfVarNotInDerivative -> 
-            failwithf "the variable %A is not present in the expression" var
+            failwithf "The variable %A is not present in the expression." var
         | None -> 
             let varExpr = Expr.makeVar var
             Expr.zerosOfType varExpr.DataType [deriv.FunElems; Expr.nElems varExpr]

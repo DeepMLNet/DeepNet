@@ -1,7 +1,9 @@
-- Problem:
-	- now that we have two argument types (single-channel expression and multi-channel expression)
-	  and two expression types, iterating over the tree is complicated
-	- how to solve this?
-	- Provide a union view, where each argument is exposed as single-channel or multi-channel.
-	- Change argument to be a union themselves, either consisting of case a) single-channel expression or
-	                                                                 case b) multi-channel expression + channel
+- next steps?
+
+- rename SymTensor -> Tensor.Expr?
+- implement loging
+- write first tests?
+- check if anything useful is left in UExpr
+- implement direct eval, i.e. formal host eval
+
+
