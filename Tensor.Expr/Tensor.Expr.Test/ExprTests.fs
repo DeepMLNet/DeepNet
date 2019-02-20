@@ -26,5 +26,13 @@ let ``Expr: a + b`` () =
     let expr = Expr a + Expr b
     printfn "a+b:"
     dumpExpr expr
+    
+    assert (expr.DataType = typeof<float32>)
+    assert (expr.Shape = [SizeSpec.fix 10L; SizeSpec.fix 20L])
+    assert (expr.CanEvalAllSymSizes = true)
+    assert (expr.Vars = Set [a; b])
+
+
+
 
 

@@ -98,3 +98,7 @@ type VarArg = { Var: Var } with
         member this.Eval env = 
             env.VarEnv |> VarEnv.get this.Var |> ITensor.transfer env.Dev |> Ch.only       
 
+    interface IVarContainingOp with
+        member this.Vars =
+            Set [this.Var]
+
