@@ -20,19 +20,26 @@ module internal ExprHelpers =
 open ExprHelpers
 
 
+/// An tensor-valued expression with a single output channel.
 type Expr (baseExpr: BaseExpr) =    
     do 
         if not (baseExpr.IsSingleChannel) then
             failwithf "Expr is for single-channel expressions only, but got %A." baseExpr
     
+    /// Create expression from specified single-channel op.
     new (op: IOp) =
         Expr (BaseExpr.ofOp op)
 
+    /// Create expression by accessing the specified channel of the BaseExpr.
     new (exprCh: BaseExprCh) =
         match exprCh with
         | BaseExprCh (Ch.Default, baseExpr) -> Expr baseExpr
         | BaseExprCh (Ch.Custom chName, baseExpr) ->
             Expr {Channel.X=baseExpr.[Ch.Custom chName]}
+
+    /// Expression having the value of the specified variable.
+    new (var: Var) =
+        Expr {VarArg.Var=var}
 
     member this.BaseExpr = baseExpr
     static member baseExpr (expr: Expr) = expr.BaseExpr
@@ -254,10 +261,6 @@ type Expr (baseExpr: BaseExpr) =
     member this.Item 
         with get ([<System.ParamArray>] allArgs: obj []) = 
             this.GetSlice (allArgs)
-
-    /// Expression using the specified variable as its argument.
-    static member makeVar var =
-        Expr {VarArg.Var=var}
 
     /// Expression a with the specified subtensor replaced with b.
     static member setSubtensor (trgt: Expr) (src: Expr) =

@@ -215,13 +215,13 @@ type LoopDeriv(op: Loop) =
                         seq { 
                             // derivative coming from external use of port's output slice
                             match dOutputVars.TryFind port with
-                            | Some dVar -> yield Expr.makeVar dVar
+                            | Some dVar -> yield Expr dVar
                             | None -> ()
 
                             // derivatives coming from PreviousPort uses of this port 
                             for dpv in dPreviousVars do
                                 let previousPort, dVar = dpv.Key, dpv.Value
-                                if previousPort.Channel = port then yield Expr.makeVar dVar
+                                if previousPort.Channel = port then yield Expr dVar
                         } |> Seq.reduce (+)
                     
                     // collapse Jacobian
@@ -248,7 +248,7 @@ type LoopDeriv(op: Loop) =
                    
                             // obtain value, if any
                             match valueOf with
-                            | Some vs -> yield Expr.makeVar vs
+                            | Some vs -> yield Expr vs
                             | None -> ()
                         } |> Seq.reduce (+)
                     let value: Loop.Value = {Expr=expr.BaseExprCh; SliceDim=sliceDim}

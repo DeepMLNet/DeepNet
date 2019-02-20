@@ -166,7 +166,7 @@ module Deriv =
         | None when Debug.FailIfVarNotInDerivative -> 
             failwithf "The variable %A is not present in the expression." var
         | None -> 
-            let varExpr = Expr.makeVar var
+            let varExpr = Expr var
             Expr.zerosOfType varExpr.DataType [deriv.FunElems; Expr.nElems varExpr]
 
     /// extracts the Jacobian of the given variable

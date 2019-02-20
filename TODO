@@ -19,9 +19,3 @@
 - implement direct eval, i.e. formal host eval
 
 
-- how to handle variables from now on?
-- problem is that variables have been simple expressions before
-- but this makes referencing them a bit problematic
-- so make variables a separte thing that must be created and converted to an expression?
-- other problem was that two variables with same name but different shapes were treated as different variables
-
