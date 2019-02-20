@@ -50,6 +50,7 @@ module internal List =
     let inline sumElemwise (ls: 'a list seq) =
         ([], ls) ||> Seq.fold addElemwise
 
+
 /// Map extensions
 module internal Map = 
 
@@ -80,6 +81,13 @@ module internal Map =
         |> Map.toSeq
         |> Seq.map (fun (k, v) -> fn k v)
         |> Map.ofSeq
+
+    /// Set of all keys contained in the map.
+    let keys m =
+        m
+        |> Map.toSeq
+        |> Seq.map fst
+        |> Set.ofSeq
 
 
 /// Functions for working with permutations.

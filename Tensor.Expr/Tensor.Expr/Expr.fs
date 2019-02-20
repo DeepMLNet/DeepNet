@@ -21,6 +21,7 @@ open ExprHelpers
 
 
 /// An tensor-valued expression with a single output channel.
+[<StructuredFormatDisplay("{Pretty}")>]
 type Expr (baseExpr: BaseExpr) =    
     do 
         if not (baseExpr.IsSingleChannel) then
@@ -65,6 +66,9 @@ type Expr (baseExpr: BaseExpr) =
     member this.NElems = baseExpr.OnlyCh.NElems
     static member nElems (expr: Expr) = expr.NElems
 
+    member this.Args = baseExpr.Args |> Map.map (fun _ arg -> Expr arg)
+    static member args (expr: Expr) = expr.Args
+
     member this.Vars = baseExpr.Vars
     static member vars (expr: Expr) = expr.Vars
 
@@ -73,6 +77,37 @@ type Expr (baseExpr: BaseExpr) =
 
     static member substSymSizes (env: SymSizeEnv) (expr: Expr) : Expr =
         expr.BaseExpr |> BaseExpr.substSymSizes env |> Expr
+
+    /// Converts expression to string with specified approximate maximum length.
+    member this.ToString maxLength =
+        let args = this.Args
+        let argSet = args |> Map.keys
+        let argList, withLabel =
+            match argSet with
+            | _ when argSet = Set [Arg.Only] -> [Arg.Only], false
+            | _ when argSet = Set [Arg.X; Arg.Y] -> [Arg.X; Arg.Y], false
+            | _ when argSet |> Set.toSeq |> Seq.forall (function | Arg.N _ -> true | _ -> false) ->
+                argSet |> Set.toList |> List.sortBy (function | Arg.N n -> n | _ -> 0), false
+            | _ ->
+                argSet |> Set.toList |> List.sortBy (sprintf "%A"), true
+        String.limited maxLength [
+            yield String.Formatter (fun _ -> sprintf "{%A}" this.Op)
+            if not argList.IsEmpty then
+                yield String.Delim " ("
+                for i, arg in List.indexed argList do
+                    if i > 0 then
+                        yield String.Delim ", "
+                    if withLabel then
+                        yield String.Formatter (fun _ -> sprintf "%A=" arg)
+                    yield String.Formatter (fun ml -> args.[arg].ToString ml)
+                yield String.Delim ")"
+        ]
+
+    /// Converts expression to string with unlimited length.
+    override this.ToString () = this.ToString System.Int32.MaxValue
+
+    /// Pretty string.
+    member this.Pretty = this.ToString 80
 
     /// Checks that given axis is valid for specified expression
     static member internal checkAxis ax (expr: Expr) =
