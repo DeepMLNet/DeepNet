@@ -1,4 +1,4 @@
-﻿namespace SymTensor.Compiler
+﻿namespace Tensor.Expr.Compiler
 
 open System
 open System.Runtime.InteropServices
@@ -7,7 +7,7 @@ open ManagedCuda
 open Tensor
 open Tensor.Utils
 open Tensor.Backend
-open SymTensor
+open Tensor.Expr
 open UExprTypes
 
 

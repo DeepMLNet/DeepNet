@@ -1,11 +1,11 @@
-﻿namespace SymTensor.Compiler
+﻿namespace Tensor.Expr.Compiler
 
 open System
 open System.Diagnostics
 open System.Collections.Generic
 
 open Tensor.Utils
-open SymTensor
+open Tensor.Expr
 open UExprTypes
 
 

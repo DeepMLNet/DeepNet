@@ -1,4 +1,4 @@
-﻿namespace SymTensor
+﻿namespace Tensor.Expr
 
 open System
 open System.Reflection
@@ -8,7 +8,7 @@ open Tensor.Backend
 open DeepNet.Utils
 
 open UExprTypes
-open SymTensor.Compiler
+open Tensor.Expr.Compiler
 
 
 module HostEval =

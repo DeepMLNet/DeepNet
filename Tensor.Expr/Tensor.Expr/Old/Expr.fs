@@ -1,4 +1,4 @@
-﻿namespace rec SymTensor
+﻿namespace rec Tensor.Expr
 
 (**
 

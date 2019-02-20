@@ -1,8 +1,8 @@
-﻿namespace SymTensor
+﻿namespace Tensor.Expr
 
 open System.Diagnostics
 open DeepNet.Utils
-open SymTensor.Ops
+open Tensor.Expr.Ops
 
 
 /// Provides a derivative for an op.

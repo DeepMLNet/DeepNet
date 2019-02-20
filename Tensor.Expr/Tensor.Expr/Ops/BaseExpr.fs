@@ -1,7 +1,7 @@
-﻿namespace rec SymTensor.Ops
+﻿namespace rec Tensor.Expr.Ops
 
 open System
-open SymTensor
+open Tensor.Expr
 open DeepNet.Utils
 open Tensor
 open Tensor.Backend

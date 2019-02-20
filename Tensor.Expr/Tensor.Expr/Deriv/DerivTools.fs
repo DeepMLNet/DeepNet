@@ -1,8 +1,8 @@
-﻿namespace SymTensor.Deriv
+﻿namespace Tensor.Expr.Deriv
 
 open DeepNet.Utils
-open SymTensor
-open SymTensor.Ops
+open Tensor.Expr
+open Tensor.Expr.Ops
 
 
 /// Internal derivative utils.

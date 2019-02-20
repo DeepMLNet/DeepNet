@@ -1,9 +1,9 @@
-﻿namespace SymTensor.Deriv
+﻿namespace Tensor.Expr.Deriv
 
 open DeepNet.Utils
-open SymTensor
-open SymTensor.Ops
-//open SymTensor.Loop
+open Tensor.Expr
+open Tensor.Expr.Ops
+//open Tensor.Expr.Loop
 
 
 type internal LoopDerivT = {

@@ -1,6 +1,6 @@
-﻿namespace SymTensor
+﻿namespace Tensor.Expr
 
-open SymTensor.Compiler
+open Tensor.Expr.Compiler
 
 module DiagnosticsVisualizer =
 

@@ -1,4 +1,4 @@
-﻿namespace SymTensor.Compiler.Cuda
+﻿namespace Tensor.Expr.Compiler.Cuda
 
 open System
 open Microsoft.FSharp.Reflection
@@ -9,8 +9,8 @@ open Tensor.Backend
 open Tensor.Utils
 open DeepNet.Utils
 
-open SymTensor
-open SymTensor.Compiler
+open Tensor.Expr
+open Tensor.Expr.Compiler
 open UExprTypes
 
 

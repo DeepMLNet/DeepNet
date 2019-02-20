@@ -1,7 +1,7 @@
-﻿namespace SymTensor.Ops
+﻿namespace Tensor.Expr.Ops
 
 open DeepNet.Utils
-open SymTensor
+open Tensor.Expr
 
 
 /// Helper functions for checking validity of expressions.

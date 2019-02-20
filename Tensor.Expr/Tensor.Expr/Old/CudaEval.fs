@@ -1,4 +1,4 @@
-﻿namespace SymTensor.Compiler.Cuda
+﻿namespace Tensor.Expr.Compiler.Cuda
 
 open System
 open System.Reflection
@@ -8,9 +8,9 @@ open Tensor.Cuda
 open Tensor.Utils
 open DeepNet.Utils
 
-open SymTensor
+open Tensor.Expr
 open UExprTypes
-open SymTensor.Compiler
+open Tensor.Expr.Compiler
 
 
 module CudaEval =

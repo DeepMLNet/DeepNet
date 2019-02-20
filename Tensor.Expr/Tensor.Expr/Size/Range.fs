@@ -1,4 +1,4 @@
-﻿namespace SymTensor
+﻿namespace Tensor.Expr
 
 open System
 open DeepNet.Utils

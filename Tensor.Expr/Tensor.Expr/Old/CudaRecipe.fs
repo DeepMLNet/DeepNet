@@ -1,4 +1,4 @@
-﻿namespace SymTensor.Compiler.Cuda
+﻿namespace Tensor.Expr.Compiler.Cuda
 
 open System.Collections.Generic
 open System.Diagnostics
@@ -10,8 +10,8 @@ open Tensor.Backend
 open Tensor.Utils
 open DeepNet.Utils
 
-open SymTensor
-open SymTensor.Compiler
+open Tensor.Expr
+open Tensor.Expr.Compiler
 open UExprTypes
 
 

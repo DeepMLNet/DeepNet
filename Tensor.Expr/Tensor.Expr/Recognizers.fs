@@ -1,6 +1,6 @@
-﻿namespace SymTensor
+﻿namespace Tensor.Expr
 
-open SymTensor.Ops
+open Tensor.Expr.Ops
 
 
 /// Active recognizers for single-channel expressions.

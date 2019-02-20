@@ -1,8 +1,8 @@
-﻿namespace SymTensor.Loop
+﻿namespace Tensor.Expr.Loop
 
 open DeepNet.Utils
-open SymTensor
-open SymTensor.Ops
+open Tensor.Expr
+open Tensor.Expr.Ops
 
 
 /// a slice of an argument to the loop

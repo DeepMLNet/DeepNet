@@ -1,9 +1,9 @@
-﻿namespace SymTensor.Ops
+﻿namespace Tensor.Expr.Ops
 
 open System
 open System.Reflection
 open DeepNet.Utils
-open SymTensor
+open Tensor.Expr
 
 
 /// Declares that the type is extending an op by implementing additional interfaces.

@@ -1,4 +1,4 @@
-﻿namespace SymTensor
+﻿namespace Tensor.Expr
 
 open System.Diagnostics
 
@@ -133,7 +133,7 @@ open UExprTypes
 [<AutoOpen>]
 module EnvTypes =
 
-    open SymTensor.Compiler
+    open Tensor.Expr.Compiler
 
     /// Information necessary to evaluate an expression.
     /// Currently this just holds the variable values, but may contain further information in the future.

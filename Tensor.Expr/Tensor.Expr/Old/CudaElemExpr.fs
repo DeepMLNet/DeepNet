@@ -1,13 +1,13 @@
-﻿namespace SymTensor.Compiler.Cuda
+﻿namespace Tensor.Expr.Compiler.Cuda
 
 open System
 
 open DeepNet.Utils
 
-open SymTensor
-open SymTensor.Compiler
-open SymTensor.Elem
-open SymTensor.Elem.Unified
+open Tensor.Expr
+open Tensor.Expr.Compiler
+open Tensor.Expr.Elem
+open Tensor.Expr.Elem.Unified
 
 
 module CudaElemExpr =

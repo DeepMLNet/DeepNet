@@ -1,4 +1,4 @@
-﻿namespace SymTensor.Compiler.Cuda
+﻿namespace Tensor.Expr.Compiler.Cuda
 
 open System
 
@@ -8,7 +8,7 @@ open Tensor.Cuda
 open Tensor.Utils
 open DeepNet.Utils
 
-open SymTensor
+open Tensor.Expr
 
 
 /// Locks and registers all variables in a VarEnv for use with CUDA.

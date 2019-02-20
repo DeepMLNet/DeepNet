@@ -1,4 +1,4 @@
-﻿namespace SymTensor.Compiler.Cuda
+﻿namespace Tensor.Expr.Compiler.Cuda
 
 open System.Diagnostics
 open System.Collections.Generic
@@ -6,8 +6,8 @@ open System.Collections.Generic
 open Tensor.Utils
 open DeepNet.Utils
 
-open SymTensor
-open SymTensor.Compiler
+open Tensor.Expr
+open Tensor.Expr.Compiler
 
 
 [<AutoOpen>]

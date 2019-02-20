@@ -1,8 +1,8 @@
-﻿namespace SymTensor.Elem
+﻿namespace Tensor.Expr.Elem
 
 open System
 
-open SymTensor
+open Tensor.Expr
 open DeepNet.Utils
 
 

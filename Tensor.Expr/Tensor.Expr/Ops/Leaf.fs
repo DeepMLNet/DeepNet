@@ -1,9 +1,9 @@
-﻿namespace SymTensor.Ops
+﻿namespace Tensor.Expr.Ops
 
 open DeepNet.Utils
 open Tensor
 open Tensor.Backend
-open SymTensor
+open Tensor.Expr
 
 
 /// Scalar constant value
