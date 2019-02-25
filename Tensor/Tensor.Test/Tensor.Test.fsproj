@@ -15,8 +15,6 @@
     <Compile Include="HDF5Tests.fs" />
     <Compile Include="RatTests.fs" />
     <Compile Include="LinAlgTests.fs" />
-    <Compile Include="Main.fs" />
-    <Content Include="App.config" />
     <None Include="TestData\MatInv.h5">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
@@ -29,10 +27,10 @@
     <ProjectReference Include="..\Tensor.Algorithm\Tensor.Algorithm.fsproj" />    
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="FsUnit.Xunit" Version="3.1.0" />
-    <PackageReference Include="xunit" Version="2.3.1" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.3.1" />
+    <PackageReference Include="FsUnit.Xunit" Version="3.4.0" />
+    <PackageReference Include="xunit" Version="2.4.1" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.4.1" />
     <DotNetCliToolReference Include="dotnet-xunit" Version="2.3.1" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.7.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.9.0" />
   </ItemGroup>
 </Project>
