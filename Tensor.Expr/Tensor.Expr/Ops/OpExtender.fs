@@ -40,7 +40,7 @@ module OpExtender =
             let opIface = OpInterface.from<'I> op
             match extenders.TryFind opIface with
             | Some extType ->
-                let ext = Activator.CreateInstance (extType, [|op|]) :?> 'I
+                let ext = Activator.CreateInstance (extType, [|box op|]) :?> 'I
                 Some ext
             | None ->
                 None

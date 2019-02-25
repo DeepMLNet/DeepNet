@@ -19,3 +19,5 @@
 - implement direct eval, i.e. formal host eval
 
 
+- there was a strange bug
+- also it might be that our expression cache is leaking memory

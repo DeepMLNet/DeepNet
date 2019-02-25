@@ -115,18 +115,18 @@ type Deriv = {
         let mutable varJacs = Map.empty
         while exprsWithFullJacobian.Count > 0 do
 
+            // get op with computed derivative
             let expr = exprsWithFullJacobian.Dequeue ()
 
-            // propagate Jacobians
-            let argDerivs = Deriv.derivOp expr incomingJacobian.[expr]
-            for KeyValue(arg, argDeriv) in argDerivs do
-                transmitJacobian expr arg argDeriv
-
-            // extract variable Jacobian
             match Expr expr with
             | Expr.VarArg vs ->
+                // arrived at a variable: save its Jacobian
                 varJacs <- varJacs |> Map.add vs (Expr incomingJacobian.[expr].[Ch.Default])
-            | _ -> ()
+            | _ -> 
+                // propagate derivative to arguments of op
+                let argDerivs = Deriv.derivOp expr incomingJacobian.[expr]
+                for KeyValue(arg, argDeriv) in argDerivs do
+                    transmitJacobian expr arg argDeriv
 
         {
             FunElems  = (rootJacobian |> Map.toSeq |> Seq.head |> snd |> BaseExprCh.shape).[0]
