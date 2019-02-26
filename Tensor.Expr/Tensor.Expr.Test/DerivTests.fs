@@ -28,6 +28,6 @@ let ``Deriv: sin a * exp b`` () =
     printfn "==== Deriv sin a * exp b:"
     let expr = sin (Expr Vars.a) * exp (Expr Vars.b)
     let derivs = Deriv.compute expr
-    printfn "wrt a: %A" derivs.[Vars.a]  
-    printfn "wrt b: %A" derivs.[Vars.b]
+    printfn "wrt a: %s" (derivs.[Vars.a].ToString())
+    printfn "wrt b: %s" (derivs.[Vars.b].ToString())
 

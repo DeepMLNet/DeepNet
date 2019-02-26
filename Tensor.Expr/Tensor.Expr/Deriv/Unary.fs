@@ -26,7 +26,7 @@ type AbsDeriv(op: Abs) =
     interface IDerivableOp with
         member this.Deriv dOp = 
             let env = DerivTools.Env.make op dOp
-            env.DOp * Expr.padLeft (Expr.signt env.X) |> DerivTools.unary 
+            env.DOp * Expr.padLeft (Expr.signt env.Only) |> DerivTools.unary 
 
 
 [<OpExtender>]
@@ -34,7 +34,7 @@ type SignTDeriv(op: SignT) =
     interface IDerivableOp with
         member this.Deriv dOp = 
             let env = DerivTools.Env.make op dOp
-            env.Zeros env.X |> DerivTools.unary 
+            env.Zeros env.Only |> DerivTools.unary 
             
 
 [<OpExtender>]
@@ -42,7 +42,7 @@ type LogDeriv(op: Log) =
     interface IDerivableOp with
         member this.Deriv dOp =  
             let env = DerivTools.Env.make op dOp
-            env.DOp * Expr.padLeft (env.X ** (-env.One)) |> DerivTools.unary
+            env.DOp * Expr.padLeft (env.Only ** (-env.One)) |> DerivTools.unary
       
 
 [<OpExtender>]
@@ -50,7 +50,7 @@ type Log10Deriv(op: Log10) =
     interface IDerivableOp with
         member this.Deriv dOp =
             let env = DerivTools.Env.make op dOp 
-            env.DOp * Expr.padLeft (env.X ** (-env.One) / log env.Ten) |> DerivTools.unary
+            env.DOp * Expr.padLeft (env.Only ** (-env.One) / log env.Ten) |> DerivTools.unary
 
 
 [<OpExtender>]
@@ -58,7 +58,7 @@ type ExpDeriv(op: Exp) =
     interface IDerivableOp with
         member this.Deriv dOp =
             let env = DerivTools.Env.make op dOp 
-            env.DOp * Expr.padLeft (exp env.X) |> DerivTools.unary
+            env.DOp * Expr.padLeft (exp env.Only) |> DerivTools.unary
 
 
 [<OpExtender>]
@@ -66,7 +66,7 @@ type SinDeriv(op: Sin) =
     interface IDerivableOp with
         member this.Deriv dOp =
             let env = DerivTools.Env.make op dOp 
-            env.DOp * Expr.padLeft (cos env.X) |> DerivTools.unary
+            env.DOp * Expr.padLeft (cos env.Only) |> DerivTools.unary
 
 
 [<OpExtender>]
@@ -74,7 +74,7 @@ type CosDeriv(op: Cos) =
     interface IDerivableOp with
         member this.Deriv dOp =
             let env = DerivTools.Env.make op dOp 
-            env.DOp * Expr.padLeft (-sin env.X) |> DerivTools.unary
+            env.DOp * Expr.padLeft (-sin env.Only) |> DerivTools.unary
 
         
 [<OpExtender>]
@@ -82,7 +82,7 @@ type TanDeriv(op: Tan) =
     interface IDerivableOp with
         member this.Deriv dOp =
             let env = DerivTools.Env.make op dOp 
-            env.DOp * Expr.padLeft (env.One + (tan env.X) ** env.Two) |> DerivTools.unary
+            env.DOp * Expr.padLeft (env.One + (tan env.Only) ** env.Two) |> DerivTools.unary
 
 
 [<OpExtender>]
@@ -90,7 +90,7 @@ type AsinDeriv(op: Asin) =
     interface IDerivableOp with
         member this.Deriv dOp =
             let env = DerivTools.Env.make op dOp 
-            env.DOp * Expr.padLeft (env.One / Expr.sqrtt (env.One - env.X ** env.Two)) |> DerivTools.unary
+            env.DOp * Expr.padLeft (env.One / Expr.sqrtt (env.One - env.Only ** env.Two)) |> DerivTools.unary
 
 
 [<OpExtender>]
@@ -98,7 +98,7 @@ type AcosDeriv(op: Acos) =
     interface IDerivableOp with
         member this.Deriv dOp =
             let env = DerivTools.Env.make op dOp
-            env.DOp * Expr.padLeft (-env.One / Expr.sqrtt (env.One - env.X ** env.Two)) |> DerivTools.unary
+            env.DOp * Expr.padLeft (-env.One / Expr.sqrtt (env.One - env.Only ** env.Two)) |> DerivTools.unary
 
 
 [<OpExtender>]
@@ -106,7 +106,7 @@ type AtanDeriv(op: Atan) =
     interface IDerivableOp with
         member this.Deriv dOp =
             let env = DerivTools.Env.make op dOp
-            env.DOp * Expr.padLeft (env.One / (env.One + env.X ** env.Two)) |> DerivTools.unary 
+            env.DOp * Expr.padLeft (env.One / (env.One + env.Only ** env.Two)) |> DerivTools.unary 
 
 
 [<OpExtender>]
@@ -114,7 +114,7 @@ type SinhDeriv(op: Sinh) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = DerivTools.Env.make op dOp 
-            env.DOp * Expr.padLeft (cosh env.X) |> DerivTools.unary
+            env.DOp * Expr.padLeft (cosh env.Only) |> DerivTools.unary
 
 
 [<OpExtender>]
@@ -122,7 +122,7 @@ type CoshDeriv(op: Cosh) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = DerivTools.Env.make op dOp 
-            env.DOp * Expr.padLeft (sinh env.X) |> DerivTools.unary
+            env.DOp * Expr.padLeft (sinh env.Only) |> DerivTools.unary
 
 
 [<OpExtender>]
@@ -130,7 +130,7 @@ type TanhDeriv(op: Tanh) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = DerivTools.Env.make op dOp 
-            env.DOp * Expr.padLeft (env.One - (tanh env.X) ** env.Two) |> DerivTools.unary
+            env.DOp * Expr.padLeft (env.One - (tanh env.Only) ** env.Two) |> DerivTools.unary
         
 
 [<OpExtender>]
@@ -138,7 +138,7 @@ type SqrtDeriv(op: Sqrt) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = DerivTools.Env.make op dOp 
-            env.DOp * Expr.padLeft (env.One / (env.Two * Expr.sqrtt env.X)) |> DerivTools.unary
+            env.DOp * Expr.padLeft (env.One / (env.Two * Expr.sqrtt env.Only)) |> DerivTools.unary
 
 
 [<OpExtender>]
@@ -146,7 +146,7 @@ type CeilingDeriv(op: Ceiling) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = DerivTools.Env.make op dOp 
-            env.Zeros env.X |> DerivTools.unary
+            env.Zeros env.Only |> DerivTools.unary
 
 
 [<OpExtender>]
@@ -154,7 +154,7 @@ type FloorDeriv(op: Floor) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = DerivTools.Env.make op dOp 
-            env.Zeros env.X |> DerivTools.unary
+            env.Zeros env.Only |> DerivTools.unary
 
 
 [<OpExtender>]
@@ -162,7 +162,7 @@ type RoundDeriv(op: Round) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = DerivTools.Env.make op dOp 
-            env.Zeros env.X |> DerivTools.unary
+            env.Zeros env.Only |> DerivTools.unary
 
 
 [<OpExtender>]
@@ -170,7 +170,7 @@ type TruncateDeriv(op: Truncate) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = DerivTools.Env.make op dOp 
-            env.Zeros env.X |> DerivTools.unary
+            env.Zeros env.Only |> DerivTools.unary
 
 
 [<OpExtender>]
@@ -186,7 +186,7 @@ type NotDeriv(op: Not) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = DerivTools.Env.make op dOp 
-            env.Zeros env.X |> DerivTools.unary
+            env.Zeros env.Only |> DerivTools.unary
 
 
 [<OpExtender>]
@@ -194,7 +194,7 @@ type ReshapeDeriv(op: Reshape) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = DerivTools.Env.make op dOp
-            env.DOp |> Expr.reshape (env.FunElems :: env.X.Shape) |> DerivTools.unary
+            env.DOp |> Expr.reshape (env.FunElems :: env.Only.Shape) |> DerivTools.unary
 
 
 [<OpExtender>]
@@ -203,7 +203,7 @@ type DoBroadcastDeriv(op: DoBroadcast) =
         member this.Deriv dOp =
             let env = DerivTools.Env.make op dOp 
             let mutable dOpUnBc = env.DOp
-            for ax, (bSize, xSize) in List.indexed (List.zip env.Expr.Shape env.X.Shape) do
+            for ax, (bSize, xSize) in List.indexed (List.zip env.Expr.Shape env.Only.Shape) do
                 match bSize, xSize with
                 | SizeSpec.Broadcast, SizeSpec.Broadcast -> ()
                 | _, SizeSpec.Broadcast ->
@@ -228,7 +228,7 @@ type SubtensorDeriv(op: Subtensor) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = DerivTools.Env.make op dOp 
-            let agExpanded = Expr.zerosOfType env.DOp.DataType (env.FunElems :: env.X.Shape)
+            let agExpanded = Expr.zerosOfType env.DOp.DataType (env.FunElems :: env.Only.Shape)
             env.DOp
             |> Expr.setSubtensor agExpanded.[SimpleRangeSpec.All :: op.Range] 
             |> DerivTools.unary
@@ -264,7 +264,7 @@ type SumAxisDeriv(op: SumAxis) =
         member this.Deriv dOp =
             let env = DerivTools.Env.make op dOp 
             let bcEgExp = env.DOp |> Expr.reshape (env.DOp.Shape |> ShapeSpec.insertBroadcastAxis (op.Axis + 1))
-            bcEgExp |> Expr.broadcast (bcEgExp.Shape |> ShapeSpec.set (op.Axis + 1) env.X.Shape.[op.Axis]) |> DerivTools.unary 
+            bcEgExp |> Expr.broadcast (bcEgExp.Shape |> ShapeSpec.set (op.Axis + 1) env.Only.Shape.[op.Axis]) |> DerivTools.unary 
 
 
 [<OpExtender>]
@@ -274,7 +274,7 @@ type ProductAxisDeriv(op: ProductAxis) =
             let env = DerivTools.Env.make op dOp 
             // TODO: This division method incorrectly returns NaN for zero elements.
             //       But currently I do not see any efficient alternative.
-            let aBc = env.X |> Expr.reshape (SizeSpec.broadcastable :: ShapeSpec.flatten env.X.Shape)
+            let aBc = env.Only |> Expr.reshape (SizeSpec.broadcastable :: ShapeSpec.flatten env.Only.Shape)
             let pBc = env.Expr |> Expr.reshape [SizeSpec.broadcastable; SizeSpec.broadcastable]
             (env.DOpJac |> Expr.enableBroadcast 1) * (pBc / aBc) |> DerivTools.unary
 
@@ -286,7 +286,7 @@ type MaxAxisDeriv(op: MaxAxis) =
             let env = DerivTools.Env.make op dOp 
             let bcExpr = env.Expr |> Expr.reshape (env.Expr.Shape |> ShapeSpec.insertBroadcastAxis op.Axis)
             let bcEgExp = env.DOp |> Expr.reshape (env.DOp.Shape |> ShapeSpec.insertBroadcastAxis (op.Axis + 1))
-            Expr.ifThenElse (Expr.padLeft (env.X ==== bcExpr)) bcEgExp (Expr.zerosLike bcEgExp) |> DerivTools.unary
+            Expr.ifThenElse (Expr.padLeft (env.Only ==== bcExpr)) bcEgExp (Expr.zerosLike bcEgExp) |> DerivTools.unary
 
 
 [<OpExtender>]
@@ -294,7 +294,7 @@ type MinAxisDeriv(op: MinAxis) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = DerivTools.Env.make op dOp 
-            env.Zeros env.X |> DerivTools.unary
+            env.Zeros env.Only |> DerivTools.unary
 
 
 [<OpExtender>]
@@ -302,7 +302,7 @@ type ArgMaxAxisDeriv(op: ArgMaxAxis) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = DerivTools.Env.make op dOp 
-            env.Zeros env.X |> DerivTools.unary
+            env.Zeros env.Only |> DerivTools.unary
 
 
 [<OpExtender>]
@@ -310,7 +310,7 @@ type ArgMinAxisDeriv(op: ArgMinAxis) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = DerivTools.Env.make op dOp 
-            env.Zeros env.X |> DerivTools.unary
+            env.Zeros env.Only |> DerivTools.unary
 
 
 [<OpExtender>]
@@ -319,7 +319,7 @@ type GatherDeriv(op: Gather) =
         member this.Deriv dOp =
             let env = DerivTools.Env.make op dOp 
             let dIndices = op.Indices |> List.map (Option.map (Expr >> Expr.padLeft))
-            env.DOp |> Expr.scatter (None::dIndices) (env.FunElems :: env.X.Shape) |> DerivTools.unary
+            env.DOp |> Expr.scatter (None::dIndices) (env.FunElems :: env.Only.Shape) |> DerivTools.unary
 
 
 [<OpExtender>]
@@ -345,7 +345,7 @@ type AssumeZeroDerivDeriv(op: AssumeZeroDeriv) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = DerivTools.Env.make op dOp 
-            env.Zeros env.X |> DerivTools.unary
+            env.Zeros env.Only |> DerivTools.unary
     
 
 [<OpExtender>]

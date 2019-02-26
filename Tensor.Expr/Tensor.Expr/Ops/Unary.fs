@@ -377,7 +377,9 @@ type DoBroadcast = { X: BaseExprCh; Shape: ShapeSpec } with
         member this.CanEvalAllSymSizes = 
             ShapeSpec.canEval this.Shape
         member this.Eval env = (ArgValue.unaryX env.Args) |> ITensor.broadcastTo (ShapeSpec.eval this.Shape) |> Ch.only
-
+    interface IOpFormat with
+        member this.Text =
+            sprintf "DoBroadcast%A" this.Shape
 
 /// Permute the axes.
 type PermuteAxes = {X: BaseExprCh; Permutation: int list} with

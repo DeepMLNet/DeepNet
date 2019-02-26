@@ -49,20 +49,19 @@ module ArgValue =
    
     let leaf = Map.empty
 
-    let unary x = Map [Arg.Only, x]
-    let unaryX (am: Map<_, _>) = am.[Arg.Only] 
+    let inline unary x = Map [Arg.Only, x]
+    let inline unaryX (am: Map<_, _>) = am.[Arg.Only] 
 
-    let binary x y = Map [Arg.X, x; 
-                          Arg.Y, y]
-    let binaryX (am: Map<_, _>) = am.[Arg.X]
-    let binaryY (am: Map<_, _>) = am.[Arg.Y]
+    let inline binary x y = Map [Arg.X, x; Arg.Y, y]
+    let inline binaryX (am: Map<_, _>) = am.[Arg.X]
+    let inline binaryY (am: Map<_, _>) = am.[Arg.Y]
 
-    let nary xs =
+    let inline nary xs =
         xs 
         |> Seq.indexed 
         |> Seq.map (fun (i,v) -> Arg.N i, v) 
         |> Map.ofSeq
-    let naryXs (am: Map<Arg, _>) =
+    let inline naryXs (am: Map<Arg, _>) =
         let xs = 
             am 
             |> Map.toList 
@@ -75,7 +74,7 @@ module ArgValue =
             failwithf "Cannot convert argument map to argument list: %A" am
         xs |> List.map snd
 
-    let naryOpt (list: 'a option list) =
+    let inline naryOpt (list: 'a option list) =
         list 
         |> List.indexed 
         |> List.choose (function 
@@ -83,7 +82,7 @@ module ArgValue =
                         | _, None -> None)
         |> Map.ofList
 
-    let naryOptXs length args =
+    let inline naryOptXs length args =
         [0 .. length-1]
         |> List.map (fun i -> args |> Map.tryFind (Arg.N i))
 
@@ -93,18 +92,18 @@ module Args =
 
     let leaf: Map<Arg, BaseExprCh> = ArgValue.leaf 
 
-    let unary x : Map<Arg, BaseExprCh>  = ArgValue.unary x
-    let unaryX (am: Map<Arg, BaseExprCh> ) = am |> ArgValue.unaryX 
+    let inline unary x : Map<Arg, BaseExprCh>  = ArgValue.unary x
+    let inline unaryX (am: Map<Arg, BaseExprCh> ) = am |> ArgValue.unaryX 
 
-    let binary x y : Map<Arg, BaseExprCh>  = ArgValue.binary x y
-    let binaryX (am: Map<Arg, BaseExprCh> ) = am |> ArgValue.binaryX 
-    let binaryY (am: Map<Arg, BaseExprCh> ) = am |> ArgValue.binaryY 
+    let inline binary x y : Map<Arg, BaseExprCh>  = ArgValue.binary x y
+    let inline binaryX (am: Map<Arg, BaseExprCh> ) = am |> ArgValue.binaryX 
+    let inline binaryY (am: Map<Arg, BaseExprCh> ) = am |> ArgValue.binaryY 
 
-    let nary xs : Map<Arg, BaseExprCh> = xs |> ArgValue.nary
-    let naryXs (am: Map<Arg, BaseExprCh>) = am |> ArgValue.naryXs
+    let inline nary xs : Map<Arg, BaseExprCh> = xs |> ArgValue.nary
+    let inline naryXs (am: Map<Arg, BaseExprCh>) = am |> ArgValue.naryXs
 
-    let naryOpt (list: BaseExprCh option list) = ArgValue.naryOpt list
-    let naryOptXs length (args: Map<Arg, BaseExprCh>) = ArgValue.naryOptXs length args
+    let inline naryOpt (list: BaseExprCh option list) = ArgValue.naryOpt list
+    let inline naryOptXs length (args: Map<Arg, BaseExprCh>) = ArgValue.naryOptXs length args
 
 
 
