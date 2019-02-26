@@ -17,8 +17,16 @@ module Vars =
 
 [<Fact>]
 let ``Deriv: a + b`` () =
-    printfn "Deriv a+b:"
+    printfn "==== Deriv a+b:"
     let expr = Expr Vars.a + Expr Vars.b
+    let derivs = Deriv.compute expr
+    printfn "wrt a: %A" derivs.[Vars.a]  
+    printfn "wrt b: %A" derivs.[Vars.b]
+
+[<Fact>]
+let ``Deriv: sin a * exp b`` () =
+    printfn "==== Deriv sin a * exp b:"
+    let expr = sin (Expr Vars.a) * exp (Expr Vars.b)
     let derivs = Deriv.compute expr
     printfn "wrt a: %A" derivs.[Vars.a]  
     printfn "wrt b: %A" derivs.[Vars.b]

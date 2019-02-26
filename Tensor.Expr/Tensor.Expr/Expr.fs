@@ -78,6 +78,25 @@ type Expr (baseExpr: BaseExpr) =
     static member substSymSizes (env: SymSizeEnv) (expr: Expr) : Expr =
         expr.BaseExpr |> BaseExpr.substSymSizes env |> Expr
 
+    interface System.IEquatable<Expr> with
+        member this.Equals other = this.BaseExpr = other.BaseExpr
+
+    override this.Equals other =
+        match other with
+        | :? Expr as other -> (this :> System.IEquatable<_>).Equals other
+        | _ -> false
+
+    interface System.IComparable<Expr> with
+        member this.CompareTo other = compare this.BaseExpr other.BaseExpr
+
+    interface System.IComparable with
+        member this.CompareTo other =
+            match other with
+            | :? Expr as other -> (this :> System.IComparable<_>).CompareTo other
+            | _ -> failwithf "Cannot compare Expr to type %A." (other.GetType())
+
+    override this.GetHashCode() = hash this.BaseExpr
+
     /// Converts expression to string with specified approximate maximum length.
     member this.ToString maxLength =     
         let opStr =

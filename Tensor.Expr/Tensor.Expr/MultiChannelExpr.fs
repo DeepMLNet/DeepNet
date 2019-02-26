@@ -40,6 +40,25 @@ type MultiChannelExpr (baseExpr: BaseExpr) =
     static member substSymSizes (env: SymSizeEnv) (expr: MultiChannelExpr) =
         expr.BaseExpr |> BaseExpr.substSymSizes env |> MultiChannelExpr
 
+    interface System.IEquatable<MultiChannelExpr> with
+        member this.Equals other = this.BaseExpr = other.BaseExpr
+
+    override this.Equals other =
+        match other with
+        | :? MultiChannelExpr as other -> (this :> System.IEquatable<_>).Equals other
+        | _ -> false
+
+    interface System.IComparable<MultiChannelExpr> with
+        member this.CompareTo other = compare this.BaseExpr other.BaseExpr
+
+    interface System.IComparable with
+        member this.CompareTo other =
+            match other with
+            | :? MultiChannelExpr as other -> (this :> System.IComparable<_>).CompareTo other
+            | _ -> failwithf "Cannot compare MultiChannelExpr to type %A." (other.GetType())
+
+    override this.GetHashCode() = hash this.BaseExpr
+
     /// Accesses the specified channel of this multi-channel expression.
     member this.Item 
         with get (channel: Ch) = Expr baseExpr.[channel]
