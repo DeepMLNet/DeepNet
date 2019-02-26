@@ -597,7 +597,7 @@ module internal Exception =
 /// The `getKey` function must return the key of the specified value.
 /// The `create` function must create a new value for the specified key.
 type ConcurrentWeakDict<'K, 'V> when 'K: equality and 'V: not struct 
-        (getKey: 'V -> 'K, create: 'K -> 'V) =
+        (getKey: 'V -> 'K, keyEqual: 'K -> 'K -> bool, create: 'K -> 'V) =
 
     /// Number of dead references that triggers cleanup.
     let deadLimit = 1024
@@ -611,7 +611,7 @@ type ConcurrentWeakDict<'K, 'V> when 'K: equality and 'V: not struct
         | Some weakValues ->
             weakValues |> Seq.tryPick (fun wv -> 
                 match wv.TryGetTarget() with
-                | true, v when getKey v = k -> Some v
+                | true, v when keyEqual (getKey v) k -> Some v
                 | _ -> None)
         | None -> None
 

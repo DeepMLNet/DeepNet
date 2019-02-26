@@ -98,6 +98,21 @@ type IOp =
     abstract Eval: env:EvalEnv -> Map<Ch, Tensor.ITensor>
 
 
+/// Helper functions for ops.
+module IOp =
+    /// Checks two ops for equality.
+    let inline equal (a: IOp) (b: IOp) =
+        a.GetType() = b.GetType() && a = b
+
+    /// Compares two ops.
+    let inline compare (a: IOp) (b: IOp) =
+        let aType, bType = a.GetType(), b.GetType()
+        if aType = bType then
+            Operators.compare a b
+        else
+            Operators.compare aType.FullName bType.FullName
+
+
 /// An op that contains variables.
 type IVarContainingOp =
     /// Variables contained in that op.
@@ -162,7 +177,7 @@ type BaseExpr private (op: IOp) =
                       op op.Channels
 
     /// Unique expression instance for each op.
-    static let uniqueExprs = new ConcurrentWeakDict<IOp, BaseExpr> (BaseExpr.op, BaseExpr)
+    static let uniqueExprs = new ConcurrentWeakDict<IOp, BaseExpr> (BaseExpr.op, IOp.equal, BaseExpr)
 
     /// Creates a base expression for the specified op.
     static member ofOp (op: IOp) = uniqueExprs.[op]
@@ -258,7 +273,7 @@ type BaseExpr private (op: IOp) =
         | _ -> false
 
     interface System.IComparable<BaseExpr> with
-        member this.CompareTo other = compare this.Op other.Op
+        member this.CompareTo other = IOp.compare this.Op other.Op
 
     interface System.IComparable with
         member this.CompareTo other =

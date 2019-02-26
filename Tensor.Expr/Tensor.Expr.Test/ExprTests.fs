@@ -26,15 +26,27 @@ let ``Expr is reference unique`` () =
 
     let expr1 = sin (Expr a1) - cos (Expr b1)
     let expr2 = sin (Expr a2) - cos (Expr b2)
+    let expr3 = sin (Expr a2) - cos (Expr a2)
 
     printfn "expr1: %A" expr1
     printfn "expr2: %A" expr2
+    printfn "expr3: %A" expr3
 
     printfn "expr1 = expr2: %A" (expr1 = expr2)
     printfn "Reference equals of BaseExpr: %A" (obj.ReferenceEquals(expr1.BaseExpr, expr2.BaseExpr))
-
     assert (expr1 = expr2)
     assert (obj.ReferenceEquals(expr1.BaseExpr, expr2.BaseExpr))
+
+    printfn "expr1 <> expr3: %A" (expr1 <> expr3)
+    printfn "Reference equals of BaseExpr: %A" (obj.ReferenceEquals(expr1.BaseExpr, expr3.BaseExpr))
+    assert (expr1 <> expr3)
+    assert (not (obj.ReferenceEquals(expr1.BaseExpr, expr3.BaseExpr)))
+
+    printfn "expr2 <> expr3: %A" (expr2 <> expr3)
+    printfn "Reference equals of BaseExpr: %A" (obj.ReferenceEquals(expr2.BaseExpr, expr3.BaseExpr))
+    assert (expr2 <> expr3)
+    assert (not (obj.ReferenceEquals(expr2.BaseExpr, expr3.BaseExpr)))
+
 
 
 [<Fact>]
