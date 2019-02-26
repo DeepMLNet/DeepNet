@@ -213,6 +213,8 @@ module internal CollectionExtensions =
     type ConcurrentQueue<'T> = System.Collections.Concurrent.ConcurrentQueue<'T>
     type HashSet<'T> = System.Collections.Generic.HashSet<'T>
     type Queue<'T> = System.Collections.Generic.Queue<'T>
+    type LinkedList<'T> = System.Collections.Generic.LinkedList<'T>
+    type LinkedListNode<'T> = System.Collections.Generic.LinkedListNode<'T>
 
 
 
@@ -590,58 +592,75 @@ module internal Exception =
         Printf.kprintf (fun msg -> raise (IndexOutOfRangeException msg)) fmt
 
 
+    
+/// A concurrent dictionary containing weak references to its keys and values.
+/// The `getKey` function must return the key of the specified value.
+/// The `create` function must create a new value for the specified key.
+type ConcurrentWeakDict<'K, 'V> when 'K: equality and 'V: not struct 
+        (getKey: 'V -> 'K, create: 'K -> 'V) =
 
-/// A concurrent dictionary containing weak references to objects.
-type ConcurrentWeakDict<'K, 'V> when 'K: equality and 'V: not struct (create: 'K -> 'V) =
     /// Number of dead references that triggers cleanup.
     let deadLimit = 1024
 
     let mutex = obj ()
-    let mutable store = new Dictionary<'K, WeakReference<'V>> ()
-    let mutable toRemove = new Queue<'K> ()
-    
+    let mutable store = new Dictionary<int, LinkedList<WeakReference<'V>>> ()
+    let mutable toClean = new Queue<int> ()
+
+    let tryGet (hsh: int) (k: 'K) =
+        match store.TryFind hsh with
+        | Some weakValues ->
+            weakValues |> Seq.tryPick (fun wv -> 
+                match wv.TryGetTarget() with
+                | true, v when getKey v = k -> Some v
+                | _ -> None)
+        | None -> None
+
+    let insert (hsh: int) (v: 'V) =
+        let weakValues = 
+            match store.TryFind hsh with
+            | Some weakValues -> weakValues
+            | None ->
+                let weakValues = new LinkedList<WeakReference<'V>> ()
+                store.[hsh] <- weakValues
+                weakValues
+        weakValues.AddLast (WeakReference<'V> v) |> ignore
+
+    let clean () =
+        while toClean.Count > 0 do
+            let hsh = toClean.Dequeue()        
+            match store.TryFind hsh with
+            | Some weakValues ->
+                let mutable node = weakValues.First
+                while node <> null do
+                    let next = node.Next
+                    match node.Value.TryGetTarget () with
+                    | false, _ -> weakValues.Remove node
+                    | _ -> ()
+                    node <- next
+                if weakValues.Count = 0 then
+                    store.Remove hsh |> ignore
+            | None -> ()
+
     /// Creates or returns the already existing value for the specified key.
     member this.Item
         with get (k: 'K) =
+            let hsh = hash k
             lock mutex (fun () ->
-                let value = 
-                    match store.TryGetValue k with
-                    | true, weakValue ->
-                        match weakValue.TryGetTarget () with
-                        | true, v -> Some v
-                        | false, _ -> None
-                    | false, _ -> None
-
-                match value with 
-                | Some value -> value
+                match tryGet hsh k with
+                | Some v -> v
                 | None ->
-                    let value = create k
-                    store.[k] <- WeakReference<'V> value
-                    value                
+                    let v = create k
+                    insert hsh v
+                    v
             )
 
-    /// Removes entries for values that have been garbage collected.
-    member private this.Clean () =
-        lock mutex (fun () ->
-            while toRemove.Count > 0 do
-                let k = toRemove.Dequeue()
-                match store.TryGetValue k with
-                | true, weakValue ->
-                    match weakValue.TryGetTarget () with
-                    | false, _ -> store.Remove k |> ignore
-                    | _ -> ()
-                | _ -> ()
-        )
-
-    /// Should be called if the value for the specified key gets finalized.
-    member this.Finalized (k: 'K) =
+    /// Should be called by the finalizer of the specified value.
+    member this.Finalized (v: 'V) =
+        let hsh = hash (getKey v)
         let deadCount = 
             lock mutex (fun () ->
-                toRemove.Enqueue k
-                toRemove.Count
+                toClean.Enqueue hsh
+                toClean.Count
             )
         if deadCount > deadLimit then
-            this.Clean ()
-        
-
-    
+            lock mutex (fun () -> clean ())

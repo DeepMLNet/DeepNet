@@ -35,9 +35,17 @@ let ``Deriv: a + b`` () =
     printfn "wrt b: %A" derivs.[Vars.b]
 
 
+let ``Deriv: sin a * exp b`` () =
+    printfn "Deriv sin a * exp b:"
+    let expr = sin (Expr Vars.a) * exp (Expr Vars.b)
+    let derivs = Deriv.compute expr
+    printfn "wrt a: %A" derivs.[Vars.a]  
+    printfn "wrt b: %A" derivs.[Vars.b]
+
 [<EntryPoint>]
 let main argv =
     ``Deriv: a + b`` ()
+    ``Deriv: sin a * exp b`` ()
     0
 
 

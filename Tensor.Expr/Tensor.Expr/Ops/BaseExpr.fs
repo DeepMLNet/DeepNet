@@ -161,7 +161,7 @@ type BaseExpr private (op: IOp) =
                       op op.Channels
 
     /// Unique expression instance for each op.
-    static let uniqueExprs = new ConcurrentWeakDict<IOp, BaseExpr> (BaseExpr)
+    static let uniqueExprs = new ConcurrentWeakDict<IOp, BaseExpr> (BaseExpr.op, BaseExpr)
 
     /// Creates a base expression for the specified op.
     static member ofOp (op: IOp) = uniqueExprs.[op]
@@ -268,7 +268,7 @@ type BaseExpr private (op: IOp) =
     override this.GetHashCode() = _hash.Force ()
 
     override this.Finalize () =
-        uniqueExprs.Finalized op
+        uniqueExprs.Finalized this
 
 
 

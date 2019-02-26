@@ -1,9 +1,3 @@
-- next steps?
-
-- rename SymTensor -> Tensor.Expr? => DONE
-- implement loging => Done
-- write first tests?
-	- find old test project
 
 - it would make sense to write basic tests
   i.e. create expression
@@ -19,5 +13,3 @@
 - implement direct eval, i.e. formal host eval
 
 
-- there was a strange bug
-- also it might be that our expression cache is leaking memory
