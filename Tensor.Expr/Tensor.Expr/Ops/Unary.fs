@@ -349,7 +349,9 @@ type Reshape = { X: BaseExprCh; Shape: ShapeSpec } with
             ShapeSpec.canEval this.Shape
         member this.Eval env =
             (ArgValue.unaryX env.Args) |> ITensor.reshape (ShapeSpec.eval this.Shape) |> Ch.only
-
+    interface IOpFormat with
+        member this.Text =
+            sprintf "Reshape%A" this.Shape
 
 /// Broadcast.
 type DoBroadcast = { X: BaseExprCh; Shape: ShapeSpec } with

@@ -115,6 +115,7 @@ type IOpFormat =
 /// BaseExpr is reference-unique, i.e. all expressions that are structurally equal 
 /// are also reference equal.
 /// No conatined variables must have the same name but different types or shapes.
+[<StructuredFormatDisplay("{Pretty}")>]
 type BaseExpr private (op: IOp) =   
     do op.Check()
 
@@ -270,14 +271,41 @@ type BaseExpr private (op: IOp) =
     override this.Finalize () =
         uniqueExprs.Finalized this
 
+    /// Converts expression to string with specified approximate maximum length.
+    member this.ToString maxLength =     
+        let opStr =
+            match this.Op with
+            | :? IOpFormat as opFormat -> opFormat.Text
+            | _ -> this.Op.GetType().Name
+        let args = this.Args
+        let argList = args |> Map.keys |> List.ofSeq |> List.sortBy (sprintf "%A")
+        String.limited maxLength [
+            yield String.Formatter (fun _ -> opStr)
+            if not argList.IsEmpty then
+                yield String.Delim " ("
+                for i, arg in List.indexed argList do
+                    if i > 0 then
+                        yield String.Delim ", "
+                    yield String.Formatter (fun _ -> sprintf "%A=" arg)
+                    yield String.Formatter args.[arg].ToString
+                yield String.Delim ")"
+        ]
+
+    /// Converts expression to string with unlimited length.
+    override this.ToString () = this.ToString System.Int32.MaxValue
+
+    /// Pretty string.
+    member this.Pretty = this.ToString 80
+
 
 
 /// A channel of a multi-channel expression.
+[<StructuredFormatDisplay("{Pretty}")>]
 type BaseExprCh = private {
-    /// Channel
-    _Channel: Ch
     /// Expression
     _Expr: BaseExpr 
+    /// Channel
+    _Channel: Ch
 } with
 
     interface IDynElem
@@ -327,6 +355,21 @@ type BaseExprCh = private {
     static member map (fn: BaseExpr -> BaseExpr) (bec: BaseExprCh) =
         BaseExprCh.make bec.Channel (fn bec.Expr)
     
+    /// Converts expression to string with specified approximate maximum length.
+    member this.ToString maxLength =     
+        String.limited maxLength [
+            yield String.Formatter this.Expr.ToString
+            if this.Channel <> Ch.Default then
+                yield String.Delim "["
+                yield String.Formatter (fun _ -> sprintf "%A" this.Channel)
+                yield String.Delim "]"
+        ]
+
+    /// Converts expression to string with unlimited length.
+    override this.ToString () = this.ToString System.Int32.MaxValue
+
+    /// Pretty string.
+    member this.Pretty = this.ToString 80
 
 [<AutoOpen>]
 module BaseExprChRecognizier =

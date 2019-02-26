@@ -20,12 +20,13 @@ type IDerivableOp =
 
     
 
-/// Jacobians for each variable occuring in an expression.
-type Deriv = {
-    /// the number of elements of the function the derivative is taken of
-    FunElems:   SizeSpec
-    /// the Jacobians w.r.t. the variables occuring in the expression
-    Jacobians:  Map<Var, Expr>
+/// Derivatives for each variable occuring in an expression.
+type Deriv = private {
+    /// The number of elements of the function the derivative is taken of.
+    _FunElems:   SizeSpec
+    /// The derivatives w.r.t. the variables occuring in the expression.
+    /// They are of the shape _FunElems x (shape of variable).
+    _WrtVar:     Map<Var, Expr>
 } with
 
     static member private log = Log "Deriv"
@@ -34,17 +35,17 @@ type Deriv = {
         (Expr x) + (Expr y) |> Expr.baseExprCh
 
     /// Merges two derivative maps by summing derivatives for variables they both have in common.
-    static member merge (aGrads: Deriv) (bGrads: Deriv) : Deriv =
-        if aGrads.FunElems <> bGrads.FunElems then
+    static member merge (a: Deriv) (b: Deriv) : Deriv =
+        if a.FunElems <> b.FunElems then
             failwithf "Cannot merge derivatives with different number of function elements: %A and %A."
-                aGrads.FunElems bGrads.FunElems
-        let jacs =
-            (aGrads.Jacobians, bGrads.Jacobians)
+                      a.FunElems b.FunElems
+        let derivs =
+            (a._WrtVar, b._WrtVar)
             ||> Map.fold (fun m v vg -> 
                 match Map.tryFind v m with
                 | Some ovg -> m |> Map.add v (vg + ovg)
                 | None -> m |> Map.add v vg) 
-        {FunElems=aGrads.FunElems; Jacobians=jacs}
+        {_FunElems=a.FunElems; _WrtVar=derivs}
 
     /// Computes the derivatives of all arguments of an expression given the derivative of the expression.
     static member private derivOp (expr: BaseExpr) (dExpr: Map<Ch, BaseExprCh>) : Map<BaseExprCh, BaseExprCh> =    
@@ -62,101 +63,114 @@ type Deriv = {
         dArgExprs
 
     /// Computes the derivatives of the specified expression w.r.t. all variables occuring in it.
-    static member baseCompute (rootJacobian: Map<Ch, BaseExprCh>) (rootExpr: BaseExpr) : Deriv =
-
+    static member baseCompute (rootDeriv: Map<Ch, BaseExprCh>) (rootExpr: BaseExpr) : Map<Var, BaseExprCh> =
+        
         // build expression info 
         let exprInfo = BaseExprGroup [rootExpr]
 
-        /// map from an expression to the sum of incoming Jacobians (for all its channels)
-        let incomingJacobian = Dictionary<BaseExpr, Map<Ch, BaseExprCh>> ()
-        /// map from an expression (channel) to the set of dependants that transmitted Jacobian to the expression
-        let receivedJacobiansFrom = Dictionary<BaseExprCh, HashSet<BaseExpr>> ()
-        /// channels of multi-channel expression that have received Jacobian from all their dependants
-        let exprChannelsWithFullJacobian = Dictionary<BaseExpr, HashSet<Ch>> ()
-        /// expressions that have received Jacobians from all their dependants (for all channels)
-        let exprsWithFullJacobian = Queue<BaseExpr> ()
+        /// map from an expression to the sum of incoming derivatives (for all its channels)
+        let incomingDeriv = Dictionary<BaseExpr, Map<Ch, BaseExprCh>> ()
+        /// map from an expression (channel) to the set of dependants that transmitted derivatives to the expression
+        let receivedFrom = Dictionary<BaseExprCh, HashSet<BaseExpr>> ()
+        /// channels of multi-channel expression that have received derivatives from all their dependants
+        let exprChsWithFullDeriv = Dictionary<BaseExpr, HashSet<Ch>> ()
+        /// expressions that have received derivatives from all their dependants (for all channels)
+        let exprsWithFullDeriv = Queue<BaseExpr> ()
 
         /// adds the specified Jacobian for `target` coming from `source`.
-        let transmitJacobian (source: BaseExpr) (target: BaseExprCh) (jacobian: BaseExprCh) =
+        let transmitDeriv (source: BaseExpr) (target: BaseExprCh) (deriv: BaseExprCh) =
             let neededSources = exprInfo.Dependants target |> Set.ofSeq
 
             // add jacobian
-            incomingJacobian.[target.Expr] <- 
-                match incomingJacobian.TryFind target.Expr with
-                | None -> Map [target.Channel, jacobian]
+            incomingDeriv.[target.Expr] <- 
+                match incomingDeriv.TryFind target.Expr with
+                | None -> Map [target.Channel, deriv]
                 | Some js -> 
                     match js |> Map.tryFind target.Channel with
-                    | Some j -> js |> Map.add target.Channel (Deriv.add j jacobian)
-                    | None -> js |> Map.add target.Channel jacobian
+                    | Some j -> js |> Map.add target.Channel (Deriv.add j deriv)
+                    | None -> js |> Map.add target.Channel deriv
 
             // add to received set
-            if not (receivedJacobiansFrom.ContainsKey target) then
-                receivedJacobiansFrom.[target] <- HashSet<_> (HashIdentity.Structural)
-            if receivedJacobiansFrom.[target].Contains source then
+            if not (receivedFrom.ContainsKey target) then
+                receivedFrom.[target] <- HashSet<_> (HashIdentity.Structural)
+            if receivedFrom.[target].Contains source then
                 failwithf "Derivative from %A to %A was transmitted more than once." source target
             if not (neededSources.Contains source) then
                 failwithf "%A received derivative from non-dependant %A." target source
-            receivedJacobiansFrom.[target].Add source |> ignore
+            receivedFrom.[target].Add source |> ignore
 
             // check if target has received all derivatives
-            let receivedSources = receivedJacobiansFrom.[target] |> Set.ofSeq
+            let receivedSources = receivedFrom.[target] |> Set.ofSeq
             if receivedSources = neededSources then 
-                if not (exprChannelsWithFullJacobian.ContainsKey target.Expr) then
-                    exprChannelsWithFullJacobian.[target.Expr] <- HashSet<_> ()
-                exprChannelsWithFullJacobian.[target.Expr].Add target.Channel |> ignore
-                if Set.ofSeq exprChannelsWithFullJacobian.[target.Expr] = Set.ofSeq target.Expr.Channels then
-                    exprsWithFullJacobian.Enqueue target.Expr
+                if not (exprChsWithFullDeriv.ContainsKey target.Expr) then
+                    exprChsWithFullDeriv.[target.Expr] <- HashSet<_> ()
+                exprChsWithFullDeriv.[target.Expr].Add target.Channel |> ignore
+                if Set.ofSeq exprChsWithFullDeriv.[target.Expr] = Set.ofSeq target.Expr.Channels then
+                    exprsWithFullDeriv.Enqueue target.Expr
 
-        // set Jacobian of root node
-        incomingJacobian.[rootExpr] <- rootJacobian
-        exprsWithFullJacobian.Enqueue rootExpr
+        // set derivative of root node
+        incomingDeriv.[rootExpr] <- rootDeriv
+        exprsWithFullDeriv.Enqueue rootExpr
 
-        // process Jacobians in loop
-        let mutable varJacs = Map.empty
-        while exprsWithFullJacobian.Count > 0 do
-
+        // process derivatives in loop
+        let mutable varDerivs = Map.empty
+        while exprsWithFullDeriv.Count > 0 do
             // get op with computed derivative
-            let expr = exprsWithFullJacobian.Dequeue ()
+            let expr = exprsWithFullDeriv.Dequeue ()
 
             match Expr expr with
             | Expr.VarArg vs ->
-                // arrived at a variable: save its Jacobian
-                varJacs <- varJacs |> Map.add vs (Expr incomingJacobian.[expr].[Ch.Default])
+                // arrived at a variable: save its derivative
+                varDerivs <- varDerivs |> Map.add vs incomingDeriv.[expr].[Ch.Default]
             | _ -> 
                 // propagate derivative to arguments of op
-                let argDerivs = Deriv.derivOp expr incomingJacobian.[expr]
+                let argDerivs = Deriv.derivOp expr incomingDeriv.[expr]
                 for KeyValue(arg, argDeriv) in argDerivs do
-                    transmitJacobian expr arg argDeriv
+                    transmitDeriv expr arg argDeriv
 
-        {
-            FunElems  = (rootJacobian |> Map.toSeq |> Seq.head |> snd |> BaseExprCh.shape).[0]
-            Jacobians = varJacs
-        }    
+        varDerivs
 
 
     /// Computes the derivative expression w.r.t. all variables occuring in it using the specified
     /// value for the derivative of the specified expression.
-    static member computeWithRootDeriv (rootJac: Expr) (rootExpr: Expr) : Deriv =
-        let rootJac = Map [Ch.Default, rootJac.BaseExprCh]
-        let deriv = Deriv.baseCompute rootJac rootExpr.BaseExpr
-        deriv
+    static member computeWithRootDeriv (rootDeriv: Expr) (rootExpr: Expr) : Deriv =
+        let funElems = ShapeSpec.nElem rootExpr.Shape
+        let rootDerivShp = funElems :: rootExpr.Shape
+        if not (ShapeSpec.equalWithoutBroadcastability rootDerivShp rootDeriv.Shape) then
+            failwithf "Expecting shape %A for root derivative, but got shape %A."
+                      rootDerivShp rootDeriv.Shape
+        let rootDeriv = Map [Ch.Default, rootDeriv.BaseExprCh]
+
+        Deriv.log.Info "Comptuing derivatives for %A with root derivative %A" rootExpr rootDeriv
+        let sw = Stopwatch.StartNew()
+        let varDerivs = Deriv.baseCompute rootDeriv rootExpr.BaseExpr
+        Deriv.log.Info "Computing derivatives took %A" sw.Elapsed
+
+        {
+            _FunElems = funElems
+            _WrtVar = varDerivs |> Map.map (fun _ deriv -> Expr deriv)
+        }    
+
 
     /// Computes the derivative expression w.r.t. all variables occuring in it.
     static member compute (rootExpr: Expr) : Deriv =
-        Deriv.log.Info "Comptuing derivatives..."
-        let sw = Stopwatch.StartNew()
-        let rootJac = rootExpr.Shape |> ShapeSpec.nElem |> Expr.identityOfType rootExpr.DataType
-        let deriv = Deriv.computeWithRootDeriv rootJac rootExpr
-        Deriv.log.Info "Computing derivatives took %A" sw.Elapsed
+        let funElems = ShapeSpec.nElem rootExpr.Shape 
+        let rootJac = Expr.identityOfType rootExpr.DataType funElems
+        let rootDeriv = rootJac |> Expr.reshape (funElems :: rootExpr.Shape)
+        let deriv = Deriv.computeWithRootDeriv rootDeriv rootExpr
         deriv
 
-    /// Returns the Jacobian of the specified variable.
+
+    /// Returns the derivatives of the specified variable.
     member this.Item 
         with get (var: Var) =
-            match this.Jacobians |> Map.tryFind var with
+            match this._WrtVar |> Map.tryFind var with
             | Some d -> d
             | None -> 
                 let varExpr = Expr var
                 Expr.zerosOfType varExpr.DataType [this.FunElems; Expr.nElems varExpr]
 
+
+    /// Number of function elements.
+    member this.FunElems = this._FunElems
 
