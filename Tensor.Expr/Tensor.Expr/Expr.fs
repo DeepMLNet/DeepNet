@@ -745,5 +745,10 @@ type Expr (baseExpr: BaseExpr) =
     static member interpolate3D interpolator (x: Expr) (y: Expr) (z: Expr) =
         Expr.interpolate interpolator [x; y; z]
 
+    /// Evaluates the expression into a numeric value.
+    static member eval (varEnv: VarEnv) (expr: Expr) = 
+        let evalEnv : EvalEnv = {VarEnv=varEnv}
+        let chVals = BaseExprEval.eval evalEnv expr.BaseExpr
+        chVals.[Ch.Default]
 
 

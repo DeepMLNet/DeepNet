@@ -11,8 +11,18 @@ open Utils
 
 
 module Vars =
-    let a = Var.make<float32> ("a", HostTensor.Dev, [SizeSpec.fix 10L; SizeSpec.fix 20L])
-    let b = Var.make<float32> ("b", HostTensor.Dev, [SizeSpec.fix 10L; SizeSpec.fix 20L])
+    let a = Var.make<float32> ("a", HostTensor.Dev, [SizeSpec.fix 2L; SizeSpec.fix 3L])
+    let b = Var.make<float32> ("b", HostTensor.Dev, [SizeSpec.fix 2L; SizeSpec.fix 3L])
+
+
+module VarVals =
+    let a = HostTensor.counting 6L |> Tensor<float32>.convert |> Tensor.reshape [2L; 3L]
+    let b = 10L + HostTensor.counting 6L |> Tensor<float32>.convert |> Tensor.reshape [2L; 3L]
+
+    let varEnv =
+        VarEnv.empty
+        |> VarEnv.add Vars.a a
+        |> VarEnv.add Vars.b b 
 
 
 [<Fact>]
@@ -48,16 +58,16 @@ let ``Expr is reference unique`` () =
     assert (not (obj.ReferenceEquals(expr2.BaseExpr, expr3.BaseExpr)))
 
 
-
 [<Fact>]
 let ``Expr: a + b`` () =
     printfn "==== a+b:"
     let expr = Expr Vars.a + Expr Vars.b
     dumpExpr expr  
     assert (expr.DataType = typeof<float32>)
-    assert (expr.Shape = [SizeSpec.fix 10L; SizeSpec.fix 20L])
+    assert (expr.Shape = [SizeSpec.fix 2L; SizeSpec.fix 3L])
     assert (expr.CanEvalAllSymSizes = true)
     assert (expr.Vars = Set [Vars.a; Vars.b])
+
 
 [<Fact>]
 let ``Expr: sin a + cos b`` () =
@@ -65,10 +75,19 @@ let ``Expr: sin a + cos b`` () =
     let expr = sin (Expr Vars.a) + cos (Expr Vars.b)
     dumpExpr expr  
     assert (expr.DataType = typeof<float32>)
-    assert (expr.Shape = [SizeSpec.fix 10L; SizeSpec.fix 20L])
+    assert (expr.Shape = [SizeSpec.fix 2L; SizeSpec.fix 3L])
     assert (expr.CanEvalAllSymSizes = true)
     assert (expr.Vars = Set [Vars.a; Vars.b])
 
+
+[<Fact>]
+let ``Eval expr: a + b`` () =
+    printfn "==== eval: a + b:"
+    let expr = Expr Vars.a + Expr Vars.b
+    let exprVal = expr |> Expr.eval VarVals.varEnv
+    printfn "a=%A" VarVals.a
+    printfn "b=%A" VarVals.b
+    printfn "expr=%A" exprVal
 
 
 

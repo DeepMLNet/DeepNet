@@ -1,8 +1,7 @@
-﻿namespace Tensor.Expr
+﻿namespace Tensor.Expr.Ops
 
 open DeepNet.Utils
 open Tensor
-open Tensor.Expr.Ops
 
 
 /// Evaluates a BaseExpr.
@@ -85,7 +84,7 @@ type BaseExprEval (rootExpr: BaseExpr, env: EvalEnv, discardUnusedVals: bool) =
     member this.RootVals = rootVals
 
     /// Evaluates the expression and returns the values of all its channels.
-    static member eval env rootExpr =
+    static member eval (env: EvalEnv) (rootExpr: BaseExpr) =
         let e = BaseExprEval (rootExpr, env, true)
         e.RootVals
 

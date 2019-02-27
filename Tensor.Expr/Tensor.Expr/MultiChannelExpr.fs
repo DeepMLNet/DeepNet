@@ -79,4 +79,7 @@ type MultiChannelExpr (baseExpr: BaseExpr) =
         let xs = xs |> List.map Expr.baseExprCh
         Ops.Loop.withLift length vars channels xs |> MultiChannelExpr
 
-
+    /// Evaluates all channels of the expression into numeric values.
+    static member eval (varEnv: VarEnv) (expr: Expr) = 
+        let evalEnv : EvalEnv = {VarEnv=varEnv}    
+        BaseExprEval.eval evalEnv expr.BaseExpr
