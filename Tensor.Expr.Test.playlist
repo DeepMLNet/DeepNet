@@ -1,0 +1,1 @@
+<Playlist Version="1.0"><Add Test="ExprTests.Expr is reference unique" /><Add Test="ExprTests.Expr: sin a + cos b" /><Add Test="DerivTests.Deriv: a + b" /><Add Test="ExprTests.Eval expr: a + b" /><Add Test="DerivTests.Deriv: sin a * exp b" /><Add Test="ExprTests.Expr: a + b" /></Playlist>

@@ -32,7 +32,7 @@ module VarEnv =
     /// get variable value from environment
     let get (vs: Var) (varEnv: VarEnv) : #ITensor =
         match varEnv |> Map.tryFind vs.Name with
-        | Some (vs, value) -> vs |> box |> unbox
+        | Some (vs, value) -> value |> box |> unbox
         | None -> failwithf "Variable %A is not present in the specified VarEnv." vs.Name
 
     ///// add variable value to environment

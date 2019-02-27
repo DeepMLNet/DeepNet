@@ -84,10 +84,11 @@ let ``Expr: sin a + cos b`` () =
 let ``Eval expr: a + b`` () =
     printfn "==== eval: a + b:"
     let expr = Expr Vars.a + Expr Vars.b
-    let exprVal = expr |> Expr.eval VarVals.varEnv
+    let exprVal = expr |> Expr.eval VarVals.varEnv :?> Tensor<float32>
     printfn "a=%A" VarVals.a
     printfn "b=%A" VarVals.b
     printfn "expr=%A" exprVal
+    assert (Tensor.almostEqual (exprVal, VarVals.a + VarVals.b))
 
 
 
