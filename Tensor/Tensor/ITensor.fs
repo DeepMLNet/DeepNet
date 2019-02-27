@@ -172,6 +172,9 @@ type ITensor =
     abstract Gather: indices:ITensor option list -> ITensor
     abstract Scatter: indices:ITensor option list -> trgtShp:int64 list -> ITensor
 
+    abstract IsClose: other:ITensor * ?absTol:obj * ?relTol:obj -> ITensor
+    abstract AlmostEqual: other:ITensor * ?absTol:obj * ?relTol:obj -> bool
+
     // type-neutral reduction operations
     abstract SumAxis: ax:int -> ITensor
     abstract SumTensor: unit -> ITensor

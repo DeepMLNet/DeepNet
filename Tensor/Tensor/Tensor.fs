@@ -3647,6 +3647,15 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         member a.Scatter indices trgtShp =
             Tensor<'T>.scatter (indices |> List.map (Option.map (fun i -> i :?> Tensor<int64>))) trgtShp a :> ITensor
 
+        member a.IsClose (b, ?absTol, ?relTol) =
+            let absTol = absTol |> Option.map (conv<'T>)
+            let relTol = relTol |> Option.map (conv<'T>)
+            Tensor<'T>.isClose (a, b :?> Tensor<'T>, ?absTol=absTol, ?relTol=relTol) :> ITensor
+        member a.AlmostEqual (b, ?absTol, ?relTol) =
+            let absTol = absTol |> Option.map (conv<'T>)
+            let relTol = relTol |> Option.map (conv<'T>)
+            Tensor<'T>.almostEqual (a, b :?> Tensor<'T>, ?absTol=absTol, ?relTol=relTol) 
+
         member a.SumAxis ax = Tensor<'T>.sumAxis ax a :> ITensor
         member a.SumTensor () = Tensor<'T>.sumTensor a :> ITensor
         member a.ProductAxis ax = Tensor<'T>.productAxis ax a :> ITensor
