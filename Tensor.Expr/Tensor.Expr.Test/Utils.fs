@@ -2,6 +2,7 @@
 
 open System.IO
 open Xunit
+open Xunit.Abstractions
 open FsUnit.Xunit
 
 open DeepNet.Utils
@@ -13,7 +14,8 @@ open Tensor.Expr
 //open Optimizers
 
 
-let dumpExpr (expr: Expr) =
+let dumpExpr (output: ITestOutputHelper) (expr: Expr) =
+    let printfn format = Printf.kprintf (fun msg -> output.WriteLine(msg)) format 
     printfn "Expr: %s" (expr.ToString())
     printfn "==== DataType:           %A" expr.DataType
     printfn "==== Device:             %A" expr.Dev
