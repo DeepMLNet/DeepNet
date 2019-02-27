@@ -11,8 +11,8 @@ open Utils
 
 
 module Vars =
-    let a = Var.make<float32> ("a", [SizeSpec.fix 10L; SizeSpec.fix 20L])
-    let b = Var.make<float32> ("b", [SizeSpec.fix 10L; SizeSpec.fix 20L])
+    let a = Var.make<float32> ("a", HostTensor.Dev, [SizeSpec.fix 10L; SizeSpec.fix 20L])
+    let b = Var.make<float32> ("b", HostTensor.Dev, [SizeSpec.fix 10L; SizeSpec.fix 20L])
 
 
 [<Fact>]

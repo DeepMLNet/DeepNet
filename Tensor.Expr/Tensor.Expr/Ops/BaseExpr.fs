@@ -43,10 +43,6 @@ type Arg =
 type EvalEnv = {
     /// Values of variables.
     VarEnv: VarEnv
-    /// Device to store result on.
-    Dev:    ITensorDevice
-    /// Argument values.
-    Args:   Map<Arg, ITensor>
 }
 
 
@@ -85,17 +81,17 @@ type IOp =
     /// The output channels of this operation.
     abstract Channels: Set<Ch>
 
-    /// Should return the types of the results.
+    /// The data types of the channels.
     abstract TypeNames: Map<Ch, TypeName>
 
-    /// Should return the shapes of the results.
+    /// The shapes of the channels.
     abstract Shapes: Map<Ch, ShapeSpec>      
 
+    /// The storage devices of the channels.
+    abstract Devs: Map<Ch, ITensorDevice>
+
     /// Should evaluate the numerical value of this op given the numerical values of its arguments.
-    /// This evaluation should be done on the host using the simplest means possible and is used
-    /// as a reference implementation for verifying the correctness of optimized (e.g. CUDA) 
-    /// implementations. This method may be omitted when no verification will be done.
-    abstract Eval: env:EvalEnv -> Map<Ch, Tensor.ITensor>
+    abstract Eval: env:EvalEnv -> argVals:Map<Arg, ITensor> -> Map<Ch, Tensor.ITensor>
 
 
 /// Helper functions for ops.
@@ -137,7 +133,8 @@ type BaseExpr private (op: IOp) =
     let _singleCh = op.Channels = Set [Ch.Default]
     let _hash = lazy (hash op)
     let _typeNames = lazy (op.TypeNames)
-    let _shapes = lazy (op.Shapes)      
+    let _shapes = lazy (op.Shapes)    
+    let _devs = lazy (op.Devs)
 
     let _varMap = 
         let add (m: Map<VarName, Var>) (var: Var) =
@@ -217,6 +214,11 @@ type BaseExpr private (op: IOp) =
     /// Number of elements of channels.
     static member nElems (expr: BaseExpr) = expr.NElems
 
+    /// Storage devices of channels.
+    member this.Devs = _devs.Force()
+    /// Storage devices of channels.
+    static member devs (expr: BaseExpr) = expr.Devs
+
     /// Channels.
     member this.Channels = op.Channels
     /// Channels.
@@ -258,11 +260,6 @@ type BaseExpr private (op: IOp) =
     /// Access to specified channel of this expression.
     member this.Item
         with get (channel: Ch) = BaseExprCh.make channel this
-
-    /// Access to the only channel of this expression.
-    member this.OnlyCh =
-        checkSingleCh()
-        this.[Ch.Default]
 
     interface System.IEquatable<BaseExpr> with
         member this.Equals other = Object.ReferenceEquals (this, other)
@@ -365,6 +362,11 @@ type BaseExprCh = private {
     member this.NElems = this.Expr.NElems.[this.Channel]
     /// Number of elements.
     static member nElems (this: BaseExprCh) = this.NElems
+
+    /// Storage device.
+    member this.Dev = this.Expr.Devs.[this.Channel]
+    /// Storage device.
+    static member dev (this: BaseExprCh) = this.Dev
 
     /// Apply mapping function to contained expression.
     static member map (fn: BaseExpr -> BaseExpr) (bec: BaseExprCh) =

@@ -11,18 +11,18 @@ open Utils
 
 
 module Vars =
-    let a = Var.make<float32> ("a", [SizeSpec.fix 10L; SizeSpec.fix 20L])
-    let b = Var.make<float32> ("b", [SizeSpec.fix 10L; SizeSpec.fix 20L])
+    let a = Var.make<float32> ("a", HostTensor.Dev, [SizeSpec.fix 10L; SizeSpec.fix 20L])
+    let b = Var.make<float32> ("b", HostTensor.Dev, [SizeSpec.fix 10L; SizeSpec.fix 20L])
 
 
 [<Fact>]
 let ``Expr is reference unique`` () =
     printfn "==== Expr is reference unique:"
 
-    let a1 = Var.make<float32> ("a", [SizeSpec.fix 10L; SizeSpec.fix 20L])
-    let b1 = Var.make<float32> ("b", [SizeSpec.fix 10L; SizeSpec.fix 20L])
-    let a2 = Var.make<float32> ("a", [SizeSpec.fix 10L; SizeSpec.fix 20L])
-    let b2 = Var.make<float32> ("b", [SizeSpec.fix 10L; SizeSpec.fix 20L])
+    let a1 = Var.make<float32> ("a", HostTensor.Dev, [SizeSpec.fix 10L; SizeSpec.fix 20L])
+    let b1 = Var.make<float32> ("b", HostTensor.Dev, [SizeSpec.fix 10L; SizeSpec.fix 20L])
+    let a2 = Var.make<float32> ("a", HostTensor.Dev, [SizeSpec.fix 10L; SizeSpec.fix 20L])
+    let b2 = Var.make<float32> ("b", HostTensor.Dev, [SizeSpec.fix 10L; SizeSpec.fix 20L])
 
     let expr1 = sin (Expr a1) - cos (Expr b1)
     let expr2 = sin (Expr a2) - cos (Expr b2)

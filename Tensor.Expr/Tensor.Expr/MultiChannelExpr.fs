@@ -22,6 +22,9 @@ type MultiChannelExpr (baseExpr: BaseExpr) =
     member this.TypeNames = baseExpr.TypeNames
     static member typeNames (expr: MultiChannelExpr) = expr.TypeNames
 
+    member this.Devs = baseExpr.Devs
+    static member devs (expr: MultiChannelExpr) = expr.Devs
+
     member this.Shapes = baseExpr.Shapes
     static member shapes (expr: MultiChannelExpr) = expr.Shapes
 

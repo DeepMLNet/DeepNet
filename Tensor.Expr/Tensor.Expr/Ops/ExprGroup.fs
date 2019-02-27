@@ -7,7 +7,7 @@ open DeepNet.Utils
 type BaseExprGroup (exprs: BaseExpr list) =
        
     // build sets of dependants for each subexpression
-    let dependants = 
+    let dependants = lazy (
         let processed = HashSet<BaseExpr> ()
         let dependants = Dictionary<BaseExprCh, HashSet<BaseExpr>> ()              
         let addDependant node dependant =
@@ -26,6 +26,7 @@ type BaseExprGroup (exprs: BaseExpr list) =
         for expr in exprs do
             doBuild expr
         dependants
+    )
 
     // build sets of used channels
     let usedChannels = lazy (
@@ -50,15 +51,42 @@ type BaseExprGroup (exprs: BaseExpr list) =
         usedChannels      
     )
 
-    /// Contained expressions.
+    // build set of all subexpressions
+    let allExprs = lazy (
+        let processed = HashSet<BaseExpr> ()
+        let allExprs = HashSet<BaseExpr> ()
+
+        let rec build expr = 
+            if not (processed.Contains expr) then
+                allExprs.Add expr |> ignore
+                for KeyValue(_, arg) in expr.Args do
+                    allExprs.Add arg.Expr |> ignore
+                    build arg.Expr
+                processed.Add expr |> ignore
+
+        for expr in exprs do
+            build expr
+        allExprs
+    )
+
+    /// Contained top-level expressions.
     member this.Exprs = exprs
 
-    /// Returns all expressions that depend on expr.
-    /// Comparison is done based on reference equality.
-    member this.Dependants expr =
-        match dependants.TryFind expr with
+    /// All (sub-)expressions contained within the expression.
+    member this.AllExprs = 
+        allExprs.Force() :> IReadOnlyCollection<_>
+
+    /// Returns all expressions that depend directly on the specified expression channel.
+    member this.Dependants exprCh =
+        match dependants.Force().TryFind exprCh with
         | Some deps -> deps :> IReadOnlyCollection<_>
         | None -> HashSet<_> () :> IReadOnlyCollection<_>
+
+    /// Returns all expressions that expr directly depends on.
+    member this.Depending (expr: BaseExpr) = seq {
+        for KeyValue(_, arg) in expr.Args do
+            yield arg.Expr
+    }        
 
     /// Returns the list of used channles for the multi-channel op
     /// with the specified arguments.

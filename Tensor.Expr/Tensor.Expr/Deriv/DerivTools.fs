@@ -22,23 +22,23 @@ module internal DerivTools =
     /// Returns a zero derivative for the specified argument.
     let inline zeros (dOp: Expr) (arg: Expr) =
         let shape = dOp.Shape.[0] :: arg.Shape
-        Expr.zerosOfType arg.DataType shape
+        Expr.zerosOfType arg.DataType arg.Dev shape
 
     /// Zero of same type as arg.
     let inline zero (arg: Expr) =
-        (convTo arg.DataType 0) |> Expr.scalar
+        Expr.scalar arg.Dev (convTo arg.DataType 0)
 
     /// One of same type as arg.
     let inline one (arg: Expr) =
-        (convTo arg.DataType 1) |> Expr.scalar
+        Expr.scalar arg.Dev (convTo arg.DataType 1) 
 
     /// Two of same type as arg.
     let inline two (arg: Expr) =
-        (convTo arg.DataType 2) |> Expr.scalar
+        Expr.scalar arg.Dev (convTo arg.DataType 2)
 
     /// Ten of same type as arg.
     let inline ten (arg: Expr) =
-        (convTo arg.DataType 10) |> Expr.scalar
+        Expr.scalar arg.Dev (convTo arg.DataType 10)
 
     /// Unary derivative result.
     let inline unary x = ArgValue.unary x

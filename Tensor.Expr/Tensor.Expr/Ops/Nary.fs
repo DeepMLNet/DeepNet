@@ -11,12 +11,14 @@ type Discard = {Xs: BaseExprCh list} with
         member this.Check () = ()
         member this.Channels = Ch.onlyOne
         member this.TypeNames = TypeName.ofType<int32> |> Ch.only
+        member this.Devs = HostTensor.Dev |> Ch.only
         member this.Shapes = ShapeSpec.emptyVector |> Ch.only
         member this.Args = Args.nary this.Xs
         member this.ReplaceArgs args = {this with Xs=Args.naryXs args} :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = HostTensor.zeros<int32> [0L] :> ITensor |> Ch.only
+        member this.Eval env argVals = 
+            HostTensor.zeros<int32> [0L] :> ITensor |> Ch.only
 
 
 /// Build tensor using numeric ranges.
@@ -24,6 +26,7 @@ type BuildTensor = {Shape: ShapeSpec; Ranges: BaseRangesSpec list; Xs: BaseExprC
     interface IOp with       
         member this.Check () = 
             Check.sameType this.Xs
+            Check.sameDev this.Xs
             if this.Ranges.Length <> this.Xs.Length then
                 failwithf "BuildTensor ranges must match arguments, but got %d ranges and %d arguments."
                             this.Ranges.Length this.Xs.Length
@@ -43,6 +46,7 @@ type BuildTensor = {Shape: ShapeSpec; Ranges: BaseRangesSpec list; Xs: BaseExprC
             | None -> ()       
         member this.Channels = Ch.onlyOne
         member this.TypeNames = this.Xs.Head.TypeName |> Ch.only
+        member this.Devs = this.Xs.Head.Dev |> Ch.only
         member this.Shapes = this.Shape |> Ch.only
         member this.Args = Args.nary this.Xs
         member this.ReplaceArgs args = {this with Xs=Args.naryXs args} :> _
@@ -53,8 +57,8 @@ type BuildTensor = {Shape: ShapeSpec; Ranges: BaseRangesSpec list; Xs: BaseExprC
         member this.CanEvalAllSymSizes = 
             ShapeSpec.canEval this.Shape &&
             List.forall BaseRangesSpec.canEval this.Ranges
-        member this.Eval env = 
-            let vs = ArgValue.naryXs env.Args
+        member this.Eval env argVals = 
+            let vs = ArgValue.naryXs argVals
             let trgt = vs.Head.ZerosOfSameType vs.Head.Dev (ShapeSpec.eval this.Shape)
             for rng, e in List.zip this.Ranges vs do                            
                 let aryRng = rng |> List.map (fun (first, last) -> 
@@ -68,24 +72,25 @@ type Elements = {Shape: ShapeSpec; ElemExpr: Elem.Expr; Xs: BaseExprCh list} wit
     // TODO: introduce multi-channel element-wise calculation op.
     interface IOp with       
         member this.Check () = 
+            Check.sameDev this.Xs
             let tns = this.Xs |> List.map (fun x -> x.TypeName)
             let ss = this.Xs |> List.map (fun x -> x.Shape)
             Elem.Expr.check this.ElemExpr |> ignore
             Elem.Expr.checkCompatibility this.ElemExpr ss tns this.Shape  
         member this.Channels = Ch.onlyOne            
         member this.TypeNames = Elem.Expr.typeName this.ElemExpr |> Ch.only
+        member this.Devs = this.Xs.Head.Dev |> Ch.only
         member this.Shapes = this.Shape |> Ch.only
         member this.Args = Args.nary this.Xs
         member this.ReplaceArgs args = {this with Xs=Args.naryXs args} :> _
         member this.SubstSymSizes env = 
-            let sSize = SizeSpec.substSymbols env
             {this with Shape=ShapeSpec.substSymbols env this.Shape
                        ElemExpr=Elem.Expr.substSymSizes env this.ElemExpr} :> _
         member this.CanEvalAllSymSizes = 
             ShapeSpec.canEval this.Shape &&
             Elem.Expr.canEvalAllSymSizes this.ElemExpr
-        member this.Eval env = 
-            let esv = ArgValue.naryXs env.Args
+        member this.Eval env argVals = 
+            let esv = ArgValue.naryXs argVals
             let nResShape = ShapeSpec.eval this.Shape
             Elem.Interpreter.evalUntyped this.ElemExpr esv nResShape 
             |> Ch.only
@@ -96,6 +101,7 @@ type Interpolate = {Interpolator: Interpolator; Xs: BaseExprCh list} with
     interface IOp with       
         member this.Check () = 
             Check.sameType this.Xs
+            Check.sameDev this.Xs
             let nDims = this.Interpolator.MinArg.Length
             if nDims < 1 then
                 failwith "Interpolator must be at least one-dimensional."
@@ -115,13 +121,14 @@ type Interpolate = {Interpolator: Interpolator; Xs: BaseExprCh list} with
                                 this.Xs.Head.Shape x.Shape
         member this.Channels = Ch.onlyOne
         member this.TypeNames = this.Xs.Head.TypeName |> Ch.only
+        member this.Devs = this.Xs.Head.Dev |> Ch.only
         member this.Shapes = this.Xs.Head.Shape |> Ch.only
         member this.Args = Args.nary this.Xs
         member this.ReplaceArgs args = {this with Xs=Args.naryXs args} :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env = 
-            let esv = ArgValue.naryXs env.Args
+        member this.Eval env argVals = 
+            let esv = ArgValue.naryXs argVals
             Interpolator.interpolateUntyped this.Interpolator esv |> Ch.only
 
 

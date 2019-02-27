@@ -84,6 +84,8 @@ type Loop = {
             this.Channels |> Map.toSeq |> Seq.map fst |> Set.ofSeq
         member this.TypeNames = 
             this.Channels |> Map.map (fun _ lv -> lv.Expr.TypeName)
+        member this.Devs =
+            this.Channels |> Map.map (fun _ lv -> lv.Expr.Dev)
         member this.Shapes = 
             this.Channels |> Map.map (fun ch lv ->
                 lv.Expr.Shape |> ShapeSpec.insertAxis lv.SliceDim this.Length)
@@ -113,7 +115,7 @@ type Loop = {
                 | Loop.PreviousChannel pc -> SizeSpec.canEval pc.Delay
                 | _ -> true)) &&
             (this.Channels |> Map.toSeq |> Seq.forall (fun (ch, lv) -> lv.Expr.Expr.CanEvalAllSymSizes))    
-        member this.Eval env = 
+        member this.Eval env argVals = 
             failwith "TODO"
 
     static member internal noLift length vars channels xs =
@@ -148,7 +150,7 @@ type Loop = {
                     match vars |> Map.tryFindKey (fun vs _ -> vs.Name = name) with
                     | Some _ -> genName (i + 1)
                     | None -> name
-                let vs = Var.make (genName 0, expr.TypeName, expr.Shape)
+                let vs = Var.make (genName 0, expr.TypeName, expr.Dev, expr.Shape)
                 let lv = Loop.ConstArg (addArg expr)
                 vars <- vars |> Map.add vs lv
                 vs
@@ -168,7 +170,7 @@ type Loop = {
                         //if not (dependsOnLoopVars expr) then
                         let vs = addConstVar expr
                         let repExpr = BaseExpr.ofOp {VarArg.Var=vs} 
-                        repExpr.OnlyCh
+                        repExpr.[Ch.Default]
                     else
                         expr |> BaseExprCh.map (BaseExpr.mapArgs lift)
                 lifted.[expr] <- rep

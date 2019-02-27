@@ -48,8 +48,9 @@
     <Compile Include="Deriv\Binary.fs" />
     <Compile Include="Deriv\Nary.fs" />
     <Compile Include="Deriv\Loop.fs" />
+    <Compile Include="VarUpdateExpr.fs" />
+    <Compile Include="BaseExprEval.fs" />
     <None Include="Old\Expr.fs" />
-    <None Include="Old\Deriv.fs" />
     <None Include="Old\Hold.fs" />
     <None Include="Old\Optimizer.fs" />
     <None Include="Old\UExpr.fs" />

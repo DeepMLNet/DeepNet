@@ -52,9 +52,9 @@ type LoopDeriv(op: Loop) =
                     idx
 
             /// adds an argument with a value full of zeros for use with initial value of a PreviousChannel
-            let addZeroInitialArg channelShp channelType sliceDim delay =
+            let addZeroInitialArg channelShp channelType channelDev sliceDim delay =
                 let shp = channelShp |> ShapeSpec.insertAxis sliceDim delay
-                let zeroExpr = Expr.zerosOfType channelType shp
+                let zeroExpr = Expr.zerosOfType channelType channelDev shp
                 addArg zeroExpr
 
             /// Name of a channel.
@@ -98,7 +98,7 @@ type LoopDeriv(op: Loop) =
                 let value = spec.Channels.[outPort]
                 let dName = VarName (sprintf "d_%s" (chName outPort))
                 let dVar =
-                    Var.make (dName, value.Expr.DataType, funElems :: value.Expr.Shape)
+                    Var.make (dName, value.Expr.DataType, value.Expr.Dev, funElems :: value.Expr.Shape)
                 dOutputVars.[outPort] <- dVar
 
                 // create variable input specification:
@@ -112,6 +112,7 @@ type LoopDeriv(op: Loop) =
             // go through loop variables and create corresponding derivative variables and ports
             for KeyValue (usingVar, li) in spec.Vars do
                 let liType = usingVar.Type
+                let liDev = usingVar.Dev
                 let liShape = usingVar.Shape
                 let liElems = ShapeSpec.nElem usingVar.Shape
                 let liDims = ShapeSpec.nDim usingVar.Shape
@@ -120,7 +121,7 @@ type LoopDeriv(op: Loop) =
                 | Loop.ConstArg argIdx ->
                     // create a variable for the sum of the accumulated Jacobian so far
                     let dAccumName = VarName (sprintf "dSum_ConstArg%d[-1]" argIdx)
-                    let dAccumVar = Var.make (dAccumName, liType, funElems :: liShape)
+                    let dAccumVar = Var.make (dAccumName, liType, liDev, funElems :: liShape)
 
                     // create loop port exposing the step Jacobian plus the accumulated Jacobian w.r.t. ConstArg argIdx
                     let dPort = Ch.Custom (sprintf "dSum_ConstArg%d" argIdx)
@@ -133,7 +134,7 @@ type LoopDeriv(op: Loop) =
                     let dpp: Loop.PreviousChannel = {
                         Channel    = dPort
                         Delay      = SizeSpec.one
-                        InitialArg = addZeroInitialArg (funElems :: usingVar.Shape) usingVar.Type (liDims+1) SizeSpec.one
+                        InitialArg = addZeroInitialArg (funElems :: usingVar.Shape) usingVar.Type usingVar.Dev (liDims+1) SizeSpec.one
                     }
                     varInputSpecs.Add (dAccumVar, Loop.PreviousChannel dpp)
 
@@ -174,7 +175,7 @@ type LoopDeriv(op: Loop) =
                     portContents.[dPort].DerivWrt.Add usingVar
 
                     // create a variable for Jacobian coming from a PreviousPort in a (future) loop iteration
-                    let dVar = Var.make (VarName dPortName, liType, funElems :: liShape)
+                    let dVar = Var.make (VarName dPortName, liType, liDev, funElems :: liShape)
                     dPreviousVars.[pp] <- dVar
 
                     // create corresponding variable input specification:
@@ -182,7 +183,7 @@ type LoopDeriv(op: Loop) =
                     let dpp: Loop.PreviousChannel = {
                         Channel    = dPort
                         Delay      = pp.Delay
-                        InitialArg = addZeroInitialArg (funElems :: usingVar.Shape) usingVar.Type (sliceDim+1) pp.Delay
+                        InitialArg = addZeroInitialArg (funElems :: usingVar.Shape) usingVar.Type usingVar.Dev (sliceDim+1) pp.Delay
                     }
                     varInputSpecs.Add (dVar, Loop.PreviousChannel dpp)                                 
 

@@ -13,18 +13,9 @@ let dumpExpr (expr: Expr) =
     printfn ""
 
 
-let ExprAPB () =
-    let a = Var.make<float32> ("a", [SizeSpec.fix 10L; SizeSpec.fix 20L])
-    let b = Var.make<float32> ("b", [SizeSpec.fix 10L; SizeSpec.fix 20L])
-    printfn "Building expr..."
-    let expr = Expr a + Expr b
-    printfn "a+b:"
-    dumpExpr expr
-
-
 module Vars =
-    let a = Var.make<float32> ("a", [SizeSpec.fix 10L; SizeSpec.fix 20L])
-    let b = Var.make<float32> ("b", [SizeSpec.fix 10L; SizeSpec.fix 20L])
+    let a = Var.make<float32> ("a", HostTensor.Dev, [SizeSpec.fix 10L; SizeSpec.fix 20L])
+    let b = Var.make<float32> ("b", HostTensor.Dev, [SizeSpec.fix 10L; SizeSpec.fix 20L])
 
 
 let ``Deriv: a + b`` () =

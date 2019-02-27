@@ -8,17 +8,22 @@ open Tensor.Expr
 module Check =
 
     let sameType (exprs: BaseExprCh list) =
-        let types = exprs |> List.map (fun e -> e.TypeName)
+        let types = exprs |> List.map BaseExprCh.typeName
         if types |> List.exists ((<>) types.Head) then
             failwithf "All arguments are expected to be of same type, but types are: %A." types
 
     let sameShape (exprs: BaseExprCh list) =
-        let shapes = exprs |> List.map (fun e -> e.Shape)
+        let shapes = exprs |> List.map BaseExprCh.shape
         if shapes |> List.exists ((<>) shapes.Head) then
             failwithf "All arguments are expected to be of same shape, but shapes are: %A." shapes
 
+    let sameDev (exprs: BaseExprCh list) =
+        let devs = exprs |> List.map BaseExprCh.dev
+        if devs |> List.exists ((<>) devs.Head) then
+            failwithf "All arguments are expected to be stored on same device, but devices are: %A." devs
+
     let bool (exprs: BaseExprCh list) =
-        let types = exprs |> List.map (fun e -> e.TypeName)
+        let types = exprs |> List.map BaseExprCh.typeName
         if types |> List.exists ((<>) TypeName.ofType<bool>) then
             failwithf "All arguments are expected to be of type bool, but types are: %A." types
 
@@ -33,7 +38,7 @@ module Check =
         range |> List.iter (function 
             | SimpleRangeSpec.SymStartSymEnd _ -> ()
             | SimpleRangeSpec.DynStartSymSize (s, _) -> 
-                if (s :?> BaseExpr).OnlyCh.DataType <> typeof<int64> then
+                if (s :?> BaseExpr).[Ch.Default].DataType <> typeof<int64> then
                     failwithf "Dynamic range start must be of type int64.")
 
 

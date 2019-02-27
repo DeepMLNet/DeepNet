@@ -155,7 +155,7 @@ type Deriv = private {
     /// Computes the derivative expression w.r.t. all variables occuring in it.
     static member compute (rootExpr: Expr) : Deriv =
         let funElems = ShapeSpec.nElem rootExpr.Shape 
-        let rootJac = Expr.identityOfType rootExpr.DataType funElems
+        let rootJac = Expr.identityOfType rootExpr.DataType rootExpr.Dev funElems
         let rootDeriv = rootJac |> Expr.reshape (funElems :: rootExpr.Shape)
         let deriv = Deriv.computeWithRootDeriv rootDeriv rootExpr
         deriv
@@ -168,7 +168,7 @@ type Deriv = private {
             | Some d -> d
             | None -> 
                 let varExpr = Expr var
-                Expr.zerosOfType varExpr.DataType [this.FunElems; Expr.nElems varExpr]
+                Expr.zerosOfType varExpr.DataType varExpr.Dev [this.FunElems; Expr.nElems varExpr]
 
 
     /// Number of function elements.

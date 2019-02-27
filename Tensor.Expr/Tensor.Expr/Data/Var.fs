@@ -1,6 +1,7 @@
 ﻿namespace Tensor.Expr
 
 open DeepNet.Utils
+open Tensor.Backend
 
 
 /// Variable name.
@@ -18,35 +19,38 @@ type Var = {
     Name:      VarName
     /// data type
     TypeName:  TypeName
+    /// storage device
+    Dev:       ITensorDevice
     /// symbolic shape
     Shape:     ShapeSpec
 } with
 
-    /// Create variable using name, shape and data type name.
-    static member make (name, typeName, shape) : Var =
-        {Name=name; TypeName=typeName; Shape=shape}
+    /// Create variable using name, shape, data type name and storage device.
+    static member make (name, typeName, dev, shape) : Var =
+        {Name=name; TypeName=typeName; Shape=shape; Dev=dev}
 
-    /// Create variable using name, shape and data type.
-    static member make (name, typ, shape) : Var =
-        {Name=name; TypeName=TypeName.ofTypeInst typ; Shape=shape}
+    /// Create variable using name, shape, data type and storage device.
+    static member make (name, typ, dev, shape) : Var =
+        {Name=name; TypeName=TypeName.ofTypeInst typ; Shape=shape; Dev=dev}
 
-    /// Create variable using name, shape and data type.
-    static member make (name, typ, shape) : Var =
-        {Name=VarName name; TypeName=TypeName.ofTypeInst typ; Shape=shape}
+    /// Create variable using name, shape, data type and storage device.
+    static member make (name, typ, dev, shape) : Var =
+        {Name=VarName name; TypeName=TypeName.ofTypeInst typ; Shape=shape; Dev=dev}
 
-    /// Create variable from name and shape.
-    static member make<'T> (name, shape) : Var =
-        {Name=name; TypeName=TypeName.ofType<'T>; Shape=shape}
+    /// Create variable from name, shape and storage device.
+    static member make<'T> (name, dev, shape) : Var =
+        {Name=name; TypeName=TypeName.ofType<'T>; Shape=shape; Dev=dev}
 
-    /// Create variable from name and shape.
-    static member make<'T> (name, shape) : Var = 
-        {Name=VarName name; TypeName=TypeName.ofType<'T>; Shape=shape}
+    /// Create variable from name, shape and storage device.
+    static member make<'T> (name, dev, shape) : Var = 
+        {Name=VarName name; TypeName=TypeName.ofType<'T>; Shape=shape; Dev=dev}
 
     /// data type
     member this.Type = TypeName.getType this.TypeName
 
     /// pretty string representation
-    member this.Pretty = sprintf "%A<%s>%A" this.Name this.Type.Name this.Shape
+    member this.Pretty = 
+        sprintf "%A<%s@%A>%A" this.Name this.Type.Name this.Dev this.Shape
 
     /// numeric shape
     member this.NShape = this.Shape |> ShapeSpec.eval
@@ -65,6 +69,9 @@ type Var = {
 
     /// typename of variable
     static member typeName (vs: Var) = vs.TypeName
+
+    /// storage device of variable
+    static member dev (vs: Var) = vs.Dev
 
     /// substitutes the size symbol environment into the variable
     static member substSymSizes symSizes (vs: Var) = 

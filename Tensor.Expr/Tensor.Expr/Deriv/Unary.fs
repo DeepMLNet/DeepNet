@@ -228,7 +228,8 @@ type SubtensorDeriv(op: Subtensor) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = DerivTools.Env.make op dOp 
-            let agExpanded = Expr.zerosOfType env.DOp.DataType (env.FunElems :: env.Only.Shape)
+            let agExpanded = 
+                Expr.zerosOfType env.DOp.DataType env.DOp.Dev (env.FunElems :: env.Only.Shape)
             env.DOp
             |> Expr.setSubtensor agExpanded.[SimpleRangeSpec.All :: op.Range] 
             |> DerivTools.unary

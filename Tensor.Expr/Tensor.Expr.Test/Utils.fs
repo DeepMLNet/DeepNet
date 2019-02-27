@@ -16,6 +16,7 @@ open Tensor.Expr
 let dumpExpr (expr: Expr) =
     printfn "Expr: %s" (expr.ToString())
     printfn "==== DataType:           %A" expr.DataType
+    printfn "==== Device:             %A" expr.Dev
     printfn "==== Shape:              %A" expr.Shape
     printfn "==== CanEvalAllSymSizes: %A" expr.CanEvalAllSymSizes
     printfn "==== Vars:               %A" expr.Vars

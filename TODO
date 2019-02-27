@@ -1,4 +1,17 @@
 
+- Port the optimizer, since it worked on Exprs before and should thus be not difficult to port.
+- or do the evaluator first, since we might want the optimizer to depend on it?
+- how would a good evaluator work?
+
+- well, for most simple case, we can implement the simpleEval thing
+- this, however has shown, that it runs out of memory quickly
+
+- not entirely clear how BaseEval will be separated from compiled eval
+- is it mostly about memory-allocation?
+- it was also about stream allocation and efficient re-run...
+-
+
+
 - it would make sense to write basic tests
   i.e. create expression
   derive expression
@@ -10,6 +23,8 @@
 
 
 - check if anything useful is left in UExpr
-- implement direct eval, i.e. formal host eval
+   - yes, Loop channel trimmer. => see where to move that. optimizer?
+
+- implement direct eval, i.e. former host eval
 
 

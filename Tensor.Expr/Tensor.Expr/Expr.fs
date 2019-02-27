@@ -1,7 +1,8 @@
 ﻿namespace Tensor.Expr
 
-open Tensor.Expr.Ops
 open DeepNet.Utils
+open Tensor.Expr.Ops
+open Tensor.Backend
 
 
 module internal ExprHelpers =
@@ -45,26 +46,29 @@ type Expr (baseExpr: BaseExpr) =
     member this.BaseExpr = baseExpr
     static member baseExpr (expr: Expr) = expr.BaseExpr
 
-    member this.BaseExprCh = baseExpr.OnlyCh
+    member this.BaseExprCh = baseExpr.[Ch.Default]
     static member baseExprCh (expr: Expr) = expr.BaseExprCh
 
     member this.Op = baseExpr.Op
     static member op (expr: Expr) = expr.Op
 
-    member this.TypeName = baseExpr.OnlyCh.TypeName
+    member this.TypeName = baseExpr.[Ch.Default].TypeName
     static member typeName (expr: Expr) = expr.TypeName
 
-    member this.DataType = baseExpr.OnlyCh.DataType
+    member this.DataType = baseExpr.[Ch.Default].DataType
     static member dataType (expr: Expr) = expr.DataType
 
-    member this.Shape = baseExpr.OnlyCh.Shape
+    member this.Shape = baseExpr.[Ch.Default].Shape
     static member shape (expr: Expr) = expr.Shape
 
-    member this.NDims = baseExpr.OnlyCh.NDims
+    member this.NDims = baseExpr.[Ch.Default].NDims
     static member nDims (expr: Expr) = expr.NDims
 
-    member this.NElems = baseExpr.OnlyCh.NElems
+    member this.NElems = baseExpr.[Ch.Default].NElems
     static member nElems (expr: Expr) = expr.NElems
+
+    member this.Dev = baseExpr.[Ch.Default].Dev
+    static member dev (expr: Expr) = expr.Dev
 
     member this.Args = baseExpr.Args |> Map.map (fun _ arg -> Expr arg)
     static member args (expr: Expr) = expr.Args
@@ -193,17 +197,17 @@ type Expr (baseExpr: BaseExpr) =
         a |> Expr.reshape (a.Shape |> ShapeSpec.disableBroadcast dim)
   
     /// scalar constant of given value
-    static member scalar (f: obj) = 
-        {Scalar.Value=Const.ofValue f} |> Expr 
+    static member scalar dev (f: obj) = 
+        {Scalar.Value=Const.ofValue f; Dev=dev} |> Expr 
 
     /// scalar of given value converted to same type as given expression
-    static member scalarOfSameType (expr: Expr) f = 
+    static member scalarLike (expr: Expr) f = 
         let v = System.Convert.ChangeType (box f, expr.TypeName.Type)
-        Expr.scalar v
+        Expr.scalar expr.Dev v
 
     /// Scalar with value of given size and type int64.
-    static member size (size: SizeSpec) = 
-        {SizeValue.Value=size} |> Expr
+    static member size dev (size: SizeSpec) = 
+        {SizeValue.Value=size; Dev=dev} |> Expr
 
     /// Permutes the axes as specified.
     /// Each entry in the specified permutation specifies the *new* position of 
@@ -324,7 +328,7 @@ type Expr (baseExpr: BaseExpr) =
     static member setSubtensor (trgt: Expr) (src: Expr) =
         match trgt.BaseExpr with
         | SubtensorExpr (range, subtensorExpr, trgtExpr) ->
-            let srcReshaped = Expr {Reshape.Shape=subtensorExpr.OnlyCh.Shape; X=src.BaseExprCh}
+            let srcReshaped = Expr {Reshape.Shape=subtensorExpr.[Ch.Default].Shape; X=src.BaseExprCh}
             Expr {SetSubtensor.Range=range; X=trgtExpr; Y=srcReshaped.BaseExprCh}
         | _ ->
             invalidArg "trgt" "The first argument of setSubtensor must be an item or slice of an expression, i.e. a.[...]."                 
@@ -386,33 +390,33 @@ type Expr (baseExpr: BaseExpr) =
     static member (<<>>) (x: Expr, y: Expr) = Expr.constructElementwise (fun x y -> {NotEqual.X=x.BaseExprCh; Y=y.BaseExprCh} :> IOp) x y
 
     // elementwise binary with basetype
-    static member (+) (x: Expr, y: System.IComparable) = x + (Expr.scalar y)
-    static member (-) (x: Expr, y: System.IComparable) = x - (Expr.scalar y)
-    static member (*) (x: Expr, y: System.IComparable) = x * (Expr.scalar y)
-    static member (/) (x: Expr, y: System.IComparable) = x / (Expr.scalar y)
-    static member (%) (x: Expr, y: System.IComparable) = x % (Expr.scalar y)
-    static member Pow (x: Expr, y: System.IComparable) = x ** (Expr.scalar y)
-    static member ( *** ) (x: Expr, y: System.IComparable) = x ** (Expr.scalar y)   
-    static member (====) (x: Expr, y: System.IComparable) = x ==== (Expr.scalar y)
-    static member (<<<<) (x: Expr, y: System.IComparable) = x <<<< (Expr.scalar y)
-    static member (<<==) (x: Expr, y: System.IComparable) = x <<== (Expr.scalar y)
-    static member (>>>>) (x: Expr, y: System.IComparable) = x >>>> (Expr.scalar y)
-    static member (>>==) (x: Expr, y: System.IComparable) = x >>== (Expr.scalar y)
-    static member (<<>>) (x: Expr, y: System.IComparable) = x <<>> (Expr.scalar y)
+    static member (+) (x: Expr, y: System.IComparable) = x + (Expr.scalarLike x y)
+    static member (-) (x: Expr, y: System.IComparable) = x - (Expr.scalarLike x y)
+    static member (*) (x: Expr, y: System.IComparable) = x * (Expr.scalarLike x y)
+    static member (/) (x: Expr, y: System.IComparable) = x / (Expr.scalarLike x y)
+    static member (%) (x: Expr, y: System.IComparable) = x % (Expr.scalarLike x y)
+    static member Pow (x: Expr, y: System.IComparable) = x ** (Expr.scalarLike x y)
+    static member ( *** ) (x: Expr, y: System.IComparable) = x ** (Expr.scalarLike x y)   
+    static member (====) (x: Expr, y: System.IComparable) = x ==== (Expr.scalarLike x y)
+    static member (<<<<) (x: Expr, y: System.IComparable) = x <<<< (Expr.scalarLike x y)
+    static member (<<==) (x: Expr, y: System.IComparable) = x <<== (Expr.scalarLike x y)
+    static member (>>>>) (x: Expr, y: System.IComparable) = x >>>> (Expr.scalarLike x y)
+    static member (>>==) (x: Expr, y: System.IComparable) = x >>== (Expr.scalarLike x y)
+    static member (<<>>) (x: Expr, y: System.IComparable) = x <<>> (Expr.scalarLike x y)
 
-    static member (+) (x: System.IComparable, y: Expr) = (Expr.scalar x) + y
-    static member (-) (x: System.IComparable, y: Expr) = (Expr.scalar x) - y
-    static member (*) (x: System.IComparable, y: Expr) = (Expr.scalar x) * y
-    static member (/) (x: System.IComparable, y: Expr) = (Expr.scalar x) / y
-    static member (%) (x: System.IComparable, y: Expr) = (Expr.scalar x) % y
-    static member Pow (x: System.IComparable, y: Expr) = (Expr.scalar x) ** y
-    static member ( *** ) (x: System.IComparable, y: Expr) = (Expr.scalar x) ** y
-    static member (====) (x: System.IComparable, y: Expr) = (Expr.scalar x) ==== y
-    static member (<<<<) (x: System.IComparable, y: Expr) = (Expr.scalar x) <<<< y
-    static member (<<==) (x: System.IComparable, y: Expr) = (Expr.scalar x) <<== y
-    static member (>>>>) (x: System.IComparable, y: Expr) = (Expr.scalar x) >>>> y
-    static member (>>==) (x: System.IComparable, y: Expr) = (Expr.scalar x) >>== y
-    static member (<<>>) (x: System.IComparable, y: Expr) = (Expr.scalar x) <<>> y
+    static member (+) (x: System.IComparable, y: Expr) = (Expr.scalarLike y x) + y
+    static member (-) (x: System.IComparable, y: Expr) = (Expr.scalarLike y x) - y
+    static member (*) (x: System.IComparable, y: Expr) = (Expr.scalarLike y x) * y
+    static member (/) (x: System.IComparable, y: Expr) = (Expr.scalarLike y x) / y
+    static member (%) (x: System.IComparable, y: Expr) = (Expr.scalarLike y x) % y
+    static member Pow (x: System.IComparable, y: Expr) = (Expr.scalarLike y x) ** y
+    static member ( *** ) (x: System.IComparable, y: Expr) = (Expr.scalarLike y x) ** y
+    static member (====) (x: System.IComparable, y: Expr) = (Expr.scalarLike y x) ==== y
+    static member (<<<<) (x: System.IComparable, y: Expr) = (Expr.scalarLike y x) <<<< y
+    static member (<<==) (x: System.IComparable, y: Expr) = (Expr.scalarLike y x) <<== y
+    static member (>>>>) (x: System.IComparable, y: Expr) = (Expr.scalarLike y x) >>>> y
+    static member (>>==) (x: System.IComparable, y: Expr) = (Expr.scalarLike y x) >>== y
+    static member (<<>>) (x: System.IComparable, y: Expr) = (Expr.scalarLike y x) <<>> y
 
     /// Dot product.
     static member ( .* ) (x: Expr, y: Expr) = Expr {Dot.X=x.BaseExprCh; Y=y.BaseExprCh}
@@ -426,31 +430,31 @@ type Expr (baseExpr: BaseExpr) =
         Expr.Sqrt expr
 
     /// Tensor of given shape filled with specified value.
-    static member filled (shp: ShapeSpec) value =
+    static member filled (dev: ITensorDevice) (shp: ShapeSpec) value =
         let bcShp = shp |> List.map (fun _ -> SizeSpec.broadcastable)
-        Expr.scalar value |> Expr.reshape bcShp |> Expr.broadcast shp
+        Expr.scalar dev value |> Expr.reshape bcShp |> Expr.broadcast shp
 
     /// Zero tensor of given shape.
     [<RequiresExplicitTypeArguments>]
-    static member zeros<'T> (shp: ShapeSpec) =
-        Expr.filled shp (conv<'T> 0)
+    static member zeros<'T> dev (shp: ShapeSpec) =
+        Expr.filled dev shp (conv<'T> 0)
 
     /// Zero tensor of given type and shape.
-    static member zerosOfType typ shp =
-        Expr.filled shp (convTo typ 0)
+    static member zerosOfType typ dev shp =
+        Expr.filled dev shp (convTo typ 0)
 
     /// zero tensor with same shape and type as given tensor
     static member zerosLike (expr: Expr) = 
-        Expr.zerosOfType expr.DataType expr.Shape
+        Expr.zerosOfType expr.DataType expr.Dev expr.Shape
 
     /// Identity matrix of given size and type.
-    static member identityOfType typ size =
-        Expr {Identity.Size=size; Type=TypeName.ofTypeInst typ}
+    static member identityOfType typ dev size =
+        Expr {Identity.Size=size; Type=TypeName.ofTypeInst typ; Dev=dev}
 
     /// Identity matrix of given size.
     [<RequiresExplicitTypeArguments>]
-    static member identity<'T> size = 
-        Expr.identityOfType typeof<'T> size
+    static member identity<'T> dev size = 
+        Expr.identityOfType typeof<'T> dev size
 
     /// Computes the inverse of a matrix.
     /// If the input has more than two dimensions, the inverses
@@ -490,7 +494,7 @@ type Expr (baseExpr: BaseExpr) =
 
         // build concatenation using iterative subtensor replacement
         let concatenated, _ =
-            ((Expr.zerosOfType es.Head.DataType shp, SizeSpec.zero), es)
+            ((Expr.zerosOfType es.Head.DataType es.Head.Dev shp, SizeSpec.zero), es)
             ||> List.fold (fun (concatSoFar, pos) e ->
                 let len = e.Shape.[dim]
                 let slice: RangesSpec = 
