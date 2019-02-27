@@ -27,4 +27,7 @@
 
 - implement direct eval, i.e. former host eval
 
+- streamline testing for eval and deriv a bit
+- make Expr and Var generic again?
+- implement var updating expression
 

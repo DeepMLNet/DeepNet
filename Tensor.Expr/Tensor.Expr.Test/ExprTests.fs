@@ -7,6 +7,7 @@ open FsUnit.Xunit
 open DeepNet.Utils
 open Tensor.Utils
 open Tensor
+open Tensor.Backend
 open Tensor.Expr
 open Utils
 
@@ -24,6 +25,53 @@ module VarVals =
         VarEnv.empty
         |> VarEnv.add Vars.a a
         |> VarEnv.add Vars.b b 
+
+
+
+type ExprTestCase = {
+    Expr:       Expr
+    DataType:   System.Type
+    Dev:        ITensorDevice
+    Shape:      ShapeSpec
+    Value:      ITensor
+}
+
+
+module ExprTestCase =
+    let test (output: ITestOutputHelper) (tc: ExprTestCase) =
+        let printfn format = Printf.kprintf (fun msg -> output.WriteLine(msg)) format 
+        printfn "Expr: %s" (tc.Expr.ToString())
+        printfn "==== DataType:           %A" tc.Expr.DataType
+        printfn "==== Device:             %A" tc.Expr.Dev
+        printfn "==== Shape:              %A" tc.Expr.Shape
+        printfn "==== CanEvalAllSymSizes: %A" tc.Expr.CanEvalAllSymSizes
+        printfn "==== Vars:               %A" tc.Expr.Vars
+        let value = tc.Expr |> Expr.eval VarVals.varEnv 
+        printfn "==== Value:              \n%A" value
+
+        assert (tc.Expr.DataType = tc.DataType)
+        assert (tc.Expr.Dev = tc.Dev)
+        assert (tc.Expr.Shape = tc.Shape)
+        assert (value.AlmostEqual tc.Value)
+
+
+
+module ExprTestCases =
+    let ``a + b`` () = {
+        Expr = Expr Vars.a + Expr Vars.b
+        DataType = typeof<float32>
+        Dev = HostTensor.Dev
+        Shape = [SizeSpec.fix 2L; SizeSpec.fix 3L]
+        Value = VarVals.a + VarVals.b
+    }
+
+    let ``sin a + cos b`` () = {
+        Expr = sin (Expr Vars.a) + cos (Expr Vars.b)
+        DataType = typeof<float32>
+        Dev = HostTensor.Dev
+        Shape = [SizeSpec.fix 2L; SizeSpec.fix 3L]
+        Value = sin VarVals.a + cos VarVals.b
+    }
 
 
 type ExprTests (output: ITestOutputHelper) =
@@ -63,37 +111,7 @@ type ExprTests (output: ITestOutputHelper) =
 
 
     [<Fact>]
-    let ``Expr: a + b`` () =
-        printfn "==== a+b:"
-        let expr = Expr Vars.a + Expr Vars.b
-        dumpExpr output expr  
-        assert (expr.DataType = typeof<float32>)
-        assert (expr.Shape = [SizeSpec.fix 2L; SizeSpec.fix 3L])
-        assert (expr.CanEvalAllSymSizes = true)
-        assert (expr.Vars = Set [Vars.a; Vars.b])
-
+    let ``a + b`` () = ExprTestCase.test output (ExprTestCases.``a + b`` ())
 
     [<Fact>]
-    let ``Expr: sin a + cos b`` () =
-        printfn "==== sin a + cos b:"
-        let expr = sin (Expr Vars.a) + cos (Expr Vars.b)
-        dumpExpr output expr  
-        assert (expr.DataType = typeof<float32>)
-        assert (expr.Shape = [SizeSpec.fix 2L; SizeSpec.fix 3L])
-        assert (expr.CanEvalAllSymSizes = true)
-        assert (expr.Vars = Set [Vars.a; Vars.b])
-
-
-    [<Fact>]
-    let ``Eval expr: a + b`` () =
-        printfn "==== eval: a + b:"
-        let expr = Expr Vars.a + Expr Vars.b
-        let exprVal = expr |> Expr.eval VarVals.varEnv :?> Tensor<float32>
-        printfn "a=%A" VarVals.a
-        printfn "b=%A" VarVals.b
-        printfn "expr=%A" exprVal
-        assert (Tensor.almostEqual (exprVal, VarVals.a + VarVals.b))
-
-
-
-
+    let ``sin a + cos b`` () = ExprTestCase.test output (ExprTestCases.``sin a + cos b`` ())
