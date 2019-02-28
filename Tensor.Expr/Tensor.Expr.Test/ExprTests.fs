@@ -12,6 +12,46 @@ open Tensor.Expr
 open Utils
 
 
+
+type ExprTestCase = {
+    Expr:       Expr
+    DataType:   System.Type
+    Dev:        ITensorDevice
+    Shape:      ShapeSpec
+    Value:      ITensor
+}
+
+
+module ExprTestCase =
+    let test (output: ITestOutputHelper) (varEnv: VarEnv) (tc: ExprTestCase) =
+        let printfn format = Printf.kprintf (fun msg -> output.WriteLine(msg)) format 
+
+        printfn "Expr: %s" (tc.Expr.ToString())
+        printfn "==== DataType:           %A" tc.Expr.DataType
+        printfn "==== Device:             %A" tc.Expr.Dev
+        printfn "==== Shape:              %A" tc.Expr.Shape
+        printfn "==== CanEvalAllSymSizes: %A" tc.Expr.CanEvalAllSymSizes
+        printfn "==== Vars:               %A" tc.Expr.Vars
+        let value = tc.Expr |> Expr.eval varEnv 
+        printfn "==== Value:              \n%A" value
+
+        assert (tc.Expr.DataType = tc.DataType)
+        assert (tc.Expr.Dev = tc.Dev)
+        assert (tc.Expr.Shape = tc.Shape)
+        assert (value.AlmostEqual tc.Value)
+
+    let deriv (output: ITestOutputHelper) (varEnv: VarEnv) (tc: ExprTestCase) =
+        let printfn format = Printf.kprintf (fun msg -> output.WriteLine(msg)) format 
+
+        printfn "Expr: %s" (tc.Expr.ToString())
+        let derivs = Deriv.compute tc.Expr
+        for var in tc.Expr.Vars do
+            printfn "wrt %A:   %A" var derivs.[var]
+            let value = derivs.[var] |> Expr.eval varEnv 
+            printfn "evaled:   %A" value
+            printfn ""
+
+
 module Vars =
     let a = Var.make<float32> ("a", HostTensor.Dev, [SizeSpec.fix 2L; SizeSpec.fix 3L])
     let b = Var.make<float32> ("b", HostTensor.Dev, [SizeSpec.fix 2L; SizeSpec.fix 3L])
@@ -25,34 +65,6 @@ module VarVals =
         VarEnv.empty
         |> VarEnv.add Vars.a a
         |> VarEnv.add Vars.b b 
-
-
-
-type ExprTestCase = {
-    Expr:       Expr
-    DataType:   System.Type
-    Dev:        ITensorDevice
-    Shape:      ShapeSpec
-    Value:      ITensor
-}
-
-
-module ExprTestCase =
-    let test (output: ITestOutputHelper) (tc: ExprTestCase) =
-        let printfn format = Printf.kprintf (fun msg -> output.WriteLine(msg)) format 
-        printfn "Expr: %s" (tc.Expr.ToString())
-        printfn "==== DataType:           %A" tc.Expr.DataType
-        printfn "==== Device:             %A" tc.Expr.Dev
-        printfn "==== Shape:              %A" tc.Expr.Shape
-        printfn "==== CanEvalAllSymSizes: %A" tc.Expr.CanEvalAllSymSizes
-        printfn "==== Vars:               %A" tc.Expr.Vars
-        let value = tc.Expr |> Expr.eval VarVals.varEnv 
-        printfn "==== Value:              \n%A" value
-
-        assert (tc.Expr.DataType = tc.DataType)
-        assert (tc.Expr.Dev = tc.Dev)
-        assert (tc.Expr.Shape = tc.Shape)
-        assert (value.AlmostEqual tc.Value)
 
 
 
@@ -77,41 +89,18 @@ module ExprTestCases =
 type ExprTests (output: ITestOutputHelper) =
     let printfn format = Printf.kprintf (fun msg -> output.WriteLine(msg)) format 
 
-    [<Fact>]
-    let ``Expr is reference unique`` () =
-        printfn "==== Expr is reference unique:"
+    [<Fact>] 
+    let ``a + b`` () = 
+        ExprTestCase.test output VarVals.varEnv (ExprTestCases.``a + b`` ())
 
-        let a1 = Var.make<float32> ("a", HostTensor.Dev, [SizeSpec.fix 10L; SizeSpec.fix 20L])
-        let b1 = Var.make<float32> ("b", HostTensor.Dev, [SizeSpec.fix 10L; SizeSpec.fix 20L])
-        let a2 = Var.make<float32> ("a", HostTensor.Dev, [SizeSpec.fix 10L; SizeSpec.fix 20L])
-        let b2 = Var.make<float32> ("b", HostTensor.Dev, [SizeSpec.fix 10L; SizeSpec.fix 20L])
-
-        let expr1 = sin (Expr a1) - cos (Expr b1)
-        let expr2 = sin (Expr a2) - cos (Expr b2)
-        let expr3 = sin (Expr a2) - cos (Expr a2)
-
-        printfn "expr1: %A" expr1
-        printfn "expr2: %A" expr2
-        printfn "expr3: %A" expr3
-
-        printfn "expr1 = expr2: %A" (expr1 = expr2)
-        printfn "Reference equals of BaseExpr: %A" (obj.ReferenceEquals(expr1.BaseExpr, expr2.BaseExpr))
-        assert (expr1 = expr2)
-        assert (obj.ReferenceEquals(expr1.BaseExpr, expr2.BaseExpr))
-
-        printfn "expr1 <> expr3: %A" (expr1 <> expr3)
-        printfn "Reference equals of BaseExpr: %A" (obj.ReferenceEquals(expr1.BaseExpr, expr3.BaseExpr))
-        assert (expr1 <> expr3)
-        assert (not (obj.ReferenceEquals(expr1.BaseExpr, expr3.BaseExpr)))
-
-        printfn "expr2 <> expr3: %A" (expr2 <> expr3)
-        printfn "Reference equals of BaseExpr: %A" (obj.ReferenceEquals(expr2.BaseExpr, expr3.BaseExpr))
-        assert (expr2 <> expr3)
-        assert (not (obj.ReferenceEquals(expr2.BaseExpr, expr3.BaseExpr)))
-
+    [<Fact>] 
+    let ``Deriv: a + b`` () = 
+        ExprTestCase.deriv output VarVals.varEnv (ExprTestCases.``a + b`` ())
 
     [<Fact>]
-    let ``a + b`` () = ExprTestCase.test output (ExprTestCases.``a + b`` ())
+    let ``sin a + cos b`` () = 
+        ExprTestCase.test output VarVals.varEnv (ExprTestCases.``sin a + cos b`` ())
 
     [<Fact>]
-    let ``sin a + cos b`` () = ExprTestCase.test output (ExprTestCases.``sin a + cos b`` ())
+    let ``Deriv: sin a + cos b`` () = 
+        ExprTestCase.deriv output VarVals.varEnv (ExprTestCases.``sin a + cos b`` ())

@@ -8,9 +8,11 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Utils.fs" />
-    <Compile Include="ExprTests.fs" />
-    <Compile Include="DerivTests.fs" />  
+    <Compile Include="DerivCheck.fs" />
+    <Compile Include="BaseExprTests.fs" />
+    <Compile Include="ExprTests.fs" />  
   </ItemGroup>
+  <ItemGroup />
   <ItemGroup>
     <ProjectReference Include="..\..\Tensor\Tensor\Tensor.fsproj" />
     <ProjectReference Include="..\Tensor.Expr\Tensor.Expr.fsproj" />    
