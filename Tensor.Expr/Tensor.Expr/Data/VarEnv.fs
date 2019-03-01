@@ -6,14 +6,6 @@ open DeepNet.Utils
 
 
 
-
-/// specification of variable storage locations
-type VarLocs = Map<VarName, ITensorDevice>
-
-/// specification of variable strides
-type VarStrides = Map<VarName, int64 list>
-
-
 /// Contains numeric values for variables.
 type VarEnv = VarEnv of Map<VarName, ITensor> with
 
@@ -22,29 +14,34 @@ type VarEnv = VarEnv of Map<VarName, ITensor> with
         let (VarEnv values) = this
         values
 
-    /// Creates a new, empty VarEnv.
-    static member empty = VarEnv Map.empty
-
     /// Variable names contained in this VarEnv.
     member this.VarNames = this.Values |> Map.keys
 
     /// Get variable value by name.
     member this.Item
         with get(varName: VarName) : ITensor = this.Values.[varName] 
+
+    /// Creates a new, empty VarEnv.
+    static member empty = VarEnv Map.empty
         
     /// Add variable value by variable name.
     static member addVarName (varName: VarName) (value: ITensor) (varEnv: VarEnv) =
         varEnv.Values |> Map.add varName value |> VarEnv
 
     /// Add base variable value to environment.
-    static member addBaseVar (vs: BaseVar) (value: ITensor) (varEnv: VarEnv) =
-        if value.DataType <> vs.DataType then
+    static member addBaseVar (baseVar: BaseVar) (value: ITensor) (varEnv: VarEnv) =
+        if value.DataType <> baseVar.DataType then
             failwithf "Variable %A is of type %A but specified value is of type %A."
-                      vs.Name vs.DataType value.DataType
-        if value.Dev <> vs.Dev then
+                      baseVar.Name baseVar.DataType value.DataType
+        if value.Dev <> baseVar.Dev then
             failwithf "Variable %A is stored on device %A but specified value is stored on device %A."
-                      vs.Name vs.Dev value.Dev
-        varEnv |> VarEnv.addVarName vs.Name value
+                      baseVar.Name baseVar.Dev value.Dev
+        match ShapeSpec.tryEval baseVar.Shape with
+        | Some varShp when varShp <> value.Shape ->
+            failwithf "Variable %A has shape %A but specified value is of shape %A."
+                      baseVar.Name varShp value.Shape
+        | _ -> ()
+        varEnv |> VarEnv.addVarName baseVar.Name value
 
     /// Add variable value to environment.
     static member add (var: Var<'T>) (value: ITensor) (varEnv: VarEnv)  =
@@ -56,12 +53,20 @@ type VarEnv = VarEnv of Map<VarName, ITensor> with
 
     /// joins two variable environments
     static member join (a: VarEnv) (b: VarEnv) : VarEnv =
-        Map.join a.Values b.Values |> VarEnv
+        Map.join a.Values b.Values |> VarEnv    
 
-    ///// Constructs a VarEnv from a sequence of variable, value tuples.
-    //static member ofSeq (entries: (BaseVar * ITensor) seq) =
-    //    (VarEnv.empty, entries)
-    //    ||> Seq.fold (fun ve (var, value) -> ve |> VarEnv.add var value)
+    /// Constructs a VarEnv from a sequence of variable, value tuples.
+    static member ofSeq (entries: (BaseVar * ITensor) seq) =
+        (VarEnv.empty, entries)
+        ||> Seq.fold (fun ve (var, value) -> ve |> VarEnv.addBaseVar var value)
+
+
+
+///// specification of variable storage locations
+//type VarLocs = Map<VarName, ITensorDevice>
+
+///// specification of variable strides
+//type VarStrides = Map<VarName, int64 list>
 
     ///// infers symbol sizes from the variable environment
     //static member inferSymSizes (symSizeEnv: SymSizeEnv) (varEnv: VarEnv) : SymSizeEnv =
