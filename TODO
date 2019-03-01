@@ -25,9 +25,8 @@
 - check if anything useful is left in UExpr
    - yes, Loop channel trimmer. => see where to move that. optimizer?
 
-- implement direct eval, i.e. former host eval
 
-- streamline testing for eval and deriv a bit
 - make Expr and Var generic again?
+- verify VarEnv while building
 - implement var updating expression
 
