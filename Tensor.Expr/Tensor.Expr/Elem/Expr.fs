@@ -237,7 +237,7 @@ with
                 if argType <> tn then
                     failwithf 
                         "the argument with zero-based index %d has type %A but was used  \
-                            as type %A in the element expression" n argType.Type tn.Type
+                         as type %A in the element expression" n argType.Type tn.Type
             | Leaf _ -> ()
 
             | Unary (_, a) -> check a

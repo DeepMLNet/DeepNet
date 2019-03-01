@@ -1,4 +1,6 @@
-﻿namespace Tensor.Expr
+﻿namespace rec Tensor.Expr
+
+open System
 
 open DeepNet.Utils
 open Tensor.Expr.Ops
@@ -18,86 +20,149 @@ module internal ExprHelpers =
             | _ -> None
         | _ -> None
 
-open ExprHelpers
 
+type IExpr =
+    inherit System.IEquatable<IExpr>
+    inherit System.IComparable<IExpr>
+
+    abstract BaseExpr: BaseExpr
+    abstract BaseExprCh: BaseExprCh
+    abstract Op: IOp
+    abstract TypeName: TypeName
+    abstract DataType: System.Type
+    abstract Shape: ShapeSpec
+    abstract NDims: int
+    abstract NElems: SizeSpec
+    abstract Dev: ITensorDevice
+    abstract Args: Map<Ch, IExpr>
+    abstract Vars: Set<BaseVar>
+    abstract CanEvalAllSymSizes: bool
+
+    abstract Pretty: string
+    abstract ToString: maxLength:int -> string
+    abstract ToString: unit -> string
+
+    abstract Reshape: ShapeSpec -> IExpr
+    abstract Broadcast: ShapeSpec -> IExpr
+
+
+
+module IExpr =
+
+    let ofBaseExpr (baseExpr: BaseExpr) : IExpr =
+         if not (baseExpr.IsSingleChannel) then
+            failwithf "IExpr is for single-channel expressions only, but got %A." baseExpr 
+         let exprType = typedefof<Expr<_>>.MakeGenericType baseExpr.[Ch.Default].DataType
+         Activator.CreateInstance(exprType, [|box baseExpr|]) :?> IExpr        
+
+    let ofBaseExprCh (exprCh: BaseExprCh) : IExpr =
+        let exprType = typedefof<Expr<_>>.MakeGenericType exprCh.DataType
+        Activator.CreateInstance(exprType, [|box exprCh|]) :?> IExpr
+ 
+    let ofOp (op: IOp) : IExpr =
+        ofBaseExpr (BaseExpr.ofOp op)
+
+    let ofBaseVar (var: BaseVar) : IExpr =
+        ofOp {VarArg.Var=var}
+        
+    let shape (expr: IExpr) = expr.Shape
+
+    let reshape (shape: ShapeSpec) (expr: IExpr) = expr.Reshape shape
+    let broadcast (shape: ShapeSpec) (expr: IExpr) = expr.Broadcast shape
+
+
+    /// pads and broadcasts all arguments to same shape if possible
+    let broadcastToSameMany (es: IExpr list) =
+        let ss = es |> List.map shape
+        let ps = ShapeSpec.padToSameMany ss
+        let bs = ShapeSpec.broadcastToSameMany false ps
+        List.zip3 es ps bs
+        |> List.map (fun (e, p, b) -> e |> reshape p |> broadcast b)      
+      
 
 /// An tensor-valued expression with a single output channel.
 [<StructuredFormatDisplay("{Pretty}")>]
-type Expr (baseExpr: BaseExpr) =    
+type Expr<'T> (baseExpr: BaseExpr) =    
     do 
         if not (baseExpr.IsSingleChannel) then
-            failwithf "Expr is for single-channel expressions only, but got %A." baseExpr
+            failwithf "Expr<'T> is for single-channel expressions only, but got %A." baseExpr
+        if baseExpr.[Ch.Default].DataType <> typeof<'T> then
+            failwithf "Cannot use Expr<%A> for BaseExpr %A of data type %A." 
+                      typeof<'T> baseExpr baseExpr.[Ch.Default].DataType
     
     /// Create expression from specified single-channel op.
     new (op: IOp) =
-        Expr (BaseExpr.ofOp op)
+        Expr<'T> (BaseExpr.ofOp op)
 
     /// Create expression by accessing the specified channel of the BaseExpr.
     new (exprCh: BaseExprCh) =
         match exprCh with
         | BaseExprCh (Ch.Default, baseExpr) -> Expr baseExpr
         | BaseExprCh (Ch.Custom chName, baseExpr) ->
-            Expr {Channel.X=baseExpr.[Ch.Custom chName]}
+            Expr<'T> {Channel.X=baseExpr.[Ch.Custom chName]}
 
     /// Expression having the value of the specified variable.
-    new (var: Var) =
-        Expr {VarArg.Var=var}
+    new (var: Var<'T>) =
+        Expr<'T> {VarArg.Var=var.BaseVar}
 
     member this.BaseExpr = baseExpr
-    static member baseExpr (expr: Expr) = expr.BaseExpr
+    static member baseExpr (expr: Expr<'T>) = expr.BaseExpr
 
     member this.BaseExprCh = baseExpr.[Ch.Default]
-    static member baseExprCh (expr: Expr) = expr.BaseExprCh
+    static member baseExprCh (expr: Expr<'T>) = expr.BaseExprCh
 
     member this.Op = baseExpr.Op
-    static member op (expr: Expr) = expr.Op
+    static member op (expr: Expr<'T>) = expr.Op
 
     member this.TypeName = baseExpr.[Ch.Default].TypeName
-    static member typeName (expr: Expr) = expr.TypeName
+    static member typeName (expr: Expr<'T>) = expr.TypeName
 
     member this.DataType = baseExpr.[Ch.Default].DataType
-    static member dataType (expr: Expr) = expr.DataType
+    static member dataType (expr: Expr<'T>) = expr.DataType
 
     member this.Shape = baseExpr.[Ch.Default].Shape
-    static member shape (expr: Expr) = expr.Shape
+    static member shape (expr: Expr<'T>) = expr.Shape
 
     member this.NDims = baseExpr.[Ch.Default].NDims
-    static member nDims (expr: Expr) = expr.NDims
+    static member nDims (expr: Expr<'T>) = expr.NDims
 
     member this.NElems = baseExpr.[Ch.Default].NElems
-    static member nElems (expr: Expr) = expr.NElems
+    static member nElems (expr: Expr<'T>) = expr.NElems
 
     member this.Dev = baseExpr.[Ch.Default].Dev
-    static member dev (expr: Expr) = expr.Dev
+    static member dev (expr: Expr<'T>) = expr.Dev
 
-    member this.Args = baseExpr.Args |> Map.map (fun _ arg -> Expr arg)
-    static member args (expr: Expr) = expr.Args
+    member this.Args = baseExpr.Args |> Map.map (fun _ arg -> IExpr.ofBaseExprCh arg)
+    static member args (expr: Expr<'T>) = expr.Args
+
+    //member this.Arg 
+    //    with get (arg: Arg) : Expr<'A> = Expr<'A> baseExpr.Args.[arg]
 
     member this.Vars = baseExpr.Vars
-    static member vars (expr: Expr) = expr.Vars
+    static member vars (expr: Expr<'T>) = expr.Vars
 
     member this.CanEvalAllSymSizes = baseExpr.CanEvalAllSymSizes
-    static member canEvalAllSymSizes (expr: Expr) = expr.CanEvalAllSymSizes
+    static member canEvalAllSymSizes (expr: Expr<'T>) = expr.CanEvalAllSymSizes
 
-    static member substSymSizes (env: SymSizeEnv) (expr: Expr) : Expr =
+    static member substSymSizes (env: SymSizeEnv) (expr: Expr<'T>) : Expr<'T> =
         expr.BaseExpr |> BaseExpr.substSymSizes env |> Expr
 
-    interface System.IEquatable<Expr> with
+    interface System.IEquatable<Expr<'T>> with
         member this.Equals other = this.BaseExpr = other.BaseExpr
 
     override this.Equals other =
         match other with
-        | :? Expr as other -> (this :> System.IEquatable<_>).Equals other
+        | :? Expr<'T> as other -> (this :> System.IEquatable<_>).Equals other
         | _ -> false
 
-    interface System.IComparable<Expr> with
+    interface System.IComparable<Expr<'T>> with
         member this.CompareTo other = compare this.BaseExpr other.BaseExpr
 
     interface System.IComparable with
         member this.CompareTo other =
             match other with
-            | :? Expr as other -> (this :> System.IComparable<_>).CompareTo other
-            | _ -> failwithf "Cannot compare Expr to type %A." (other.GetType())
+            | :? Expr<'T> as other -> (this :> System.IComparable<_>).CompareTo other
+            | _ -> failwithf "Cannot compare Expr<%A> to type %A." this.DataType (other.GetType())
 
     override this.GetHashCode() = hash this.BaseExpr
 
@@ -137,45 +202,45 @@ type Expr (baseExpr: BaseExpr) =
     member this.Pretty = this.ToString 80
 
     /// Checks that given axis is valid for specified expression
-    static member internal checkAxis ax (expr: Expr) =
+    static member internal checkAxis ax (expr: Expr<'T>) =
         if not (0 <= ax && ax < expr.NDims) then
             failwithf "Specified axis %d is invalid for expression of shape %A." ax expr.Shape
 
     /// Reshapes the expression into the given shape.
     /// The element count must not change.
-    static member reshape ss (expr: Expr) =
+    static member reshape ss (expr: Expr<'T>) : Expr<'T> =
         if ss = expr.Shape then expr 
         else Expr {Reshape.Shape=ss; X=expr.BaseExprCh}
 
     /// Broadcasts the expression into the given shape.
-    static member broadcast ss (expr: Expr) =
+    static member broadcast ss (expr: Expr<'T>) : Expr<'T> =
         if ss = expr.Shape then expr 
         else Expr {DoBroadcast.Shape=ss; X=expr.BaseExprCh}
 
     /// Inserts a broadcast axis at the given dimension.
-    static member insertBroadcastAxis dim (expr: Expr) =
+    static member insertBroadcastAxis dim (expr: Expr<'T>) : Expr<'T> =
         expr |> Expr.reshape (expr.Shape |> ShapeSpec.insertBroadcastAxis dim)
 
     /// adds one broadcastable dimension to the left
-    static member padLeft (a: Expr) =
+    static member padLeft (a: Expr<'T>) : Expr<'T> =
         a |> Expr.reshape (ShapeSpec.padLeft a.Shape)
 
     /// adds one broadcastable dimension to the right
-    static member padRight (a: Expr) =
+    static member padRight (a: Expr<'T>) : Expr<'T> =
         a |> Expr.reshape (ShapeSpec.padRight a.Shape)
 
     /// Reshapes the expression so that a single dimension remains.
-    static member flatten (expr: Expr) =
+    static member flatten (expr: Expr<'T>) =
         expr |> Expr.reshape (ShapeSpec.flatten expr.Shape)
 
     /// pads from the left and broadcasts the argument to the given shape if possible
-    static member broadcastToShape shp (a: Expr) =
+    static member broadcastToShape shp (a: Expr<'T>) =
         let psa = a.Shape |> ShapeSpec.padTo (ShapeSpec.nDim shp)
         let bsa = psa |> ShapeSpec.broadcastToShape shp
         a |> Expr.reshape psa |> Expr.broadcast bsa        
 
     /// pads and broadcasts all arguments to same shape if possible
-    static member broadcastToSameMany (es: Expr list) =
+    static member broadcastToSameMany (es: Expr<'T> list) =
         let ss = es |> List.map Expr.shape
         let ps = ShapeSpec.padToSameMany ss
         let bs = ShapeSpec.broadcastToSameMany false ps
@@ -183,30 +248,30 @@ type Expr (baseExpr: BaseExpr) =
         |> List.map (fun (e, p, b) -> e |> Expr.reshape p |> Expr.broadcast b)
 
     /// pads and broadcasts `a` and `b` to same shape if possible
-    static member broadcastToSame (a: Expr) (b: Expr) =
+    static member broadcastToSame (a: Expr<'T>) (b: Expr<'T>) =
         match Expr.broadcastToSameMany [a; b] with
         | [bcA; bcB] -> bcA, bcB
         | _ -> failwith "impossible"
 
     /// enables broadcasting in the given dimension, it must be of size one
-    static member enableBroadcast dim (a: Expr) = 
+    static member enableBroadcast dim (a: Expr<'T>) = 
         a |> Expr.reshape (a.Shape |> ShapeSpec.enableBroadcast dim)
 
     /// disables broadcasting in the given dimension
-    static member disableBroadcast dim (a: Expr) =
+    static member disableBroadcast dim (a: Expr<'T>) =
         a |> Expr.reshape (a.Shape |> ShapeSpec.disableBroadcast dim)
   
     /// scalar constant of given value
-    static member scalar dev (f: obj) = 
-        {Scalar.Value=Const.ofValue f; Dev=dev} |> Expr 
+    static member scalar dev (value: 'T) : Expr<'T> = 
+        {Scalar.Value=Const.ofValue value; Dev=dev} |> Expr 
 
     /// scalar of given value converted to same type as given expression
-    static member scalarLike (expr: Expr) f = 
-        let v = System.Convert.ChangeType (box f, expr.TypeName.Type)
+    static member scalarLike (expr: Expr<'T>) value : Expr<'T> = 
+        let v = System.Convert.ChangeType (box value, expr.DataType) :?> 'T
         Expr.scalar expr.Dev v
 
     /// Scalar with value of given size and type int64.
-    static member size dev (size: SizeSpec) = 
+    static member size dev (size: SizeSpec) : Expr<int64> = 
         {SizeValue.Value=size; Dev=dev} |> Expr
 
     /// Permutes the axes as specified.

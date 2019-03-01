@@ -105,7 +105,7 @@ and internal ArangeTyped<'T> () =
 
 
 /// Argument (placeholder for a variable).
-type VarArg = { Var: Var } with
+type VarArg = { Var: BaseVar } with
     interface IOp with       
         member this.Check () = ()
         member this.Channels = Ch.onlyOne
@@ -118,7 +118,7 @@ type VarArg = { Var: Var } with
             {Var={this.Var with Shape=SymSizeEnv.substShape env this.Var.Shape}} :> _
         member this.CanEvalAllSymSizes = ShapeSpec.canEval this.Var.Shape
         member this.Eval env argVals = 
-            env.VarEnv |> VarEnv.get this.Var |> Ch.only       
+            env.VarEnv.[this.Var.Name] |> Ch.only       
 
     interface IVarContainingOp with
         member this.Vars =

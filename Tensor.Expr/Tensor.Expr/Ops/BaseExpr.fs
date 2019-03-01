@@ -112,7 +112,7 @@ module IOp =
 /// An op that contains variables.
 type IVarContainingOp =
     /// Variables contained in that op.
-    abstract Vars: Set<Var>
+    abstract Vars: Set<BaseVar>
 
 
 /// An op that has a custom print format.
