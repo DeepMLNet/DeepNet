@@ -51,15 +51,17 @@ module ExprTestCase =
             printfn "evaled:   %A" value
             printfn ""
 
+        DerivCheck.expr (tc.Expr, varEnv, log=output.WriteLine)
+
 
 module Vars =
-    let a = Var.make<float32> ("a", HostTensor.Dev, [SizeSpec.fix 2L; SizeSpec.fix 3L])
-    let b = Var.make<float32> ("b", HostTensor.Dev, [SizeSpec.fix 2L; SizeSpec.fix 3L])
+    let a = Var.make<float> ("a", HostTensor.Dev, [SizeSpec.fix 2L; SizeSpec.fix 3L])
+    let b = Var.make<float> ("b", HostTensor.Dev, [SizeSpec.fix 2L; SizeSpec.fix 3L])
 
 
 module VarVals =
-    let a = HostTensor.counting 6L |> Tensor<float32>.convert |> Tensor.reshape [2L; 3L]
-    let b = 10L + HostTensor.counting 6L |> Tensor<float32>.convert |> Tensor.reshape [2L; 3L]
+    let a = HostTensor.counting 6L |> Tensor<float>.convert |> Tensor.reshape [2L; 3L]
+    let b = 10L + HostTensor.counting 6L |> Tensor<float>.convert |> Tensor.reshape [2L; 3L]
 
     let varEnv =
         VarEnv.empty
@@ -71,7 +73,7 @@ module VarVals =
 module ExprTestCases =
     let ``a + b`` () = {
         Expr = Expr Vars.a + Expr Vars.b
-        DataType = typeof<float32>
+        DataType = typeof<float>
         Dev = HostTensor.Dev
         Shape = [SizeSpec.fix 2L; SizeSpec.fix 3L]
         Value = VarVals.a + VarVals.b
@@ -79,7 +81,7 @@ module ExprTestCases =
 
     let ``sin a + cos b`` () = {
         Expr = sin (Expr Vars.a) + cos (Expr Vars.b)
-        DataType = typeof<float32>
+        DataType = typeof<float>
         Dev = HostTensor.Dev
         Shape = [SizeSpec.fix 2L; SizeSpec.fix 3L]
         Value = sin VarVals.a + cos VarVals.b

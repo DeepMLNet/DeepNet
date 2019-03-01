@@ -1,12 +1,9 @@
 ﻿namespace Tensor.Expr
 
+open DeepNet.Utils
 open Tensor
 open Tensor.Backend
 open Tensor.Expr
-open DeepNet.Utils
-
-//open System
-
 
 
 type NumDeriv =
@@ -14,27 +11,32 @@ type NumDeriv =
     /// Evaluates the derivative of f at x numerically with specified finite difference step.
     /// The resulting tensor has shape fE x x1 x x2 x ... xN, where fE is the number of elements
     /// of f(x) and x1 x x2 x ... x xN is the shape of x.
-    static member calc (f: Tensor<'T> -> Tensor<'T>, x: Tensor<'T>, ?epsilon: float) =
+    /// Note: float32 is often too imprecise to get meaningful results.
+    static member calc (f: ITensor -> ITensor, x: ITensor, ?epsilon: float) =
         let epsilon = defaultArg epsilon 1e-5
-        let epsilon = Tensor.scalar x.Dev (conv<'T> epsilon)
 
         let y = f x
-        let xd = Tensor.copy x
+        assert (x.Dev = y.Dev)
 
-        let deriv = Tensor.zeros x.Dev (y.NElems :: x.Shape)
-        for xIdx in Tensor.allIdx x do
+        let xEpsilon = epsilon |> Tensor.scalar x.Dev |> ITensor.convertToType x.DataType
+        let y2Epsilon = 2.0 * epsilon |> Tensor.scalar x.Dev |> ITensor.convertToType y.DataType
+
+        let xd = ITensor.copy x
+        let deriv = ITensor.zeros x.DataType x.Dev (y.NElems :: x.Shape)
+
+        for xIdx in ITensor.allIdx x do
             let xRng = xIdx |> List.map Rng.Elem
 
             // f (x+epsilon)
-            xd.[xRng] <- x.[xRng] + epsilon    
-            let ydf = f xd |> Tensor.flatten
+            xd.[xRng] <- x.[xRng].Add xEpsilon    
+            let ydf = f xd |> ITensor.flatten
 
             // f (x-epsilon)
-            xd.[xRng] <- x.[xRng] - epsilon    
-            let ydb = f xd |> Tensor.flatten
+            xd.[xRng] <- x.[xRng].Subtract xEpsilon    
+            let ydb = f xd |> ITensor.flatten
 
             // [f (x+epsilon) - f (x-epsilon)] / (2 * epsilon) 
-            let df = (ydf - ydb) / (epsilon + epsilon)
+            let df = (ydf.Subtract ydb).Divide y2Epsilon
             deriv.[Rng.All :: xRng] <- df
 
             xd.[xRng] <- x.[xRng] 
@@ -47,7 +49,10 @@ type DerivCheck =
 
     /// Checks that symbolic and numeric derivatives of the given expression are close enough.
     /// The derivatives are evaluated at the location specified by the given VarEnv.
-    static member expr (expr: Expr, varEnv: VarEnv, ?maxDeviation: float, ?epsilon: float) =
+    static member expr (expr: Expr, varEnv: VarEnv, ?maxDeviation: float, ?epsilon: float, ?log: string -> unit) =
+        let log = defaultArg log (printfn "%s")
+        let printfn format = Printf.kprintf log format 
+
         let maxDeviation = defaultArg maxDeviation 1e-4
 
         let derivExprs = Deriv.compute expr
@@ -63,25 +68,28 @@ type DerivCheck =
             let wrtVal = varEnv |> VarEnv.get wrt
             let derivNumVal = NumDeriv.calc (exprFn, wrtVal, ?epsilon=epsilon)
 
+            // Check.
+            if derivExprVal.Dev <> derivNumVal.Dev then
+                failwithf "Symbolic derivative has device %A but numeric derivative has device %A."
+                          derivExprVal.Dev derivNumVal.Dev
+            if derivExprVal.Shape <> derivNumVal.Shape then
+                failwithf "Symbolic derivative has shape %A but numeric derivative has shape %A."
+                          derivExprVal.Dev derivNumVal.Dev
+            if derivExprVal.DataType <> derivNumVal.DataType then
+                failwithf "Symbolic derivative has data type %A but numeric derivative has shape %A."
+                          derivExprVal.DataType derivNumVal.DataType
 
+            // Compare.
+            let funElems = derivExprVal.Shape.[0]
+            let derivDiff = (derivExprVal.Subtract derivNumVal).Abs()
+            let derivDiffSum = derivDiff.SumTensor() |> ITensor.convert<float> |> Tensor.value
+            let derivDiffAvg = derivDiffSum / (float funElems)
 
-            let varEnvWithoutWrt = varEnv |> VarEnv.removeVarSpec wrt
-            let exprFun = expr |> Func.make<'T> device.DefaultFactory |> addVarEnv varEnvWithoutWrt |> arg1 (Expr.makeVar wrt)
-            let rDiffFun = derivExpr |> Func.make<'T> device.DefaultFactory |> addVarEnv varEnvWithoutWrt |> arg1 (Expr.makeVar wrt)
+            if derivDiffAvg > maxDeviation then
+                printfn "Derivative check failed for expression:\n%A\n" expr
+                printfn "wrt %A:\n%A\n" wrt derivExpr
+                printfn "Symbolic value:\n%A\n" derivExprVal
+                printfn "Numeric value:\n%A\n" derivNumVal
+                failwithf "Average difference between symbolic and numeric derivative of %A wrt. %A is %f > %f."
+                          expr wrt derivDiffAvg maxDeviation
 
-            let value = VarEnv.getVarSpec wrt varEnv
-            let symGradVal = rDiffFun value
-            let exprGradVal = numDerivEpsilon epsilon exprFun value
-            let gradDiff = abs (symGradVal - exprGradVal)
-
-            let deviation = Tensor.sum gradDiff 
-            if deviation > maxDeviation then
-                printfn "Symbolic grad of \n%s\n wrt %A is \n%s\n with value \n%A" 
-                        (String.truncObj expr) wrt (String.truncObj rDiff) symGradVal
-                printfn "and numeric grad has value \n%A." exprGradVal
-                failwithf "Deviation of expression %s is %A which is greater than maximum deviation %A."
-                    (String.truncObj expr) deviation maxDeviation
-
-            //else
-            //    printfn "DerivCheck: Skipping variable %A because it does not match type %A."
-            //            wrt typeof<'T>

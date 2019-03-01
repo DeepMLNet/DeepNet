@@ -8,8 +8,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Utils.fs" />
-    <Compile Include="DerivCheck.fs" />
     <Compile Include="BaseExprTests.fs" />
+    <Compile Include="DerivCheck.fs" />
     <Compile Include="ExprTests.fs" />  
   </ItemGroup>
   <ItemGroup />
