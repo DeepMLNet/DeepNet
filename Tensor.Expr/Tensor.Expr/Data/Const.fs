@@ -1,138 +1,118 @@
 ﻿namespace Tensor.Expr
 
+
 open DeepNet.Utils
 open Tensor
 
 
-/// scalar constant value
-[<Struct; RequireQualifiedAccess; StructuralEquality; StructuralComparison>]
-type Const = 
-    | Int of intValue:int
-    | Int64 of int64Value:int64
-    | Double of doubleValue:double
-    | Single of singleValue:single
-    | Bool of boolValue:bool
-    with
+/// Scalar constant value of any type with support for comparison and equality.
+type Const (value: System.IComparable) = 
 
-        /// the type name of the constant
-        member this.TypeName = 
-            match this with
-            | Const.Int _    -> TypeName.ofType<int>
-            | Const.Int64 _  -> TypeName.ofType<int64>
-            | Const.Double _ -> TypeName.ofType<double>
-            | Const.Single _ -> TypeName.ofType<single>
-            | Const.Bool _   -> TypeName.ofType<bool>
+    let _typeName = TypeName.ofObject value
 
-        /// the type of the constant
-        member this.Type =
-            this.TypeName.Type
-
-        /// gets the value which must be of type 'T
-        member this.GetValue() : 'T =
-            match this with
-            | Const.Int v    -> v |> box |> unbox
-            | Const.Int64 v  -> v |> box |> unbox
-            | Const.Double v -> v |> box |> unbox
-            | Const.Single v -> v |> box |> unbox
-            | Const.Bool v   -> v |> box |> unbox  
-            
-        /// the value as object
-        member this.Value =
-            match this with
-            | Const.Int v    -> v |> box 
-            | Const.Int64 v  -> v |> box 
-            | Const.Double v -> v |> box
-            | Const.Single v -> v |> box 
-            | Const.Bool v   -> v |> box 
-
-        /// the value as an scalar ITensor stored on the specified device
-        member this.AsTensor dev : ITensor =
-            match this with
-            | Const.Int v -> Tensor.scalar dev v :> ITensor
-            | Const.Int64 v -> Tensor.scalar dev v :> ITensor
-            | Const.Double v -> Tensor.scalar dev v :> ITensor
-            | Const.Single v -> Tensor.scalar dev v :> ITensor
-            | Const.Bool v -> Tensor.scalar dev v :> ITensor
-                
-        /// gets the value converting it to type 'T
-        member this.GetConvertedValue<'T>() : 'T =   
-            this.Value |> conv<'T>          
+    /// the value 
+    member this.Value = value
     
-        /// creates a Const from a scalar value
-        static member ofValue (value: obj) =
-            match value.GetType() with
-            | t when t = typeof<int> -> Const.Int (value |> unbox)
-            | t when t = typeof<int64> -> Const.Int64 (value |> unbox)
-            | t when t = typeof<double> -> Const.Double (value |> unbox)
-            | t when t = typeof<single> -> Const.Single (value |> unbox)
-            | t when t = typeof<bool> -> Const.Bool (value |> unbox)
-            | t -> failwithf "unsupported constant type: %A" t
+    /// gets the value 
+    static member value (cs: Const) = cs.Value
 
-        /// gets the value 
-        static member value (cs: Const) =
-            cs.GetValue ()
+    /// gets the value which must be of type 'T
+    member this.GetValue() : 'T = this.Value |> unbox
 
-        /// the type name of the constant
-        static member typeName (cs: Const) =
-            cs.TypeName
+    /// the type name of the constant
+    member this.TypeName = _typeName
 
-        /// the type of the constant
-        static member typ (cs: Const) =
-            cs.Type
+    /// the type name of the constant
+    static member typeName (cs: Const) = cs.TypeName
 
-        /// one of specified type
-        static member one (typ: System.Type) =
-            1 |> convTo typ |> Const.ofValue
+    /// the type of the constant
+    member this.DataType = value.GetType()
 
-        /// two of specified type
-        static member two (typ: System.Type) =
-            1 |> convTo typ |> Const.ofValue
+    /// the type of the constant
+    static member dataType (cs: Const) = cs.DataType
 
-        /// zero constant of specified type
-        static member zero typ =
-            match typ with
-            | _ when typ = typeof<int>    -> Const.Int 0
-            | _ when typ = typeof<int64>  -> Const.Int64 0L
-            | _ when typ = typeof<double> -> Const.Double 0.0
-            | _ when typ = typeof<single> -> Const.Single 0.0f
-            | _ when typ = typeof<bool>   -> Const.Bool false
-            | _ -> failwithf "unsupported type %A" typ
+    interface System.IComparable<Const> with
+        member this.CompareTo other =
+            if this.TypeName <> other.TypeName then
+                compare this.TypeName other.TypeName
+            else
+                value.CompareTo other.Value
 
-        /// minimum value constant of specified type
-        static member minValue typ =
-            match typ with
-            | _ when typ = typeof<int>    -> Const.Int (System.Int32.MinValue)
-            | _ when typ = typeof<int64>  -> Const.Int64 (System.Int64.MinValue)
-            | _ when typ = typeof<double> -> Const.Double (System.Double.MinValue)
-            | _ when typ = typeof<single> -> Const.Single (System.Single.MinValue)
-            | _ when typ = typeof<bool>   -> Const.Bool false
-            | _ -> failwithf "unsupported type %A" typ
+    interface System.IComparable with
+        member this.CompareTo other =
+            match other with
+            | :? Const as other -> (this :> System.IComparable<_>).CompareTo other
+            | _ -> failwithf "Cannot compare Const to %A." (other.GetType())
 
-        /// maximum value constant of specified type
-        static member maxValue typ =
-            match typ with
-            | _ when typ = typeof<int>    -> Const.Int (System.Int32.MaxValue)
-            | _ when typ = typeof<int64>  -> Const.Int64 (System.Int64.MaxValue)
-            | _ when typ = typeof<double> -> Const.Double (System.Double.MaxValue)
-            | _ when typ = typeof<single> -> Const.Single (System.Single.MaxValue)
-            | _ when typ = typeof<bool>   -> Const.Bool true
-            | _ -> failwithf "unsupported type %A" typ
+    interface System.IEquatable<Const> with
+        member this.Equals other = 
+            this.TypeName = other.TypeName && this.Value.Equals other.Value
 
-/// Active patterns for Const.         
-module Const = 
+    override this.Equals other =
+        match other with
+        | :? Const as other -> (this :> System.IEquatable<_>).Equals other
+        | _ -> false
 
-    /// matches a zero constant of any type
-    let (|Zero|_|) cs =
-        match cs with
-        | Const.Int 0
-        | Const.Int64 0L
-        | Const.Single 0.0f
-        | Const.Double 0.0 -> Some ()
-        | _ -> None
+    override this.GetHashCode() = value.GetHashCode()
 
-    /// true if constant is zero
+    override this.ToString() = value.ToString()                   
+
+    /// the value as an scalar ITensor stored on the specified device
+    static member asTensor dev (cs: Const) : ITensor =
+        ITensor.scalar dev cs.Value
+
+
+/// Scalar constant value with support for comparison and equality.
+module Const =
+
+    /// Constant with value zero of specified type.
+    let zeroOf (typ: System.Type) =
+        Const (zeroOf typ :?> System.IComparable)
+
+    /// Matches a constant of value zero.
+    let (|Zero|_|) (cs: Const) =
+        if cs = zeroOf cs.DataType then Some ()
+        else None
+
+    /// True if constant is zero.
     let isZero cs =
         match cs with
         | Zero -> true
         | _ -> false
+
+    /// Constant with value one of specified type.
+    let oneOf (typ: System.Type) =
+        Const (oneOf typ :?> System.IComparable)
+
+    /// Matches a constant of value one.
+    let (|One|_|) (cs: Const) =
+        if cs = oneOf cs.DataType then Some ()
+        else None
+
+    /// True if constant is one.
+    let isOne cs =
+        match cs with
+        | One -> true
+        | _ -> false
+
+    /// minimum value constant of specified type
+    let minValueOf typ =
+        Const (minValueOf typ :?> System.IComparable)
+
+    /// maximum value constant of specified type
+    let maxValue typ =
+        Const (maxValueOf typ :?> System.IComparable)
         
+
+/// Recognizers for Const type.
+[<AutoOpen>]
+module ConstRecogniziers =
+
+    /// Matches a Const and returns its value.
+    let (|Const|) (cs: Const) : System.IComparable =
+        cs.Value
+
+    /// Matches a Const of type 'T and returns its value.
+    let (|ConstT|_|) (cs: Const) : 'T option =
+        if cs.DataType = typeof<'T> then Some (unbox cs.Value)
+        else None
