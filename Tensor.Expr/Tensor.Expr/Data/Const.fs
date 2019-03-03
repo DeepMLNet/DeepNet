@@ -6,7 +6,15 @@ open Tensor
 
 
 /// Scalar constant value of any type with support for comparison and equality.
-type Const (value: System.IComparable) = 
+/// The data type must implement the System.IComparable interface.
+type Const (value: obj) = 
+
+    let _value =
+        match value with
+        | :? System.IComparable as value -> value
+        | _ -> 
+            failwithf "Constant values must implement the System.IComparable interface, \
+                       but the type %A does not." (value.GetType())
 
     let _typeName = TypeName.ofObject value
 
@@ -36,7 +44,7 @@ type Const (value: System.IComparable) =
             if this.TypeName <> other.TypeName then
                 compare this.TypeName other.TypeName
             else
-                value.CompareTo other.Value
+                _value.CompareTo other.Value
 
     interface System.IComparable with
         member this.CompareTo other =
@@ -58,7 +66,7 @@ type Const (value: System.IComparable) =
     override this.ToString() = value.ToString()                   
 
     /// the value as an scalar ITensor stored on the specified device
-    static member asTensor dev (cs: Const) : ITensor =
+    static member asITensor dev (cs: Const) : ITensor =
         ITensor.scalar dev cs.Value
 
 
@@ -109,7 +117,7 @@ module Const =
 module ConstRecogniziers =
 
     /// Matches a Const and returns its value.
-    let (|Const|) (cs: Const) : System.IComparable =
+    let (|Const|) (cs: Const) : obj =
         cs.Value
 
     /// Matches a Const of type 'T and returns its value.

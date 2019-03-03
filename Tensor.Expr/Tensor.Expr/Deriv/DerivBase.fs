@@ -26,7 +26,7 @@ type Deriv = private {
     _FunElems:   SizeSpec
     /// The derivatives w.r.t. the variables occuring in the expression.
     /// They are of the shape _FunElems x (shape of variable).
-    _WrtVar:     Map<Var, Expr>
+    _WrtVar:     Map<BaseVar, IExpr>
 } with
 
     static member private log = Log "Deriv"

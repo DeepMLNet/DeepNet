@@ -26,7 +26,7 @@ module Deriv =
         match expr with
         | Leaf (op) ->
             match op with
-            | Const _ -> Map.empty
+            | LeafOp.Const _ -> Map.empty
             | SizeValue _ -> Map.empty
             | ArgElement (argSpec, _) -> Map [argSpec, eg]
 

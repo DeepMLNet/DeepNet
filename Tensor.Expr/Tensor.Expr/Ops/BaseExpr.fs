@@ -137,14 +137,14 @@ type BaseExpr private (op: IOp) =
     let _devs = lazy (op.Devs)
 
     let _varMap = 
-        let add (m: Map<VarName, Var>) (var: Var) =
+        let add (m: Map<VarName, BaseVar>) (var: BaseVar) =
             match m |> Map.tryFind var.Name with
             | Some otherVar when otherVar = var -> m
             | Some otherVar ->
                 failwithf "Expression contains inconsistent variable %A with specifications %A and %A."
                           var.Name var otherVar
             | None -> m |> Map.add var.Name var
-        let merge (a: Map<VarName, Var>) b =
+        let merge (a: Map<VarName, BaseVar>) b =
             (a, Map.toSeq b)||> Seq.fold (fun m (varName, var) -> add m var)
 
         let opVarSet =

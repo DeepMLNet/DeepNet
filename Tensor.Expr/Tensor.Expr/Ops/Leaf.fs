@@ -19,7 +19,7 @@ type Scalar = { Value: Const; Dev: ITensorDevice } with
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = 
-            this.Value.AsTensor this.Dev |> Ch.only
+            this.Value |> Const.asITensor this.Dev |> Ch.only
 
     interface IOpFormat with
         member this.Text =

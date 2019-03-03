@@ -65,7 +65,18 @@ module IExpr =
     let ofBaseVar (var: BaseVar) : IExpr =
         ofOp {VarArg.Var=var}
         
+    let baseExpr (expr: IExpr) = expr.BaseExpr
+    let baseExprCh (expr: IExpr) = expr.BaseExprCh
+    let op (expr: IExpr) = expr.Op
+    let typeName (expr: IExpr) = expr.TypeName
+    let dataType (expr: IExpr) = expr.DataType
     let shape (expr: IExpr) = expr.Shape
+    let nDims (expr: IExpr) = expr.NDims
+    let nElems (expr: IExpr) = expr.NElems
+    let dev (expr: IExpr) = expr.Dev
+    let args (expr: IExpr) = expr.Args
+    let vars (expr: IExpr) = expr.Vars
+    let canEvalAllSymSizes (expr: IExpr) = expr.CanEvalAllSymSizes
 
     let reshape (shape: ShapeSpec) (expr: IExpr) = expr.Reshape shape
     let broadcast (shape: ShapeSpec) (expr: IExpr) = expr.Broadcast shape
@@ -263,7 +274,7 @@ type Expr<'T> (baseExpr: BaseExpr) =
   
     /// scalar constant of given value
     static member scalar dev (value: 'T) : Expr<'T> = 
-        {Scalar.Value=Const.ofValue value; Dev=dev} |> Expr 
+        Expr<'T> {Scalar.Value=Const value; Dev=dev} 
 
     ///// scalar of given value converted to same type as given expression
     //static member scalarLike (expr: Expr<'T>) value : Expr<'T> = 

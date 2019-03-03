@@ -59,7 +59,7 @@ module Interpreter =
             match expr with
             | Leaf (op) ->
                 match op with
-                | Const v -> v.GetConvertedValue()
+                | LeafOp.Const v -> unbox v.Value
                 | SizeValue (ss, _) ->
                     let sv = ss |> SizeSpec.substSymbols symVals |> SizeSpec.eval
                     conv<'T> sv

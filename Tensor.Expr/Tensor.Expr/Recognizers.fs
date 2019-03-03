@@ -7,29 +7,29 @@ open Tensor.Expr.Ops
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Expr =
 
-    let (|Scalar|_|) (expr: Expr) =
+    let (|Scalar|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Scalar as this -> Some this.Value
+        | :? Scalar as this -> Some (this.Value.Value :?> 'T)
         | _ -> None
 
-    let (|SizeValue|_|) (expr: Expr) =
+    let (|SizeValue|_|) (expr: Expr<int64>) =
         match expr.Op with
         | :? SizeValue as this -> Some this.Value
         | _ -> None
 
-    let (|Identity|_|) (expr: Expr) =
+    let (|Identity|_|) (expr: Expr<'T>) =
         match expr.Op with
         | :? Identity as this -> Some this
         | _ -> None
 
-    let (|Arange|_|) (expr: Expr) =
+    let (|Arange|_|) (expr: Expr<'T>) =
         match expr.Op with
         | :? Arange as this -> Some this
         | _ -> None
 
-    let (|VarArg|_|) (expr: Expr) =
+    let (|VarArg|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? VarArg as this -> Some this.Var
+        | :? VarArg as this -> Some (Var<'T> this.Var)
         | _ -> None
 
     let varArg expr = 
@@ -37,359 +37,363 @@ module Expr =
         | VarArg v -> v
         | _ -> failwithf "Not an expression consisting solely of a variable"
 
-    let (|UnaryPlus|_|) (expr: Expr) =
+    let (|UnaryPlus|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? UnaryPlus as this -> Some (Expr this.X)
+        | :? UnaryPlus as this -> Some (Expr<'T> this.X)
         | _ -> None
 
-    let (|Negate|_|) (expr: Expr) =
+    let (|Negate|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Negate as this -> Some (Expr this.X)
+        | :? Negate as this -> Some (Expr<'T> this.X)
         | _ -> None
 
-    let (|Abs|_|) (expr: Expr) =
+    let (|Abs|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Abs as this -> Some (Expr this.X)
+        | :? Abs as this -> Some (Expr<'T> this.X)
         | _ -> None
 
-    let (|SignT|_|) (expr: Expr) =
+    let (|SignT|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? SignT as this -> Some (Expr this.X)
+        | :? SignT as this -> Some (Expr<'T> this.X)
         | _ -> None
 
-    let (|Log|_|) (expr: Expr) =
+    let (|Log|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Log as this -> Some (Expr this.X)
+        | :? Log as this -> Some (Expr<'T> this.X)
         | _ -> None
 
-    let (|Log10|_|) (expr: Expr) =
+    let (|Log10|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Log10 as this -> Some (Expr this.X)
+        | :? Log10 as this -> Some (Expr<'T> this.X)
         | _ -> None
 
-    let (|Exp|_|) (expr: Expr) =
+    let (|Exp|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Exp as this -> Some (Expr this.X)
+        | :? Exp as this -> Some (Expr<'T> this.X)
         | _ -> None
 
-    let (|Sin|_|) (expr: Expr) =
+    let (|Sin|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Sin as this -> Some (Expr this.X)
+        | :? Sin as this -> Some (Expr<'T> this.X)
         | _ -> None
 
-    let (|Cos|_|) (expr: Expr) =
+    let (|Cos|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Cos as this -> Some (Expr this.X)
+        | :? Cos as this -> Some (Expr<'T> this.X)
         | _ -> None
 
-    let (|Tan|_|) (expr: Expr) =
+    let (|Tan|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Tan as this -> Some (Expr this.X)
+        | :? Tan as this -> Some (Expr<'T> this.X)
         | _ -> None
 
-    let (|Asin|_|) (expr: Expr) =
+    let (|Asin|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Asin as this -> Some (Expr this.X)
+        | :? Asin as this -> Some (Expr<'T> this.X)
         | _ -> None
 
-    let (|Acos|_|) (expr: Expr) =
+    let (|Acos|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Acos as this -> Some (Expr this.X)
+        | :? Acos as this -> Some (Expr<'T> this.X)
         | _ -> None
 
-    let (|Atan|_|) (expr: Expr) =
+    let (|Atan|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Atan as this -> Some (Expr this.X)
+        | :? Atan as this -> Some (Expr<'T> this.X)
         | _ -> None
 
-    let (|Sinh|_|) (expr: Expr) =
+    let (|Sinh|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Sinh as this -> Some (Expr this.X)
+        | :? Sinh as this -> Some (Expr<'T> this.X)
         | _ -> None
 
-    let (|Cosh|_|) (expr: Expr) =
+    let (|Cosh|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Cosh as this -> Some (Expr this.X)
+        | :? Cosh as this -> Some (Expr<'T> this.X)
         | _ -> None
 
-    let (|Tanh|_|) (expr: Expr) =
+    let (|Tanh|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Tanh as this -> Some (Expr this.X)
+        | :? Tanh as this -> Some (Expr<'T> this.X)
         | _ -> None
 
-    let (|Sqrt|_|) (expr: Expr) =
+    let (|Sqrt|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Sqrt as this -> Some (Expr this.X)
+        | :? Sqrt as this -> Some (Expr<'T> this.X)
         | _ -> None
 
-    let (|Ceiling|_|) (expr: Expr) =
+    let (|Ceiling|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Ceiling as this -> Some (Expr this.X)
+        | :? Ceiling as this -> Some (Expr<'T> this.X)
         | _ -> None
 
-    let (|Floor|_|) (expr: Expr) =
+    let (|Floor|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Floor as this -> Some (Expr this.X)
+        | :? Floor as this -> Some (Expr<'T> this.X)
         | _ -> None
 
-    let (|Round|_|) (expr: Expr) =
+    let (|Round|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Round as this -> Some (Expr this.X)
+        | :? Round as this -> Some (Expr<'T> this.X)
         | _ -> None
 
-    let (|Truncate|_|) (expr: Expr) =
+    let (|Truncate|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Truncate as this -> Some (Expr this.X)
+        | :? Truncate as this -> Some (Expr<'T> this.X)
         | _ -> None
 
-    let (|Invert|_|) (expr: Expr) =
+    let (|Invert|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Invert as this -> Some (Expr this.X)
+        | :? Invert as this -> Some (Expr<'T> this.X)
         | _ -> None
 
-    let (|Not|_|) (expr: Expr) =
+    let (|Not|_|) (expr: Expr<bool>) =
         match expr.Op with
-        | :? Not as this -> Some (Expr this.X)
+        | :? Not as this -> Some (Expr<bool> this.X)
         | _ -> None
 
-    let (|Reshape|_|) (expr: Expr) =
+    let (|Reshape|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Reshape as this -> Some (this.Shape, Expr this.X)
+        | :? Reshape as this -> Some (this.Shape, Expr<'T> this.X)
         | _ -> None
 
-    let (|DoBroadcast|_|) (expr: Expr) =
+    let (|DoBroadcast|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? DoBroadcast as this -> Some (this.Shape, Expr this.X)
+        | :? DoBroadcast as this -> Some (this.Shape, Expr<'T> this.X)
         | _ -> None
 
-    let (|PermuteAxes|_|) (expr: Expr) =
+    let (|PermuteAxes|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? PermuteAxes as this -> Some (this.Permutation, Expr this.X)
+        | :? PermuteAxes as this -> Some (this.Permutation, Expr<'T> this.X)
         | _ -> None
 
-    let (|Subtensor|_|) (expr: Expr) =
+    let (|Subtensor|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Subtensor as this -> Some (this.Range, Expr this.X)
+        | :? Subtensor as this -> Some (this.Range, Expr<'T> this.X)
         | _ -> None
 
-    let (|SetSubtensor|_|) (expr: Expr) =
+    let (|SetSubtensor|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? SetSubtensor as this -> Some (this.Range, Expr this.X, Expr this.Y)
+        | :? SetSubtensor as this -> Some (this.Range, Expr<'T> this.X, Expr<'T> this.Y)
         | _ -> None
 
-    let (|ReverseAxis|_|) (expr: Expr) =
+    let (|ReverseAxis|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? ReverseAxis as this -> Some (this.Axis, Expr this.X)
+        | :? ReverseAxis as this -> Some (this.Axis, Expr<'T> this.X)
         | _ -> None   
 
-    let (|Diag|_|) (expr: Expr) =
+    let (|Diag|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Diag as this -> Some (this.Axis1, this.Axis2, Expr this.X)
+        | :? Diag as this -> Some (this.Axis1, this.Axis2, Expr<'T> this.X)
         | _ -> None   
 
-    let (|DiagMat|_|) (expr: Expr) =
+    let (|DiagMat|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? DiagMat as this -> Some (this.Axis1, this.Axis2, Expr this.X)
+        | :? DiagMat as this -> Some (this.Axis1, this.Axis2, Expr<'T> this.X)
         | _ -> None   
 
-    let (|SumAxis|_|) (expr: Expr) =
+    let (|SumAxis|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? SumAxis as this -> Some (this.Axis, Expr this.X)
+        | :? SumAxis as this -> Some (this.Axis, Expr<'T> this.X)
         | _ -> None
 
-    let (|ProductAxis|_|) (expr: Expr) =
+    let (|ProductAxis|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? ProductAxis as this -> Some (this.Axis, Expr this.X)
+        | :? ProductAxis as this -> Some (this.Axis, Expr<'T> this.X)
         | _ -> None
 
-    let (|MaxAxis|_|) (expr: Expr) =
+    let (|MaxAxis|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? MaxAxis as this -> Some (this.Axis, Expr this.X)
+        | :? MaxAxis as this -> Some (this.Axis, Expr<'T> this.X)
         | _ -> None
 
-    let (|MinAxis|_|) (expr: Expr) =
+    let (|MinAxis|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? MinAxis as this -> Some (this.Axis, Expr this.X)
+        | :? MinAxis as this -> Some (this.Axis, Expr<'T> this.X)
         | _ -> None
 
-    let (|ArgMaxAxis|_|) (expr: Expr) =
+    let (|ArgMaxAxis|_|) (expr: Expr<int64>) =
         match expr.Op with
-        | :? ArgMaxAxis as this -> Some (this.Axis, Expr this.X)
+        | :? ArgMaxAxis as this -> Some (this.Axis, Expr<'T> this.X)
         | _ -> None
 
-    let (|ArgMinAxis|_|) (expr: Expr) =
+    let (|ArgMinAxis|_|) (expr: Expr<int64>) =
         match expr.Op with
-        | :? ArgMinAxis as this -> Some (this.Axis, Expr this.X)
+        | :? ArgMinAxis as this -> Some (this.Axis, Expr<'T> this.X)
         | _ -> None
 
-    let (|Gather|_|) (expr: Expr) =
+    let (|Gather|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Gather as this -> Some (this.Indices, Expr this.X)
+        | :? Gather as this -> 
+            let indices = this.Indices |> List.map (Option.map Expr<int64>)
+            Some (indices, Expr<'T> this.X)
         | _ -> None    
 
-    let (|Scatter|_|) (expr: Expr) =
+    let (|Scatter|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Scatter as this -> Some (this.Shape, this.Indices, Expr this.X)
+        | :? Scatter as this -> 
+            let indices = this.Indices |> List.map (Option.map Expr<int64>)
+            Some (this.Shape, indices, Expr<'T> this.X)
         | _ -> None   
 
-    let (|Store|_|) (expr: Expr) =
+    let (|Store|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Store as this -> Some (this.Var, Expr this.X)
+        | :? Store as this -> Some (Var<'T> this.Var, Expr<'T> this.X)
         | _ -> None
 
-    let (|AssumeZeroDeriv|_|) (expr: Expr) =
+    let (|AssumeZeroDeriv|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? AssumeZeroDeriv as this -> Some (Expr this.X)
+        | :? AssumeZeroDeriv as this -> Some (Expr<'T> this.X)
         | _ -> None
 
-    let (|AssumeDeriv|_|) (expr: Expr) =
+    let (|AssumeDeriv|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? AssumeDeriv as this -> Some (Expr this.Deriv, Expr this.X)
+        | :? AssumeDeriv as this -> Some (Expr<'T> this.Deriv, Expr<'T> this.X)
         | _ -> None
 
-    let (|Annotated|_|) (expr: Expr) =
+    let (|Annotated|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Annotated as this -> Some (this.Label, Expr this.X)
+        | :? Annotated as this -> Some (this.Label, Expr<'T> this.X)
         | _ -> None
 
-    let (|Print|_|) (expr: Expr) =
+    let (|Print|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Print as this -> Some (this.Label, Expr this.X)
+        | :? Print as this -> Some (this.Label, Expr<'T> this.X)
         | _ -> None
 
-    let (|Dump|_|) (expr: Expr) =
+    let (|Dump|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Dump as this -> Some (this.Dataset, Expr this.X)
+        | :? Dump as this -> Some (this.Dataset, Expr<'T> this.X)
         | _ -> None
 
-    let (|CheckFinite|_|) (expr: Expr) =
+    let (|CheckFinite|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? CheckFinite as this -> Some (this.Label, Expr this.X)
+        | :? CheckFinite as this -> Some (this.Label, Expr<'T> this.X)
         | _ -> None
 
-    let (|Channel|_|) (expr: Expr) =
+    let (|Channel|_|) (expr: Expr<'T>) =
         match expr.Op with
         | :? Channel as this -> Some (this.X.Channel, MultiChannelExpr this.X.Expr)
         | _ -> None
 
-    let (|Add|_|) (expr: Expr) =
+    let (|Add|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Add as this -> Some (Expr this.X, Expr this.Y)
+        | :? Add as this -> Some (Expr<'T> this.X, Expr<'T> this.Y)
         | _ -> None
 
-    let (|Subtract|_|) (expr: Expr) =
+    let (|Subtract|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Subtract as this -> Some (Expr this.X, Expr this.Y)
+        | :? Subtract as this -> Some (Expr<'T> this.X, Expr<'T> this.Y)
         | _ -> None
 
-    let (|Multiply|_|) (expr: Expr) =
+    let (|Multiply|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Multiply as this -> Some (Expr this.X, Expr this.Y)
+        | :? Multiply as this -> Some (Expr<'T> this.X, Expr<'T> this.Y)
         | _ -> None
 
-    let (|Divide|_|) (expr: Expr) =
+    let (|Divide|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Divide as this -> Some (Expr this.X, Expr this.Y)
+        | :? Divide as this -> Some (Expr<'T> this.X, Expr<'T> this.Y)
         | _ -> None
 
-    let (|Pow|_|) (expr: Expr) =
+    let (|Pow|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Pow as this -> Some (Expr this.X, Expr this.Y)
+        | :? Pow as this -> Some (Expr<'T> this.X, Expr<'T> this.Y)
         | _ -> None
 
-    let (|Modulo|_|) (expr: Expr) =
+    let (|Modulo|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Modulo as this -> Some (Expr this.X, Expr this.Y)
+        | :? Modulo as this -> Some (Expr<'T> this.X, Expr<'T> this.Y)
         | _ -> None
 
-    let (|MaxElemwise|_|) (expr: Expr) =
+    let (|MaxElemwise|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? MaxElemwise as this -> Some (Expr this.X, Expr this.Y)
+        | :? MaxElemwise as this -> Some (Expr<'T> this.X, Expr<'T> this.Y)
         | _ -> None
 
-    let (|MinElemwise|_|) (expr: Expr) =
+    let (|MinElemwise|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? MinElemwise as this -> Some (Expr this.X, Expr this.Y)
+        | :? MinElemwise as this -> Some (Expr<'T> this.X, Expr<'T> this.Y)
         | _ -> None
 
-    let (|And|_|) (expr: Expr) =
+    let (|And|_|) (expr: Expr<bool>) =
         match expr.Op with
-        | :? And as this -> Some (Expr this.X, Expr this.Y)
+        | :? And as this -> Some (Expr<bool> this.X, Expr<bool> this.Y)
         | _ -> None
 
-    let (|Or|_|) (expr: Expr) =
+    let (|Or|_|) (expr: Expr<bool>) =
         match expr.Op with
-        | :? Or as this -> Some (Expr this.X, Expr this.Y)
+        | :? Or as this -> Some (Expr<bool> this.X, Expr<bool> this.Y)
         | _ -> None
 
-    let (|Xor|_|) (expr: Expr) =
+    let (|Xor|_|) (expr: Expr<bool>) =
         match expr.Op with
-        | :? Xor as this -> Some (Expr this.X, Expr this.Y)
+        | :? Xor as this -> Some (Expr<bool> this.X, Expr<bool> this.Y)
         | _ -> None
 
-    let (|Equal|_|) (expr: Expr) =
+    let (|Equal|_|) (expr: Expr<bool>) =
         match expr.Op with
-        | :? Equal as this -> Some (Expr this.X, Expr this.Y)
+        | :? Equal as this -> Some (Expr<'T> this.X, Expr<'T> this.Y)
         | _ -> None
 
-    let (|NotEqual|_|) (expr: Expr) =
+    let (|NotEqual|_|) (expr: Expr<bool>) =
         match expr.Op with
-        | :? NotEqual as this -> Some (Expr this.X, Expr this.Y)
+        | :? NotEqual as this -> Some (Expr<'T> this.X, Expr<'T> this.Y)
         | _ -> None
 
-    let (|Less|_|) (expr: Expr) =
+    let (|Less|_|) (expr: Expr<bool>) =
         match expr.Op with
-        | :? Less as this -> Some (Expr this.X, Expr this.Y)
+        | :? Less as this -> Some (Expr<'T> this.X, Expr<'T> this.Y)
         | _ -> None
 
-    let (|LessOrEqual|_|) (expr: Expr) =
+    let (|LessOrEqual|_|) (expr: Expr<bool>) =
         match expr.Op with
-        | :? LessOrEqual as this -> Some (Expr this.X, Expr this.Y)
+        | :? LessOrEqual as this -> Some (Expr<'T> this.X, Expr<'T> this.Y)
         | _ -> None
 
-    let (|Greater|_|) (expr: Expr) =
+    let (|Greater|_|) (expr: Expr<bool>) =
         match expr.Op with
-        | :? Greater as this -> Some (Expr this.X, Expr this.Y)
+        | :? Greater as this -> Some (Expr<'T> this.X, Expr<'T> this.Y)
         | _ -> None
 
-    let (|GreaterOrEqual|_|) (expr: Expr) =
+    let (|GreaterOrEqual|_|) (expr: Expr<bool>) =
         match expr.Op with
         | :? GreaterOrEqual as this -> Some (Expr this.X, Expr this.Y)
         | _ -> None
 
-    let (|Dot|_|) (expr: Expr) =
+    let (|Dot|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Dot as this -> Some (Expr this.X, Expr this.Y)
+        | :? Dot as this -> Some (Expr<'T> this.X, Expr<'T> this.Y)
         | _ -> None
 
-    let (|TensorProduct|_|) (expr: Expr) =
+    let (|TensorProduct|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? TensorProduct as this -> Some (Expr this.X, Expr this.Y)
+        | :? TensorProduct as this -> Some (Expr<'T> this.X, Expr<'T> this.Y)
         | _ -> None
 
-    let (|IfThenElse|_|) (expr: Expr) =
+    let (|IfThenElse|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? IfThenElse as this -> Some (Expr this.Cond, Expr this.IfTrue, Expr this.IfFalse)
+        | :? IfThenElse as this -> Some (Expr<bool> this.Cond, Expr<'T> this.IfTrue, Expr<'T> this.IfFalse)
         | _ -> None
 
-    let (|Discard|_|) (expr: Expr) =
+    let (|Discard|_|) (expr: Expr<int>) =
         match expr.Op with
-        | :? Discard as this -> Some (this.Xs |> List.map Expr)
+        | :? Discard as this -> Some (this.Xs |> List.map IExpr.ofBaseExprCh)
         | _ -> None
 
-    let (|BuildTensor|_|) (expr: Expr) =
+    let (|BuildTensor|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? BuildTensor as this -> Some (this.Shape, this.Ranges, this.Xs |> List.map Expr)
+        | :? BuildTensor as this -> Some (this.Shape, this.Ranges, this.Xs |> List.map Expr<'T>)
         | _ -> None
 
-    let (|Elements|_|) (expr: Expr) =
+    let (|Elements|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Elements as this -> Some (this.Shape, this.ElemExpr, this.Xs |> List.map Expr)
+        | :? Elements as this -> Some (this.Shape, this.ElemExpr, this.Xs |> List.map Expr<'T>)
         | _ -> None
 
-    let (|Interpolate|_|) (expr: Expr) =
+    let (|Interpolate|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Interpolate as this -> Some (this.Interpolator, this.Xs |> List.map Expr)
+        | :? Interpolate as this -> Some (this.Interpolator, this.Xs |> List.map Expr<'T>)
         | _ -> None
 
 
@@ -399,5 +403,5 @@ module MultiChannelExpr =
 
     let (|Loop|_|) (expr: MultiChannelExpr) =
         match expr.Op with
-        | :? Loop as this -> Some (this.Length, this.Vars, this.Channels, this.Xs |> List.map Expr)
+        | :? Loop as this -> Some (this.Length, this.Vars, this.Channels, this.Xs |> List.map IExpr.ofBaseExprCh)
         | _ -> None

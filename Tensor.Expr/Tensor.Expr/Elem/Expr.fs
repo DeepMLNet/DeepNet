@@ -89,7 +89,7 @@ with
 
     /// a constant value
     static member scalar f =
-        f |> Const.ofValue |> Expr.constSpec              
+        Expr.constSpec (Tensor.Expr.Const f)              
 
     // elementwise unary
     static member (~+) (a: Expr) = a |> Expr.check

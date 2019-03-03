@@ -695,7 +695,7 @@ type Scatter = {X: BaseExprCh; Indices: BaseExprCh option list; Shape: ShapeSpec
 
 
 /// Store value to variable.
-type Store = {X: BaseExprCh; Var: Var} with
+type Store = {X: BaseExprCh; Var: BaseVar} with
     interface IOp with       
         member this.Check () = 
             if this.X.TypeName <> this.Var.TypeName then
@@ -715,7 +715,7 @@ type Store = {X: BaseExprCh; Var: Var} with
             {this with Var={this.Var with Shape=SymSizeEnv.substShape env this.Var.Shape}} :> _
         member this.CanEvalAllSymSizes = ShapeSpec.canEval this.Var.Shape
         member this.Eval env argVals = 
-            let tv = env.VarEnv |> VarEnv.get this.Var 
+            let tv = env.VarEnv.[this.Var.Name]
             let v = ArgValue.unaryX argVals                
             tv.CopyFrom (v.Transfer tv.Dev)
             v.ZerosOfSameType v.Dev [0L] |> Ch.only
