@@ -695,7 +695,7 @@ type Scatter = {X: BaseExprCh; Indices: BaseExprCh option list; Shape: ShapeSpec
 
 
 /// Store value to variable.
-type Store = {X: BaseExprCh; Var: BaseVar} with
+type Store = {X: BaseExprCh; Var: Var} with
     interface IOp with       
         member this.Check () = 
             if this.X.TypeName <> this.Var.TypeName then

@@ -11,7 +11,7 @@ type Loop = {
     Length:     SizeSpec
     /// specifies the values of the variables used in the channel value expressions,
     /// i.e. LoopValueT.Expr
-    Vars:       Map<BaseVar, Loop.Input>   
+    Vars:       Map<Var, Loop.Input>   
     /// specifies the values of the loop channels
     Channels:   Map<Ch, Loop.Value>
     /// inputs
@@ -121,7 +121,7 @@ type Loop = {
     static member internal noLift length vars channels xs =
         BaseExpr.ofOp {Loop.Length=length; Vars=vars; Channels=channels; Xs=xs} 
 
-    static member internal withLift (length: SizeSpec) (vars: Map<BaseVar, Loop.Input>) 
+    static member internal withLift (length: SizeSpec) (vars: Map<Var, Loop.Input>) 
                                     (channels: Map<Ch, Loop.Value>) (xs: BaseExprCh list) =       
         let mutable args = xs
         let mutable vars = vars
@@ -150,7 +150,7 @@ type Loop = {
                     match vars |> Map.tryFindKey (fun vs _ -> vs.Name = name) with
                     | Some _ -> genName (i + 1)
                     | None -> name
-                let vs = BaseVar.make (genName 0, expr.TypeName, expr.Dev, expr.Shape)
+                let vs = Var.make (genName 0, expr.TypeName, expr.Dev, expr.Shape)
                 let lv = Loop.ConstArg (addArg expr)
                 vars <- vars |> Map.add vs lv
                 vs

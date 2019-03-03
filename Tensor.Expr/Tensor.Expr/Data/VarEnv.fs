@@ -29,7 +29,7 @@ type VarEnv = VarEnv of Map<VarName, ITensor> with
         varEnv.Values |> Map.add varName value |> VarEnv
 
     /// Add base variable value to environment.
-    static member addBaseVar (baseVar: BaseVar) (value: ITensor) (varEnv: VarEnv) =
+    static member addBaseVar (baseVar: Var) (value: ITensor) (varEnv: VarEnv) =
         if value.DataType <> baseVar.DataType then
             failwithf "Variable %A is of type %A but specified value is of type %A."
                       baseVar.Name baseVar.DataType value.DataType
@@ -45,7 +45,7 @@ type VarEnv = VarEnv of Map<VarName, ITensor> with
 
     /// Add variable value to environment.
     static member add (var: Var<'T>) (value: ITensor) (varEnv: VarEnv)  =
-        varEnv |> VarEnv.addBaseVar var.BaseVar value
+        varEnv |> VarEnv.addBaseVar var.Var value
 
     /// Remove variable by name from environment.
     static member remove (varName: VarName) (varEnv: VarEnv) : VarEnv =
@@ -56,7 +56,7 @@ type VarEnv = VarEnv of Map<VarName, ITensor> with
         Map.join a.Values b.Values |> VarEnv    
 
     /// Constructs a VarEnv from a sequence of variable, value tuples.
-    static member ofSeq (entries: (BaseVar * ITensor) seq) =
+    static member ofSeq (entries: (Var * ITensor) seq) =
         (VarEnv.empty, entries)
         ||> Seq.fold (fun ve (var, value) -> ve |> VarEnv.addBaseVar var value)
 

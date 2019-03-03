@@ -35,7 +35,7 @@ type Expr<'T> (baseExpr: BaseExpr) =
 
     /// Expression having the value of the specified variable.
     static member var (var: Var<'T>) = 
-        Expr.baseVar var.BaseVar |> Expr<'T>
+        Expr.baseVar var.Var |> Expr<'T>
 
     /// Argument expression.
     member this.Arg (arg: Arg) : Expr<'A> = Expr<'A> baseExpr.Args.[arg]

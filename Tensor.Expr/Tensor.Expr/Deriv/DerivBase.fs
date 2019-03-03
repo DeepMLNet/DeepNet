@@ -26,7 +26,7 @@ type Deriv = private {
     _FunElems:   SizeSpec
     /// The derivatives w.r.t. the variables occuring in the expression.
     /// They are of the shape _FunElems x (shape of variable).
-    _WrtVar:     Map<BaseVar, Expr>
+    _WrtVar:     Map<Var, Expr>
 } with
 
     static member private log = Log "Deriv"
@@ -65,7 +65,7 @@ type Deriv = private {
 
 
     /// Computes the derivatives of the specified expression w.r.t. all variables occuring in it.
-    static member baseCompute (rootDeriv: Map<Ch, BaseExprCh>) (rootExpr: BaseExpr) : Map<BaseVar, BaseExprCh> =
+    static member baseCompute (rootDeriv: Map<Ch, BaseExprCh>) (rootExpr: BaseExpr) : Map<Var, BaseExprCh> =
         
         // build expression info 
         let exprInfo = BaseExprGroup [rootExpr]
@@ -164,7 +164,7 @@ type Deriv = private {
 
 
     /// Returns the derivatives of the specified untyped variable.
-    member this.Wrt (var: BaseVar) = 
+    member this.Wrt (var: Var) = 
         match this._WrtVar |> Map.tryFind var with
         | Some d -> d
         | None -> 
@@ -173,7 +173,7 @@ type Deriv = private {
 
     /// Returns the derivatives of the specified typed variable.
     member this.Wrt (var: Var<'T>) = 
-        this.Wrt var.BaseVar |> Expr<'T>
+        this.Wrt var.Var |> Expr<'T>
 
 
     /// Number of function elements.

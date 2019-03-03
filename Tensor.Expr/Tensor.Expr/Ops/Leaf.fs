@@ -105,7 +105,7 @@ and internal ArangeTyped<'T> () =
 
 
 /// Argument (placeholder for a variable).
-type VarArg = { Var: BaseVar } with
+type VarArg = { Var: Var } with
     interface IOp with       
         member this.Check () = ()
         member this.Channels = Ch.onlyOne

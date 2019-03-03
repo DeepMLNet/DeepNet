@@ -40,7 +40,7 @@ type Expr (baseExpr: BaseExpr) =
             Expr {Channel.X=baseExpr.[Ch.Custom chName]}
 
     /// Expression having the value of the specified variable.
-    static member baseVar (baseVar: BaseVar) = 
+    static member baseVar (baseVar: Var) = 
         Expr {VarArg.Var=baseVar}
 
     member this.BaseExpr = baseExpr
