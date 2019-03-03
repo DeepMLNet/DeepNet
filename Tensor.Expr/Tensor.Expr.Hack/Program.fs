@@ -14,24 +14,24 @@ let dumpExpr (expr: Expr) =
 
 
 module Vars =
-    let a = Var.make<float32> ("a", HostTensor.Dev, [SizeSpec.fix 10L; SizeSpec.fix 20L])
-    let b = Var.make<float32> ("b", HostTensor.Dev, [SizeSpec.fix 10L; SizeSpec.fix 20L])
+    let a = Var<float32> ("a", HostTensor.Dev, [SizeSpec.fix 10L; SizeSpec.fix 20L])
+    let b = Var<float32> ("b", HostTensor.Dev, [SizeSpec.fix 10L; SizeSpec.fix 20L])
 
 
 let ``Deriv: a + b`` () =
     printfn "Deriv a+b:"
-    let expr = Expr Vars.a + Expr Vars.b
+    let expr = Expr.var Vars.a + Expr.var Vars.b
     let derivs = Deriv.compute expr
-    printfn "wrt a: %A" derivs.[Vars.a]  
-    printfn "wrt b: %A" derivs.[Vars.b]
+    printfn "wrt a: %A" (derivs.Wrt Vars.a)
+    printfn "wrt b: %A" (derivs.Wrt Vars.b)
 
 
 let ``Deriv: sin a * exp b`` () =
     printfn "Deriv sin a * exp b:"
-    let expr = sin (Expr Vars.a) * exp (Expr Vars.b)
+    let expr = sin (Expr.var Vars.a) * exp (Expr.var Vars.b)
     let derivs = Deriv.compute expr
-    printfn "wrt a: %A" derivs.[Vars.a]  
-    printfn "wrt b: %A" derivs.[Vars.b]
+    printfn "wrt a: %A" (derivs.Wrt Vars.a)  
+    printfn "wrt b: %A" (derivs.Wrt Vars.b)
 
 [<EntryPoint>]
 let main argv =

@@ -14,8 +14,8 @@ type internal LoopDerivT = {
 
 
 type internal PortContentsT = {
-    DerivWrt:   ResizeArray<Var>
-    ValueOf:    Var option
+    DerivWrt:   ResizeArray<BaseVar>
+    ValueOf:    BaseVar option
     SliceDim:   int
 }
 
@@ -54,7 +54,7 @@ type LoopDeriv(op: Loop) =
             /// adds an argument with a value full of zeros for use with initial value of a PreviousChannel
             let addZeroInitialArg channelShp channelType channelDev sliceDim delay =
                 let shp = channelShp |> ShapeSpec.insertAxis sliceDim delay
-                let zeroExpr = Expr.zerosOfType channelType channelDev shp
+                let zeroExpr = Expr.zeros channelType channelDev shp
                 addArg zeroExpr
 
             /// Name of a channel.
@@ -64,13 +64,13 @@ type LoopDeriv(op: Loop) =
                 | Ch.Custom name -> name
 
             /// map from variable representing a derivative to the loop input specification
-            let varInputSpecs = Dictionary<Var, Loop.Input> ()
+            let varInputSpecs = Dictionary<BaseVar, Loop.Input> ()
 
             /// map from a loop output to the variable representing its derivative
-            let dOutputVars = Dictionary<Ch, Var> ()
+            let dOutputVars = Dictionary<Ch, BaseVar> ()
 
             /// map from a loop PreviousPort to the variables representing its derivative sources
-            let dPreviousVars = Dictionary<Loop.PreviousChannel, Var> ()
+            let dPreviousVars = Dictionary<Loop.PreviousChannel, BaseVar> ()
 
             /// map from a loop port to the value it must contain
             let portContents = Dictionary<Ch, PortContentsT> ()
@@ -98,7 +98,7 @@ type LoopDeriv(op: Loop) =
                 let value = spec.Channels.[outPort]
                 let dName = VarName (sprintf "d_%s" (chName outPort))
                 let dVar =
-                    Var.make (dName, value.Expr.DataType, value.Expr.Dev, funElems :: value.Expr.Shape)
+                    BaseVar.make (dName, value.Expr.DataType, value.Expr.Dev, funElems :: value.Expr.Shape)
                 dOutputVars.[outPort] <- dVar
 
                 // create variable input specification:
@@ -111,7 +111,7 @@ type LoopDeriv(op: Loop) =
                
             // go through loop variables and create corresponding derivative variables and ports
             for KeyValue (usingVar, li) in spec.Vars do
-                let liType = usingVar.Type
+                let liType = usingVar.DataType
                 let liDev = usingVar.Dev
                 let liShape = usingVar.Shape
                 let liElems = ShapeSpec.nElem usingVar.Shape
@@ -121,7 +121,7 @@ type LoopDeriv(op: Loop) =
                 | Loop.ConstArg argIdx ->
                     // create a variable for the sum of the accumulated Jacobian so far
                     let dAccumName = VarName (sprintf "dSum_ConstArg%d[-1]" argIdx)
-                    let dAccumVar = Var.make (dAccumName, liType, liDev, funElems :: liShape)
+                    let dAccumVar = BaseVar.make (dAccumName, liType, liDev, funElems :: liShape)
 
                     // create loop port exposing the step Jacobian plus the accumulated Jacobian w.r.t. ConstArg argIdx
                     let dPort = Ch.Custom (sprintf "dSum_ConstArg%d" argIdx)
@@ -134,7 +134,7 @@ type LoopDeriv(op: Loop) =
                     let dpp: Loop.PreviousChannel = {
                         Channel    = dPort
                         Delay      = SizeSpec.one
-                        InitialArg = addZeroInitialArg (funElems :: usingVar.Shape) usingVar.Type usingVar.Dev (liDims+1) SizeSpec.one
+                        InitialArg = addZeroInitialArg (funElems :: usingVar.Shape) usingVar.DataType usingVar.Dev (liDims+1) SizeSpec.one
                     }
                     varInputSpecs.Add (dAccumVar, Loop.PreviousChannel dpp)
 
@@ -175,7 +175,7 @@ type LoopDeriv(op: Loop) =
                     portContents.[dPort].DerivWrt.Add usingVar
 
                     // create a variable for Jacobian coming from a PreviousPort in a (future) loop iteration
-                    let dVar = Var.make (VarName dPortName, liType, liDev, funElems :: liShape)
+                    let dVar = BaseVar.make (VarName dPortName, liType, liDev, funElems :: liShape)
                     dPreviousVars.[pp] <- dVar
 
                     // create corresponding variable input specification:
@@ -183,7 +183,7 @@ type LoopDeriv(op: Loop) =
                     let dpp: Loop.PreviousChannel = {
                         Channel    = dPort
                         Delay      = pp.Delay
-                        InitialArg = addZeroInitialArg (funElems :: usingVar.Shape) usingVar.Type usingVar.Dev (sliceDim+1) pp.Delay
+                        InitialArg = addZeroInitialArg (funElems :: usingVar.Shape) usingVar.DataType usingVar.Dev (sliceDim+1) pp.Delay
                     }
                     varInputSpecs.Add (dVar, Loop.PreviousChannel dpp)                                 
 
@@ -216,13 +216,13 @@ type LoopDeriv(op: Loop) =
                         seq { 
                             // derivative coming from external use of port's output slice
                             match dOutputVars.TryFind port with
-                            | Some dVar -> yield Expr dVar
+                            | Some dVar -> yield Expr.baseVar dVar
                             | None -> ()
 
                             // derivatives coming from PreviousPort uses of this port 
                             for dpv in dPreviousVars do
                                 let previousPort, dVar = dpv.Key, dpv.Value
-                                if previousPort.Channel = port then yield Expr dVar
+                                if previousPort.Channel = port then yield Expr.baseVar dVar
                         } |> Seq.reduce (+)
                     
                     // collapse Jacobian
@@ -243,13 +243,13 @@ type LoopDeriv(op: Loop) =
                         seq {
                             // obtain Jacobians
                             for wrt in derivWrts do
-                                let wrtJacobian = portDerivs.[wrt]
+                                let wrtJacobian = portDerivs.Wrt wrt
                                 let wrtExpandedJacobian = wrtJacobian |> Expr.reshape (funElems :: wrt.Shape)
                                 yield wrtExpandedJacobian
                    
                             // obtain value, if any
                             match valueOf with
-                            | Some vs -> yield Expr vs
+                            | Some vs -> yield Expr.baseVar vs
                             | None -> ()
                         } |> Seq.reduce (+)
                     let value: Loop.Value = {Expr=expr.BaseExprCh; SliceDim=sliceDim}

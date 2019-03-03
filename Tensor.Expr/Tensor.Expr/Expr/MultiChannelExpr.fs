@@ -64,7 +64,8 @@ type MultiChannelExpr (baseExpr: BaseExpr) =
 
     /// Accesses the specified channel of this multi-channel expression as IExpr.
     member this.Item 
-        with get (channel: Ch) : IExpr = IExpr.ofBaseExprCh baseExpr.[channel]
+        with get (channel: Ch) : Expr = 
+            Expr baseExpr.[channel]
 
     /// Accesses the specified channel of this multi-channel expression as Expr<'T>.
     member this.Ch (channel: Ch) : Expr<'T> = 
@@ -74,13 +75,13 @@ type MultiChannelExpr (baseExpr: BaseExpr) =
     /// All variables occurs in the loop channel expressions must be defined as loop variables.
     /// The function `loop` performs automatic lifting of constants and thus allows for easy
     /// usage of variables external to the loop.
-    static member loopNoLift length vars channels (xs: IExpr list) =
-        let xs = xs |> List.map IExpr.baseExprCh
+    static member loopNoLift length vars channels (xs: Expr list) =
+        let xs = xs |> List.map Expr.baseExprCh
         Ops.Loop.noLift length vars channels xs |> MultiChannelExpr
 
     /// A loop provides iterative evaluation of one or multiple expresisons.
-    static member loop length vars channels (xs: IExpr list) =
-        let xs = xs |> List.map IExpr.baseExprCh
+    static member loop length vars channels (xs: Expr list) =
+        let xs = xs |> List.map Expr.baseExprCh
         Ops.Loop.withLift length vars channels xs |> MultiChannelExpr
 
     /// Evaluates all channels of the expression into numeric values.

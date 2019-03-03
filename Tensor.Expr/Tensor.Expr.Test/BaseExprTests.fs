@@ -14,14 +14,14 @@ type BaseExprTests (output: ITestOutputHelper) =
 
     [<Fact>]
     let ``Expr equality`` () =
-        let a1 = Var.make<float32> ("a", HostTensor.Dev, [SizeSpec.fix 10L; SizeSpec.fix 20L])
-        let b1 = Var.make<float32> ("b", HostTensor.Dev, [SizeSpec.fix 10L; SizeSpec.fix 20L])
-        let a2 = Var.make<float32> ("a", HostTensor.Dev, [SizeSpec.fix 10L; SizeSpec.fix 20L])
-        let b2 = Var.make<float32> ("b", HostTensor.Dev, [SizeSpec.fix 10L; SizeSpec.fix 20L])
+        let a1 = Var<float32> ("a", HostTensor.Dev, [SizeSpec.fix 10L; SizeSpec.fix 20L])
+        let b1 = Var<float32> ("b", HostTensor.Dev, [SizeSpec.fix 10L; SizeSpec.fix 20L])
+        let a2 = Var<float32> ("a", HostTensor.Dev, [SizeSpec.fix 10L; SizeSpec.fix 20L])
+        let b2 = Var<float32> ("b", HostTensor.Dev, [SizeSpec.fix 10L; SizeSpec.fix 20L])
 
-        let expr1 = sin (Expr a1) - cos (Expr b1)
-        let expr2 = sin (Expr a2) - cos (Expr b2)
-        let expr3 = sin (Expr a2) - cos (Expr a2)
+        let expr1 = sin (Expr.var a1) - cos (Expr.var b1)
+        let expr2 = sin (Expr.var a2) - cos (Expr.var b2)
+        let expr3 = sin (Expr.var a2) - cos (Expr.var a2)
 
         printfn "expr1: %A" expr1
         printfn "expr2: %A" expr2

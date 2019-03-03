@@ -22,7 +22,7 @@ module internal DerivTools =
     /// Returns a zero derivative for the specified argument.
     let inline zeros (dOp: Expr) (arg: Expr) =
         let shape = dOp.Shape.[0] :: arg.Shape
-        Expr.zerosOfType arg.DataType arg.Dev shape
+        Expr.zeros arg.DataType arg.Dev shape
 
     /// Zero of same type as arg.
     let inline zero (arg: Expr) =

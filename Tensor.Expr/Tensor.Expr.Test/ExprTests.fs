@@ -46,8 +46,8 @@ module ExprTestCase =
         printfn "Expr: %s" (tc.Expr.ToString())
         let derivs = Deriv.compute tc.Expr
         for var in tc.Expr.Vars do
-            printfn "wrt %A:   %A" var derivs.[var]
-            let value = derivs.[var] |> Expr.eval varEnv 
+            printfn "wrt %A:   %A" var (derivs.Wrt var)
+            let value = derivs.Wrt var |> Expr.eval varEnv 
             printfn "evaled:   %A" value
             printfn ""
 
@@ -55,8 +55,8 @@ module ExprTestCase =
 
 
 module Vars =
-    let a = Var.make<float> ("a", HostTensor.Dev, [SizeSpec.fix 2L; SizeSpec.fix 3L])
-    let b = Var.make<float> ("b", HostTensor.Dev, [SizeSpec.fix 2L; SizeSpec.fix 3L])
+    let a = Var<float> ("a", HostTensor.Dev, [SizeSpec.fix 2L; SizeSpec.fix 3L])
+    let b = Var<float> ("b", HostTensor.Dev, [SizeSpec.fix 2L; SizeSpec.fix 3L])
 
 
 module VarVals =
@@ -72,7 +72,7 @@ module VarVals =
 
 module ExprTestCases =
     let ``a + b`` () = {
-        Expr = Expr Vars.a + Expr Vars.b
+        Expr = Expr.var Vars.a + Expr.var Vars.b
         DataType = typeof<float>
         Dev = HostTensor.Dev
         Shape = [SizeSpec.fix 2L; SizeSpec.fix 3L]
@@ -80,7 +80,7 @@ module ExprTestCases =
     }
 
     let ``sin a + cos b`` () = {
-        Expr = sin (Expr Vars.a) + cos (Expr Vars.b)
+        Expr = sin (Expr.var Vars.a) + cos (Expr.var Vars.b)
         DataType = typeof<float>
         Dev = HostTensor.Dev
         Shape = [SizeSpec.fix 2L; SizeSpec.fix 3L]

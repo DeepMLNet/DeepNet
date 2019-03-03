@@ -26,7 +26,7 @@ type Deriv = private {
     _FunElems:   SizeSpec
     /// The derivatives w.r.t. the variables occuring in the expression.
     /// They are of the shape _FunElems x (shape of variable).
-    _WrtVar:     Map<BaseVar, IExpr>
+    _WrtVar:     Map<BaseVar, Expr>
 } with
 
     static member private log = Log "Deriv"
@@ -47,6 +47,7 @@ type Deriv = private {
                 | None -> m |> Map.add v vg) 
         {_FunElems=a.FunElems; _WrtVar=derivs}
 
+
     /// Computes the derivatives of all arguments of an expression given the derivative of the expression.
     static member private derivOp (expr: BaseExpr) (dExpr: Map<Ch, BaseExprCh>) : Map<BaseExprCh, BaseExprCh> =    
         let deriver = 
@@ -62,8 +63,9 @@ type Deriv = private {
             |> Map.ofSeq
         dArgExprs
 
+
     /// Computes the derivatives of the specified expression w.r.t. all variables occuring in it.
-    static member baseCompute (rootDeriv: Map<Ch, BaseExprCh>) (rootExpr: BaseExpr) : Map<Var, BaseExprCh> =
+    static member baseCompute (rootDeriv: Map<Ch, BaseExprCh>) (rootExpr: BaseExpr) : Map<BaseVar, BaseExprCh> =
         
         // build expression info 
         let exprInfo = BaseExprGroup [rootExpr]
@@ -155,20 +157,23 @@ type Deriv = private {
     /// Computes the derivative expression w.r.t. all variables occuring in it.
     static member compute (rootExpr: Expr) : Deriv =
         let funElems = ShapeSpec.nElem rootExpr.Shape 
-        let rootJac = Expr.identityOfType rootExpr.DataType rootExpr.Dev funElems
+        let rootJac = Expr.identity rootExpr.DataType rootExpr.Dev funElems
         let rootDeriv = rootJac |> Expr.reshape (funElems :: rootExpr.Shape)
         let deriv = Deriv.computeWithRootDeriv rootDeriv rootExpr
         deriv
 
 
-    /// Returns the derivatives of the specified variable.
-    member this.Item 
-        with get (var: Var) =
-            match this._WrtVar |> Map.tryFind var with
-            | Some d -> d
-            | None -> 
-                let varExpr = Expr var
-                Expr.zerosOfType varExpr.DataType varExpr.Dev [this.FunElems; Expr.nElems varExpr]
+    /// Returns the derivatives of the specified untyped variable.
+    member this.Wrt (var: BaseVar) = 
+        match this._WrtVar |> Map.tryFind var with
+        | Some d -> d
+        | None -> 
+            Expr.zeros var.DataType var.Dev [this.FunElems; ShapeSpec.nElem var.Shape]
+
+
+    /// Returns the derivatives of the specified typed variable.
+    member this.Wrt (var: Var<'T>) = 
+        this.Wrt var.BaseVar :?> Expr<'T>
 
 
     /// Number of function elements.

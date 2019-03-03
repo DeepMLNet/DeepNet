@@ -3,9 +3,8 @@
 open Tensor.Expr.Ops
 
 
-/// Active recognizers for single-channel expressions.
-[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module Expr =
+/// Active recognizers for typed single-channel expressions.
+module ExprT =
 
     let (|Scalar|_|) (expr: Expr<'T>) =
         match expr.Op with
@@ -32,10 +31,10 @@ module Expr =
         | :? VarArg as this -> Some (Var<'T> this.Var)
         | _ -> None
 
-    let varArg expr = 
+    let varArg (expr: Expr<'T>) = 
         match expr with
         | VarArg v -> v
-        | _ -> failwithf "Not an expression consisting solely of a variable"
+        | _ -> failwithf "Not an expression consisting solely of a variable."
 
     let (|UnaryPlus|_|) (expr: Expr<'T>) =
         match expr.Op with
@@ -376,11 +375,6 @@ module Expr =
         | :? IfThenElse as this -> Some (Expr<bool> this.Cond, Expr<'T> this.IfTrue, Expr<'T> this.IfFalse)
         | _ -> None
 
-    let (|Discard|_|) (expr: Expr<int>) =
-        match expr.Op with
-        | :? Discard as this -> Some (this.Xs |> List.map IExpr.ofBaseExprCh)
-        | _ -> None
-
     let (|BuildTensor|_|) (expr: Expr<'T>) =
         match expr.Op with
         | :? BuildTensor as this -> Some (this.Shape, this.Ranges, this.Xs |> List.map Expr<'T>)
@@ -396,12 +390,3 @@ module Expr =
         | :? Interpolate as this -> Some (this.Interpolator, this.Xs |> List.map Expr<'T>)
         | _ -> None
 
-
-/// Active recognizers for multi-channel expressions.
-[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module MultiChannelExpr =
-
-    let (|Loop|_|) (expr: MultiChannelExpr) =
-        match expr.Op with
-        | :? Loop as this -> Some (this.Length, this.Vars, this.Channels, this.Xs |> List.map IExpr.ofBaseExprCh)
-        | _ -> None

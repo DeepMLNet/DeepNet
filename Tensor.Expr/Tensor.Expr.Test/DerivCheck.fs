@@ -59,13 +59,13 @@ type DerivCheck =
         for wrt in expr.Vars do
 
             // Calculate numeric value of derivative expression.
-            let derivExpr = derivExprs.[wrt]
+            let derivExpr = derivExprs.Wrt wrt
             let derivExprVal = derivExpr |> Expr.eval varEnv
 
             // Calculate numeric (finite difference) derivative.
             let exprFn (wrtVal: ITensor) =
-                expr |> Expr.eval (varEnv |> VarEnv.add wrt wrtVal)
-            let wrtVal = varEnv |> VarEnv.get wrt
+                expr |> Expr.eval (varEnv |> VarEnv.addBaseVar wrt wrtVal)
+            let wrtVal = varEnv.[wrt.Name]
             let derivNumVal = NumDeriv.calc (exprFn, wrtVal, ?epsilon=epsilon)
 
             // Check.
