@@ -142,30 +142,30 @@ type Expr<'T> (baseExpr: BaseExpr) =
         Expr.constructElementwise op a b |> Expr<'T>
 
     // elementwise unary arithmetic
-    static member (~+) (x: Expr<'T>) = Expr<'T> {UnaryPlus.X=x.BaseExprCh}
-    static member (~-) (x: Expr<'T>) = Expr<'T> {Negate.X=x.BaseExprCh}
-    static member Abs (x: Expr<'T>) = Expr<'T> {Abs.X=x.BaseExprCh}
-    static member SignT (x: Expr<'T>) = Expr<'T> {SignT.X=x.BaseExprCh}
-    static member Log (x: Expr<'T>) = Expr<'T> {Log.X=x.BaseExprCh}
-    static member Log10 (x: Expr<'T>) = Expr<'T> {Log10.X=x.BaseExprCh}
-    static member Exp (x: Expr<'T>) = Expr<'T> {Exp.X=x.BaseExprCh}
-    static member Sin (x: Expr<'T>) = Expr<'T> {Sin.X=x.BaseExprCh}
-    static member Cos (x: Expr<'T>) = Expr<'T> {Cos.X=x.BaseExprCh}
-    static member Tan (x: Expr<'T>) = Expr<'T> {Tan.X=x.BaseExprCh}
-    static member Asin (x: Expr<'T>) = Expr<'T> {Asin.X=x.BaseExprCh}
-    static member Acos (x: Expr<'T>) = Expr<'T> {Acos.X=x.BaseExprCh}
-    static member Atan (x: Expr<'T>) = Expr<'T> {Atan.X=x.BaseExprCh}
-    static member Sinh (x: Expr<'T>) = Expr<'T> {Sinh.X=x.BaseExprCh}
-    static member Cosh (x: Expr<'T>) = Expr<'T> {Cosh.X=x.BaseExprCh}
-    static member Tanh (x: Expr<'T>) = Expr<'T> {Tanh.X=x.BaseExprCh}
-    static member Sqrt (x: Expr<'T>) = Expr<'T> {Sqrt.X=x.BaseExprCh}
-    static member Ceiling (x: Expr<'T>) = Expr<'T> {Ceiling.X=x.BaseExprCh}
-    static member Floor (x: Expr<'T>) = Expr<'T> {Floor.X=x.BaseExprCh}
-    static member Round (x: Expr<'T>) = Expr<'T> {Round.X=x.BaseExprCh}
-    static member Truncate (x: Expr<'T>) = Expr<'T> {Truncate.X=x.BaseExprCh}
+    static member (~+) (x: Expr<'T>) = +(x :> Expr) |> Expr<'T>
+    static member (~-) (x: Expr<'T>) = -(x :> Expr) |> Expr<'T>
+    static member Abs (x: Expr<'T>) = abs (x :> Expr) |> Expr<'T>
+    static member SignT (x: Expr<'T>) = Expr.SignT (x :> Expr) |> Expr<'T>
+    static member Log (x: Expr<'T>) = log (x :> Expr) |> Expr<'T>
+    static member Log10 (x: Expr<'T>) = log10 (x :> Expr) |> Expr<'T>
+    static member Exp (x: Expr<'T>) = exp (x :> Expr) |> Expr<'T>
+    static member Sin (x: Expr<'T>) = sin (x :> Expr) |> Expr<'T>
+    static member Cos (x: Expr<'T>) = cos (x :> Expr) |> Expr<'T>
+    static member Tan (x: Expr<'T>) = tan (x :> Expr) |> Expr<'T>
+    static member Asin (x: Expr<'T>) = asin (x :> Expr) |> Expr<'T>
+    static member Acos (x: Expr<'T>) = acos (x :> Expr) |> Expr<'T>
+    static member Atan (x: Expr<'T>) = atan (x :> Expr) |> Expr<'T>
+    static member Sinh (x: Expr<'T>) = sinh (x :> Expr) |> Expr<'T>
+    static member Cosh (x: Expr<'T>) = cosh (x :> Expr) |> Expr<'T>
+    static member Tanh (x: Expr<'T>) = tanh (x :> Expr) |> Expr<'T>
+    static member Sqrt (x: Expr<'T>) = sqrt (x :> Expr) |> Expr<'T>
+    static member Ceiling (x: Expr<'T>) = ceil (x :> Expr) |> Expr<'T>
+    static member Floor (x: Expr<'T>) = floor (x :> Expr) |> Expr<'T>
+    static member Round (x: Expr<'T>) = round (x :> Expr) |> Expr<'T>
+    static member Truncate (x: Expr<'T>) = truncate (x :> Expr) |> Expr<'T>
 
     // element-wise unary logic
-    static member (~~~~) (x: Expr<bool>) = Expr<bool> {Not.X=x.BaseExprCh}
+    static member (~~~~) (x: Expr<bool>) = ~~~~(x :> Expr) |> Expr<bool>
 
     // elementwise binary arithmetic
     static member (+) (x: Expr<'T>, y: Expr<'T>) = (x :> Expr) + (y :> Expr) |> Expr<'T>

@@ -26,7 +26,12 @@
    - yes, Loop channel trimmer. => see where to move that. optimizer?
 
 
-- make Expr and Var generic again?
-- verify VarEnv while building
-- implement var updating expression
+
+1. implement var updating expression
+2. think about eval interfaces, i.e. functions etc.
+3. think about how to integrate trace and dump without global variables or with thread local variables
+4. think about how to output the graph for visualization along with values for each iteration
+5. port optimizers
+
+
 
