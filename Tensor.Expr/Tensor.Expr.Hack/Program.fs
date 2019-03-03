@@ -22,16 +22,17 @@ let ``Deriv: a + b`` () =
     printfn "Deriv a+b:"
     let expr = Expr.var Vars.a + Expr.var Vars.b
     let derivs = Deriv.compute expr
-    printfn "wrt a: %A" (derivs.Wrt Vars.a)
-    printfn "wrt b: %A" (derivs.Wrt Vars.b)
+    printfn "wrt a: %s" ((derivs.Wrt Vars.a).ToString())
+    printfn "wrt b: %s" ((derivs.Wrt Vars.a).ToString())
 
 
 let ``Deriv: sin a * exp b`` () =
     printfn "Deriv sin a * exp b:"
     let expr = sin (Expr.var Vars.a) * exp (Expr.var Vars.b)
     let derivs = Deriv.compute expr
-    printfn "wrt a: %A" (derivs.Wrt Vars.a)  
-    printfn "wrt b: %A" (derivs.Wrt Vars.b)
+    printfn "wrt a: %s" ((derivs.Wrt Vars.a).ToString())
+    printfn "wrt b: %s" ((derivs.Wrt Vars.a).ToString())
+
 
 [<EntryPoint>]
 let main argv =

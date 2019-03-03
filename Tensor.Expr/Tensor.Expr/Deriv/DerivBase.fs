@@ -173,7 +173,7 @@ type Deriv = private {
 
     /// Returns the derivatives of the specified typed variable.
     member this.Wrt (var: Var<'T>) = 
-        this.Wrt var.BaseVar :?> Expr<'T>
+        this.Wrt var.BaseVar |> Expr<'T>
 
 
     /// Number of function elements.
