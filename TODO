@@ -28,24 +28,7 @@
 
 
 1. implement var updating expression => DONE
-2. think about eval interfaces, i.e. functions etc.
-3. think about how to integrate trace and dump without global variables or with thread local variables
-4. think about how to output the graph for visualization along with values for each iteration
+2. think about eval interfaces, i.e. functions etc. => reintroduce function interface with and without EvalEnv
+3. think about how to integrate trace and dump without global variables or with thread local variables => specify tracers in EvalEnv
+4. think about how to output the graph for visualization along with values for each iteration => use tracers
 5. port optimizers
-
-
-
-challenge is somehow to integrate simple invocation of expression with trace ability
-especially how to handle the function scenario?
-
-- yes, how can this be done?
-- good method would be to pass in some extra parameters for eval
-- however, this might make it more compilcated
-- we could have two methods
-- one for easy eval and another for custom eval
-- but this is not that easy since we also want to support other stuff like graph viewing
-- so an eval should also return diagnostic data if we want it too
-- should ops also be able to plug into that?
-- its also the question how to support logging for compilation
-- problem is that eval function cannot really return something
-- 
