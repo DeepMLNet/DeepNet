@@ -1,5 +1,6 @@
 ﻿namespace Tensor.Expr
 
+open DeepNet.Utils
 open Tensor.Expr.Ops
 
 
@@ -7,6 +8,12 @@ open Tensor.Expr.Ops
 /// Active recognizers for multi-channel expressions.
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module MultiChannelExpr =
+
+    let (|Bundle|_|) (expr: MultiChannelExpr) =
+        match expr.Op with
+        | :? Bundle as this ->
+            Some (this.ChExprs |> Map.map (fun _ e -> Expr e))
+        | _ -> None
 
     let (|Loop|_|) (expr: MultiChannelExpr) =
         match expr.Op with

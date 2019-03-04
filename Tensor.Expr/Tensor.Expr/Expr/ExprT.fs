@@ -26,8 +26,8 @@ type Expr<'T> (baseExpr: BaseExpr) =
     new (exprCh: BaseExprCh) =
         match exprCh with
         | BaseExprCh (Ch.Default, baseExpr) -> Expr<'T> baseExpr
-        | BaseExprCh (Ch.Custom chName, baseExpr) ->
-            Expr<'T> {Channel.X=baseExpr.[Ch.Custom chName]}
+        | BaseExprCh (ch, baseExpr) ->
+            Expr<'T> {Channel.X=baseExpr.[ch]}
 
     /// Create typed expression from specified untyped expression.
     new (expr: Expr) =

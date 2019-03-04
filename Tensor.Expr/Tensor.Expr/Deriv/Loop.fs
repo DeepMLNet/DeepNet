@@ -62,6 +62,7 @@ type LoopDeriv(op: Loop) =
                 match ch with
                 | Ch.Default -> "__DEFAULT__"
                 | Ch.Custom name -> name
+                | Ch.N n -> sprintf "#%d" n
 
             /// map from variable representing a derivative to the loop input specification
             let varInputSpecs = Dictionary<Var, Loop.Input> ()

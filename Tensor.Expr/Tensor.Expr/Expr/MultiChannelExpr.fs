@@ -71,6 +71,11 @@ type MultiChannelExpr (baseExpr: BaseExpr) =
     member this.Ch (channel: Ch) : Expr<'T> = 
         Expr<'T> baseExpr.[channel]
 
+    /// Bundle single-channel expressions into a multi-channel expression. 
+    static member bundle (chExprs: Map<Ch, Expr>) =
+        let chExprs = chExprs |> Map.map (fun _ expr -> expr.BaseExprCh)
+        MultiChannelExpr {Bundle.ChExprs=chExprs}
+
     /// A loop provides iterative evaluation of one or multiple expresisons.
     /// All variables occurs in the loop channel expressions must be defined as loop variables.
     /// The function `loop` performs automatic lifting of constants and thus allows for easy
@@ -88,3 +93,5 @@ type MultiChannelExpr (baseExpr: BaseExpr) =
     static member eval (varEnv: VarEnv) (expr: MultiChannelExpr) = 
         let evalEnv : EvalEnv = {VarEnv=varEnv}    
         BaseExprEval.eval evalEnv expr.BaseExpr
+
+

@@ -14,6 +14,8 @@ type Ch =
     | Default
     /// Custom channel name.
     | Custom of string
+    /// N-th channel.
+    | N of int
 
 
 /// An argument name.

@@ -5,6 +5,15 @@ open Tensor.Expr
 open Tensor.Expr.Ops
 
 
+
+[<OpExtender>]
+type BundleDeriv(op: Bundle) =
+    interface IDerivableOp with      
+        member this.Deriv dOp =
+            dOp |> Map.mapKeyValue (fun ch dCh -> Bundle.chToArg ch, dCh)
+
+
+
 [<OpExtender>]
 type ElementsDeriv(op: Elements) =
     interface IDerivableOp with      
@@ -19,6 +28,7 @@ type ElementsDeriv(op: Elements) =
                     let dXArgs = env.Xs @ [env.DOp]
                     Expr.elements dXShp dXElemExpr dXArgs)
             DerivTools.nary dXs
+
 
 
 [<OpExtender>]

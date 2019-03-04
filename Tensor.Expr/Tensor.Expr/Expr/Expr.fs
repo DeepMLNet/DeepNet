@@ -36,8 +36,8 @@ type Expr (baseExpr: BaseExpr) =
     new (exprCh: BaseExprCh) =
         match exprCh with
         | BaseExprCh (Ch.Default, baseExpr) -> Expr baseExpr
-        | BaseExprCh (Ch.Custom chName, baseExpr) ->
-            Expr {Channel.X=baseExpr.[Ch.Custom chName]}
+        | BaseExprCh (ch, baseExpr) ->
+            Expr {Channel.X=baseExpr.[ch]}
 
     /// Expression having the value of the specified variable.
     static member baseVar (baseVar: Var) = 

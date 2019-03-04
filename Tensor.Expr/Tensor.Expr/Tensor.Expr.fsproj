@@ -6,11 +6,11 @@
     <ProjectReference Include="../../Tensor/Tensor/Tensor.fsproj" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\..\Utils\Log.fs" Link="Log.fs" />
-    <Compile Include="../../Utils/Utils.fs" />
-    <Compile Include="../../Utils/NativeLib.fs" />
-    <Compile Include="../../Utils/DiskMap.fs" />
-    <Compile Include="../../Tensor/Tensor/Cuda/CudaUtils.fs" />
+    <Compile Include="..\..\Utils\Log.fs" Link="Utils/Log.fs" />
+    <Compile Include="../../Utils/Utils.fs" Link="Utils/Utils.fs" />
+    <Compile Include="../../Utils/NativeLib.fs" Link="Utils/NativeLib.fs" />
+    <Compile Include="../../Utils/DiskMap.fs" Link="Utils/DiskMap.fs" />
+    <Compile Include="../../Tensor/Tensor/Cuda/CudaUtils.fs" Link="Utils/CudaUtils.fs" />
     <Compile Include="Common/DiskMapOld.fs" />
     <Compile Include="Debug.fs" />
     <Compile Include="Size/Frac.fs" />
@@ -53,7 +53,7 @@
     <Compile Include="Deriv\Binary.fs" />
     <Compile Include="Deriv\Nary.fs" />
     <Compile Include="Deriv\Loop.fs" />
-    <Compile Include="VarUpdateExpr.fs" />
+    <Compile Include="EvalUpdateBundle.fs" />
     <None Include="Old\Expr.fs" />
     <None Include="Old\Hold.fs" />
     <None Include="Old\Optimizer.fs" />

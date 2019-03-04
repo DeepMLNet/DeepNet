@@ -5,6 +5,46 @@ open Tensor.Expr
 open Tensor
 
 
+
+/// Outputs each argument as a channel.
+type Bundle = {ChExprs: Map<Ch, BaseExprCh>} with
+
+    /// Argument corresponding to specifed channel.
+    static member chToArg ch =
+        match ch with
+        | Ch.Default -> Arg.Only
+        | Ch.Custom name -> Arg.Custom name
+        | Ch.N n -> Arg.N n
+
+    /// Channels corresponding to specifed argument.
+    static member argToCh arg =
+        match arg with
+        | Arg.Only -> Ch.Default
+        | Arg.Custom name -> Ch.Custom name
+        | Arg.N n -> Ch.N n
+        | _ -> failwithf "Argument %A not allowed for Bundle." arg
+
+    interface IOp with
+        member this.Check () = ()
+        member this.Channels = 
+            this.ChExprs |> Map.keys
+        member this.TypeNames = 
+            this.ChExprs |> Map.map (fun _ expr -> expr.TypeName)
+        member this.Devs = 
+            this.ChExprs |> Map.map (fun _ expr -> expr.Dev)
+        member this.Shapes = 
+            this.ChExprs |> Map.map (fun _ expr -> expr.Shape)
+        member this.Args = 
+            this.ChExprs |> Map.mapKeyValue (fun ch expr -> Bundle.chToArg ch, expr)
+        member this.ReplaceArgs args = 
+            {this with ChExprs=args |> Map.mapKeyValue (fun arg expr -> Bundle.argToCh arg, expr)} :> _
+        member this.SubstSymSizes env = this :> _
+        member this.CanEvalAllSymSizes = true
+        member this.Eval env argVals = 
+            argVals |> Map.mapKeyValue (fun arg value -> Bundle.argToCh arg, value)
+        
+
+
 /// Discards the results of all arguments.
 type Discard = {Xs: BaseExprCh list} with
     interface IOp with       
@@ -19,6 +59,7 @@ type Discard = {Xs: BaseExprCh list} with
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = 
             HostTensor.zeros<int32> [0L] :> ITensor |> Ch.only
+
 
 
 /// Build tensor using numeric ranges.
@@ -67,6 +108,7 @@ type BuildTensor = {Shape: ShapeSpec; Ranges: BaseRangesSpec list; Xs: BaseExprC
             trgt |> Ch.only
 
 
+
 /// Elementwise calculated tensor.
 type Elements = {Shape: ShapeSpec; ElemExpr: Elem.Expr; Xs: BaseExprCh list} with
     // TODO: introduce multi-channel element-wise calculation op.
@@ -94,6 +136,7 @@ type Elements = {Shape: ShapeSpec; ElemExpr: Elem.Expr; Xs: BaseExprCh list} wit
             let nResShape = ShapeSpec.eval this.Shape
             Elem.Interpreter.evalUntyped this.ElemExpr esv nResShape 
             |> Ch.only
+
 
 
 /// Elementwise interpolation using a value table.
