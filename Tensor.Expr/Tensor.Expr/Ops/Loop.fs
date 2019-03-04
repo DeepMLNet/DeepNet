@@ -1,8 +1,29 @@
 ﻿namespace Tensor.Expr.Ops
 
 open DeepNet.Utils
+open Tensor
+open Tensor.Backend
 open Tensor.Expr
 
+/// specification of variable strides
+type internal VarStrides = Map<Var, int64 list>
+
+/// specification of channel strides
+type internal ChannelStridesT = Map<Ch, int64 list>
+
+/// channel information for loop execution
+type internal LoopChannelInfoT = {
+    Shape:          NShapeSpec
+    SliceDim:       int
+    Target:         ITensor
+} 
+
+/// channel layout information for building loop strides
+type internal LoopChannelLayoutInfoT = {
+    Shape:          NShapeSpec
+    SliceDim:       int
+    TargetLayout:   TensorLayout
+} 
 
 
 /// Elementwise interpolation using a value table.
@@ -17,6 +38,135 @@ type Loop = {
     /// inputs
     Xs:         BaseExprCh list
 } with
+
+    /// Device on which IterationIndex and IterationsRemaining is expected.
+    /// Defaults to host device, if value is not used in loop expression.
+    member private this.IterIndexDev =
+        this.Vars
+        |> Map.tryFindKey (fun var li ->
+            match li with
+            | Loop.Input.IterationIndex
+            | Loop.Input.IterationsRemaining -> true
+            | _ -> false)
+        |> Option.map Var.dev
+        |> Option.defaultValue HostTensor.Dev
+
+    /// build strides information for loop sources and targets
+    static member buildStrides (vars: Map<Var, Loop.Input>) (args: TensorLayout list) 
+                               (channels: Map<Ch, LoopChannelLayoutInfoT>) 
+                               : VarStrides * ChannelStridesT * int list option list =
+
+        let mutable argRequiredStrideOrder = List.replicate args.Length None
+
+        let varStrides = 
+            vars |> Map.map (fun vs li ->
+                match li with
+                | Loop.ConstArg idx -> 
+                    args.[idx].Stride
+                | Loop.SequenceArgSlice {ArgIdx=idx; SliceDim=dim} ->
+                    args.[idx].Stride |> List.without dim
+                | Loop.PreviousChannel {Channel=ch; InitialArg=ivIdx} ->
+                    let sliceDim = channels.[ch].SliceDim
+                    let chStride = channels.[ch].TargetLayout.Stride |> List.without sliceDim
+
+                    // check that initial value has same stride as channel target
+                    let ivStride = args.[ivIdx].Stride |> List.without sliceDim
+                    if chStride <> ivStride then
+                        // Stride mismatch. 
+                        // Check that copying argument to temporary array would
+                        // result in matching strides.
+                        let shp = args.[ivIdx].Shape
+                        let strideOrder = 
+                            [0 .. shp.Length-1] |> List.swap 0 sliceDim |> List.rev
+                        let ivCopyStride = 
+                            TensorLayout.orderedStride args.[ivIdx].Shape strideOrder
+                            |> List.without sliceDim
+                        if chStride <> ivCopyStride then 
+                            eprintfn "Loop stride problem:"
+                            eprintfn "Channel %A:\n%A" ch channels.[ch]
+                            eprintfn "Initial value layout:\n%A" args.[ivIdx]
+                            eprintfn "Copy stride:    %A" ivCopyStride
+                            eprintfn "Channel stride: %A" chStride
+                            failwithf "channel %A slice strides %A are different from initial \
+                                       value slice strides %A for loop variable %A and copying \
+                                       to a temporary array would not help" 
+                                      ch chStride ivStride vs
+                        // request copy to C-strided temporary array
+                        argRequiredStrideOrder <- 
+                            argRequiredStrideOrder |> List.set ivIdx (Some strideOrder)
+                    chStride
+                | Loop.IterationIndex
+                | Loop.IterationsRemaining -> [])
+
+        let channelStrides =
+            channels |> Map.map (fun ch lv -> lv.TargetLayout.Stride |> List.without lv.SliceDim)
+
+        varStrides, channelStrides, argRequiredStrideOrder
+
+    /// builds inputs and outputs for one loop iteration 
+    static member buildInOut (nIters: int64) (iter: int64) (iterAry: ITensor) (itersRemainingAry: ITensor)
+                             (vars: Map<Var, Loop.Input>)
+                             (args: ITensor list) (channels: Map<Ch, LoopChannelInfoT>)
+                             : Map<Var, ITensor> * Map<Ch, ITensor> =
+
+        /// RngAll in all dimensions but specified one
+        let rngAllBut ary dim dimSlice = 
+            List.replicate (ITensor.nDims ary) Rng.All
+            |> List.set dim dimSlice
+
+        /// The slice of the channel's target for the specified iteration.
+        let targetSlice ch iter =
+            let dim = channels.[ch].SliceDim
+            let trgtSize = channels.[ch].Target.Shape.[dim]
+            // calculate offset so that last loop iteration is written into last element of
+            // channel's target
+            let offset = trgtSize - 1L - ((nIters - 1L) % trgtSize)
+            assert ((offset + nIters - 1L) % trgtSize = trgtSize - 1L)
+            let pos = (offset + iter) % trgtSize
+            let slice = rngAllBut channels.[ch].Target dim (Rng.Elem pos)
+            channels.[ch].Target.[slice]
+
+        // build variable environment for value sources
+        let srcVarEnv = 
+            vars
+            |> Map.map (fun vs li ->
+                // get value for variable
+                let value = 
+                    match li with
+                    | Loop.ConstArg idx -> 
+                        args.[idx] 
+                    | Loop.SequenceArgSlice {ArgIdx=idx; SliceDim=dim} -> 
+                        let slice = rngAllBut args.[idx] dim (Rng.Elem iter)
+                        args.[idx].[slice] 
+                    | Loop.PreviousChannel {Channel=ch; Delay=delay; InitialArg=ivIdx} ->
+                        let delay = SizeSpec.eval delay
+                        let dim = channels.[ch].SliceDim
+                        if channels.[ch].Target.Shape.[dim] < delay then
+                            failwithf "target for channel %A has insufficient size %d for delay %d"
+                                       ch channels.[ch].Target.Shape.[dim] delay
+                        let prvIter = iter - delay
+                        if prvIter >= 0L then targetSlice ch prvIter
+                        else
+                            let initialIter = args.[ivIdx].Shape.[dim] + prvIter
+                            let slice = rngAllBut args.[ivIdx] dim (Rng.Elem initialIter)
+                            args.[ivIdx].[slice] 
+                    | Loop.IterationIndex -> iterAry
+                    | Loop.IterationsRemaining -> itersRemainingAry
+
+                // check type and shape
+                if ShapeSpec.eval vs.Shape <> value.Shape then
+                    failwithf "loop variable %A got value with shape %A" vs value.Shape
+                if vs.DataType <> value.DataType then
+                    failwithf "loop variable %A got value with data type %A" vs value.DataType
+                    
+                value)
+
+        // slice outputs into channel targets
+        let targets =
+            channels |> Map.map (fun ch _ -> targetSlice ch iter)
+
+        srcVarEnv, targets
+
 
     interface IOp with       
         member this.Check () =
@@ -80,6 +230,10 @@ type Loop = {
                         failwithf "Iteration index variable %A must be of type int." vs
                     if not (ShapeSpec.equalWithoutBroadcastability vs.Shape []) then
                         failwithf "Iteration index variable %A must be scalar." vs
+                    if vs.Dev <> this.IterIndexDev then
+                        failwithf "Iteration index variable %A is inconsistent with another usage on device %A."
+                                  vs this.IterIndexDev
+
         member this.Channels = 
             this.Channels |> Map.toSeq |> Seq.map fst |> Set.ofSeq
         member this.TypeNames = 
@@ -89,8 +243,10 @@ type Loop = {
         member this.Shapes = 
             this.Channels |> Map.map (fun ch lv ->
                 lv.Expr.Shape |> ShapeSpec.insertAxis lv.SliceDim this.Length)
+
         member this.Args = Args.nary this.Xs
         member this.ReplaceArgs args = {this with Xs=Args.naryXs args} :> _
+
         member this.SubstSymSizes env = 
             {this with
                 Length = SizeSpec.substSymbols env this.Length
@@ -107,6 +263,7 @@ type Loop = {
                 Channels = this.Channels
                             |> Map.map (fun ch lv -> {lv with Expr = lv.Expr |> BaseExprCh.map (BaseExpr.substSymSizes env)})
             } :> _
+
         member this.CanEvalAllSymSizes = 
             (SizeSpec.canEval this.Length) &&
             (this.Vars |> Map.toSeq |> Seq.forall (fun (vs, li) ->
@@ -114,9 +271,46 @@ type Loop = {
                 match li with
                 | Loop.PreviousChannel pc -> SizeSpec.canEval pc.Delay
                 | _ -> true)) &&
-            (this.Channels |> Map.toSeq |> Seq.forall (fun (ch, lv) -> lv.Expr.Expr.CanEvalAllSymSizes))    
-        member this.Eval env argVals = 
-            failwith "TODO"
+            (this.Channels |> Map.toSeq |> Seq.forall (fun (ch, lv) -> lv.Expr.Expr.CanEvalAllSymSizes))   
+            
+        member this.Eval evalEnv argVals = 
+            let args = ArgValue.naryXs argVals
+
+            // iteration index variables
+            let nIters = SizeSpec.eval this.Length
+            let iterAry = Tensor<int64>.zeros this.IterIndexDev []
+            let itersRemAry = Tensor<int64>.zeros this.IterIndexDev []
+
+            // create channel information
+            let channelInfos =
+                this.Channels
+                |> Map.map (fun ch lv ->
+                    let sliceShp = lv.Expr.Shape |> ShapeSpec.eval
+                    let targetShp = sliceShp |> List.insert lv.SliceDim nIters
+                    let target = Tensor.NewOfType (targetShp, lv.Expr.DataType, HostTensor.Dev, order=RowMajor)
+                    {
+                        LoopChannelInfoT.Shape      = sliceShp
+                        LoopChannelInfoT.SliceDim   = lv.SliceDim
+                        LoopChannelInfoT.Target     = target
+                    })
+
+            // perform loop
+            for iter in 0L .. nIters-1L do            
+                //if Trace.isActive () then Trace.setLoopIter iter
+                   
+                // set iteration indices
+                iterAry.[[]] <- iter
+                itersRemAry.[[]] <- nIters - iter - 1L
+
+                // calculate and store channel values
+                let iterVarEnv, iterChannelEnv =
+                    Loop.buildInOut nIters iter iterAry itersRemAry this.Vars args channelInfos
+                let iterEvalEnv = {evalEnv with VarEnv=iterVarEnv}
+                for KeyValue(ch, lv) in this.Channels do
+                    iterChannelEnv.[ch].[Fill] <- EvalT.EvalTypeNeutral (iterEvalEnv, lv.Expr)
+
+            // return outputs
+            channelInfos |> Map.map (fun ch ci -> ci.Target)   
 
     static member internal noLift length vars channels xs =
         BaseExpr.ofOp {Loop.Length=length; Vars=vars; Channels=channels; Xs=xs} 

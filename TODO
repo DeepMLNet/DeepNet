@@ -32,3 +32,13 @@
 3. think about how to integrate trace and dump without global variables or with thread local variables => specify tracers in EvalEnv
 4. think about how to output the graph for visualization along with values for each iteration => use tracers
 5. port optimizers
+
+6. How to deal with proper compilation?
+7. Shall we add a compile method that returns a compiled expression object?
+8. Then user would have to dispose that object?
+9. Well, this is probably not something we want.
+10. Perhaps not focus on it too much now and instead continue with some ML application for now
+11. For example learning MNIST...
+
+1. First get done with simple eval of loop expressions.
+2. Then check what to do about ModelContext and RecordParams.
