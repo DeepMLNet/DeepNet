@@ -53,6 +53,7 @@
     <Compile Include="Deriv\Binary.fs" />
     <Compile Include="Deriv\Nary.fs" />
     <Compile Include="Deriv\Loop.fs" />
+    <Compile Include="TextTracer.fs" />
     <Compile Include="EvalUpdateBundle.fs" />
     <None Include="Old\Expr.fs" />
     <None Include="Old\Hold.fs" />

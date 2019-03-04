@@ -516,9 +516,10 @@ module internal Util =
             None
 
 
-/// Utility operators        
+
+/// Utility types and operators.        
 [<AutoOpen>]
-module internal UtilOperators = 
+module internal UtilTypes = 
 
     /// Default value for options. Returns b if a is None, else the value of a.
     let inline (|?) (a: 'a option) b = 
@@ -526,6 +527,8 @@ module internal UtilOperators =
         | Some v -> v
         | None -> b
                       
+    // Allow access to DateTime without opening System.
+    type DateTime = System.DateTime
 
 
 /// String extensions

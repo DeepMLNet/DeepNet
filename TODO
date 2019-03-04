@@ -37,3 +37,15 @@
 
 challenge is somehow to integrate simple invocation of expression with trace ability
 especially how to handle the function scenario?
+
+- yes, how can this be done?
+- good method would be to pass in some extra parameters for eval
+- however, this might make it more compilcated
+- we could have two methods
+- one for easy eval and another for custom eval
+- but this is not that easy since we also want to support other stuff like graph viewing
+- so an eval should also return diagnostic data if we want it too
+- should ops also be able to plug into that?
+- its also the question how to support logging for compilation
+- problem is that eval function cannot really return something
+- 

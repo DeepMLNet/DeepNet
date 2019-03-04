@@ -33,11 +33,54 @@ type Arg =
     | Custom of string
 
 
-/// Map containing argument expression by name.
-//type ArgsMap = Map<Arg, BaseExprCh>
+/// Custom data for a trace event.
+[<RequireQualifiedAccess>]
+type TraceCustomData =
+    | Bool of bool
+    | Int of int
+    | Int64 of int64
+    | Single of single
+    | Double of double
+    | String of string
+    | Tensor of ITensor
+    | DateTime of DateTime
 
-/// Map containing argument expression by name for multi-channel arguments.
-//type MultiChannelArgsMap = Map<string, string * BaseMultiChannelExpr>
+
+/// A trace event.
+[<RequireQualifiedAccess>]
+type TraceEvent =
+    /// Expression to associate with.
+    | Expr of BaseExpr
+    /// Parent expression to assoicate with.
+    | ParentExpr of BaseExpr
+    /// A log message.
+    | Msg of string
+    /// Evaluated expression value.
+    | EvalValue of Map<Ch, ITensor>
+    /// Evaluation start time.
+    | EvalStart of DateTime
+    /// Evaluation end time.
+    | EvalEnd of DateTime
+    /// Custom data.
+    | Custom of key:string * data:TraceCustomData
+    /// Event assoicated with an expression.
+    | ForExpr of BaseExpr * TraceEvent
+    /// Event from a sub tracer.
+    | Subtrace of id:int * TraceEvent
+
+
+/// Interface for tracing operations on expression trees.
+type ITracer =
+    /// Logs data associated with a base expression.
+    abstract Log: TraceEvent -> unit
+    /// Creates a sub-tracer.
+    abstract GetSubTracer: unit -> ITracer
+    
+/// Tracer that performs no trace.
+type NoTracer() =
+    interface ITracer with
+        member this.Log event = ()
+        member this.GetSubTracer () = NoTracer() :> _
 
 
 /// Information necessary to evaluate an expression.
@@ -45,13 +88,10 @@ type Arg =
 type EvalEnv = {
     /// Values of variables.
     VarEnv: VarEnv
+    /// Tracer for logging of evaluation.
+    Tracer: ITracer
 }
 
-
-/// start plus the specified number of (symbolic elements)
-type internal PlusElems (elems: SizeSpec) =
-    new (intElems: int64) = PlusElems (SizeSpec.fix intElems)
-    member this.Elems = elems
 
 
 /// A mathematical operation in an expression with multiple output values.

@@ -32,12 +32,15 @@ module ExprTestCase =
         printfn "==== Shape:              %A" tc.Expr.Shape
         printfn "==== CanEvalAllSymSizes: %A" tc.Expr.CanEvalAllSymSizes
         printfn "==== Vars:               %A" tc.Expr.Vars
-        let value = tc.Expr |> Expr.eval varEnv 
-        printfn "==== Value:              \n%A" value
-
         assert (tc.Expr.DataType = tc.DataType)
         assert (tc.Expr.Dev = tc.Dev)
         assert (tc.Expr.Shape = tc.Shape)
+
+        printfn ""
+        let tracer = TextTracer (output.WriteLine)
+        let evalEnv: Ops.EvalEnv = {VarEnv=varEnv; Tracer=tracer}
+        let value = tc.Expr |> Expr.evalWithEnv evalEnv      
+        printfn ""
         assert (value.AlmostEqual tc.Value)
 
     let deriv (output: ITestOutputHelper) (varEnv: VarEnv) (tc: ExprTestCase) =

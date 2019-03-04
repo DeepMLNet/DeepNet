@@ -91,7 +91,7 @@ type MultiChannelExpr (baseExpr: BaseExpr) =
 
     /// Evaluates all channels of the expression into numeric values.
     static member eval (varEnv: VarEnv) (expr: MultiChannelExpr) = 
-        let evalEnv : EvalEnv = {VarEnv=varEnv}    
+        let evalEnv : EvalEnv = {VarEnv=varEnv; Tracer=NoTracer()}    
         BaseExprEval.eval evalEnv expr.BaseExpr
 
 

@@ -31,6 +31,8 @@ type ITensor =
     abstract Pretty:            string
     /// full contents string
     abstract Full:              string
+    /// String representation of the tensor limited to a specific number of elements per dimension.
+    abstract ToString:          int64 -> string
 
     /// a tensor with the same storage but new layout
     abstract Relayout:          TensorLayout -> ITensor

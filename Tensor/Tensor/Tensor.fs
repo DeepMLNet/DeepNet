@@ -3827,6 +3827,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         member this.DataType = this.DataType
         member this.Pretty = this.Pretty
         member this.Full = this.Full
+        member this.ToString maxElems = this.ToString maxElems
 
         member this.Relayout layout = this.Relayout layout :> ITensor
         member this.Copy (?order) = this.Copy (?order=order) :> ITensor

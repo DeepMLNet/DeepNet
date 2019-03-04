@@ -7,6 +7,14 @@ open Tensor.Expr.Ops
 open Tensor.Backend
 
 
+
+/// start plus the specified number of (symbolic elements)
+type internal PlusElems (elems: SizeSpec) =
+    new (intElems: int64) = PlusElems (SizeSpec.fix intElems)
+    member this.Elems = elems
+
+
+
 module internal ExprHelpers =
 
     let (|SubtensorExpr|_|) (expr: BaseExpr) =
@@ -742,11 +750,15 @@ type Expr (baseExpr: BaseExpr) =
     static member interpolate3D interpolator (x: Expr) (y: Expr) (z: Expr) =
         Expr.interpolate interpolator [x; y; z]
 
+    /// Evaluates the expression into a numeric value using the specified evaluation envirnoment.
+    static member evalWithEnv (evalEnv: EvalEnv) (expr: Expr) : Tensor.ITensor = 
+        let chVals = BaseExprEval.eval evalEnv expr.BaseExpr
+        chVals.[Ch.Default]        
+
     /// Evaluates the expression into a numeric value.
     static member eval (varEnv: VarEnv) (expr: Expr) : Tensor.ITensor = 
-        let evalEnv : EvalEnv = {VarEnv=varEnv}
-        let chVals = BaseExprEval.eval evalEnv expr.BaseExpr
-        chVals.[Ch.Default] 
+        let evalEnv : EvalEnv = {VarEnv=varEnv; Tracer=NoTracer()}
+        Expr.evalWithEnv evalEnv expr
 
 
 
