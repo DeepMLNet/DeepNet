@@ -480,6 +480,35 @@ type Expr (baseExpr: BaseExpr) =
     static member sqrtt (expr: Expr) =
         Expr.Sqrt expr
 
+    /// Elementwise maximum.
+    static member maxElemwise (x: Expr) (y: Expr) =
+        Expr.constructElementwise (fun x y -> {MaxElemwise.X=x.BaseExprCh; Y=y.BaseExprCh} :> IOp) x y
+
+    /// Elementwise minimum.
+    static member minElemwise (x: Expr) (y: Expr) =
+        Expr.constructElementwise (fun x y -> {MinElemwise.X=x.BaseExprCh; Y=y.BaseExprCh} :> IOp) x y
+
+    /// Ensures that all elements are between minVal and maxVal.
+    /// Values outside these limits are capped to the limits.
+    static member limit (x: Expr, ?minVal: obj, ?maxVal: obj) =
+        let checkType (value: obj) =
+            if value.GetType() <> x.DataType then
+                failwithf "Limit value has type %A but expression data type is %A."
+                          (value.GetType()) x.DataType
+        let x =
+            match minVal with
+            | Some minVal -> 
+                checkType minVal
+                Expr.maxElemwise (Expr.scalar x.Dev minVal) x
+            | None -> x
+        let x =
+            match maxVal with
+            | Some maxVal -> 
+                checkType maxVal
+                Expr.minElemwise (Expr.scalar x.Dev maxVal) x
+            | None -> x
+        x
+
     /// Tensor of given shape filled with specified value.
     static member filled (dev: ITensorDevice) (shp: ShapeSpec) (value: obj) =
         let bcShp = shp |> List.map (fun _ -> SizeSpec.broadcastable)

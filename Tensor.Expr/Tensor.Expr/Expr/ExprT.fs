@@ -239,6 +239,19 @@ type Expr<'T> (baseExpr: BaseExpr) =
     static member sqrtt (expr: Expr<'T>) =
         Expr.sqrtt expr |> Expr<'T>
 
+    /// Elementwise maximum.
+    static member maxElemwise (x: Expr<'T>) (y: Expr<'T>) =
+        Expr.maxElemwise x y |> Expr<'T>
+
+    /// Elementwise minimum.
+    static member minElemwise (x: Expr<'T>) (y: Expr<'T>) =
+        Expr.minElemwise x y |> Expr<'T>
+
+    /// Ensures that all elements are between minVal and maxVal.
+    /// Values outside these limits are capped to the limits.
+    static member limit (x: Expr<'T>, ?minVal: 'T, ?maxVal: 'T) =
+        Expr.limit (x, ?minVal=Option.map box minVal, ?maxVal=Option.map box maxVal) |> Expr<'T> 
+
     /// Tensor of given shape filled with specified value.
     static member filled (dev: ITensorDevice) (shp: ShapeSpec) (value: 'T) =
         Expr.filled dev shp (box value) |> Expr<'T>
