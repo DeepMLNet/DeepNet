@@ -14,7 +14,7 @@ open Tensor.Expr
 //open Optimizers
 
 
-let dumpExpr (output: ITestOutputHelper) (expr: Expr) =
+let dumpExpr (output: ITestOutputHelper) (expr: UExpr) =
     let printfn format = Printf.kprintf (fun msg -> output.WriteLine(msg)) format 
     printfn "Expr: %s" (expr.ToString())
     printfn "==== DataType:           %A" expr.DataType

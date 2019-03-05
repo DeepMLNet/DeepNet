@@ -49,7 +49,7 @@ type DerivCheck =
 
     /// Checks that symbolic and numeric derivatives of the given expression are close enough.
     /// The derivatives are evaluated at the location specified by the given VarEnv.
-    static member expr (expr: Expr, varEnv: VarEnv, ?maxDeviation: float, ?epsilon: float, ?log: string -> unit) =
+    static member expr (expr: UExpr, varEnv: VarEnv, ?maxDeviation: float, ?epsilon: float, ?log: string -> unit) =
         let log = defaultArg log (printfn "%s")
         let printfn format = Printf.kprintf log format 
 
@@ -60,11 +60,11 @@ type DerivCheck =
 
             // Calculate numeric value of derivative expression.
             let derivExpr = derivExprs.Wrt wrt
-            let derivExprVal = derivExpr |> Expr.eval varEnv
+            let derivExprVal = derivExpr |> UExpr.eval varEnv
 
             // Calculate numeric (finite difference) derivative.
             let exprFn (wrtVal: ITensor) =
-                expr |> Expr.eval (varEnv |> VarEnv.addBaseVar wrt wrtVal)
+                expr |> UExpr.eval (varEnv |> VarEnv.addBaseVar wrt wrtVal)
             let wrtVal = varEnv.[wrt.Name]
             let derivNumVal = NumDeriv.calc (exprFn, wrtVal, ?epsilon=epsilon)
 

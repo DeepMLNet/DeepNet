@@ -14,7 +14,7 @@ open Utils
 
 
 type ExprTestCase = {
-    Expr:       Expr
+    Expr:       UExpr
     DataType:   System.Type
     Dev:        ITensorDevice
     Shape:      ShapeSpec
@@ -39,7 +39,7 @@ module ExprTestCase =
         printfn ""
         let tracer = TextTracer (output.WriteLine)
         let evalEnv: Ops.EvalEnv = {VarEnv=varEnv; Tracer=tracer}
-        let value = tc.Expr |> Expr.evalWithEnv evalEnv      
+        let value = tc.Expr |> UExpr.evalWithEnv evalEnv      
         printfn ""
         assert (value.AlmostEqual tc.Value)
 
@@ -50,7 +50,7 @@ module ExprTestCase =
         let derivs = Deriv.compute tc.Expr
         for var in tc.Expr.Vars do
             printfn "wrt %A:   %A" var (derivs.Wrt var)
-            let value = derivs.Wrt var |> Expr.eval varEnv 
+            let value = derivs.Wrt var |> UExpr.eval varEnv 
             printfn "evaled:   %A" value
             printfn ""
 

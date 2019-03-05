@@ -41,11 +41,11 @@
     <Compile Include="Ops\Nary.fs" />
     <Compile Include="Ops\LoopTypes.fs" />
     <Compile Include="Ops\Loop.fs" />
+    <Compile Include="Expr\UExpr.fs" />
     <Compile Include="Expr\Expr.fs" />
-    <Compile Include="Expr\ExprT.fs" />
     <Compile Include="Expr\MultiChannelExpr.fs" />
+    <Compile Include="Expr\UExprRecognizers.fs" />
     <Compile Include="Expr\ExprRecognizers.fs" />
-    <Compile Include="Expr\ExprTRecognizers.fs" />
     <Compile Include="Expr\MultiChannelExprRecognizers.fs" />
     <Compile Include="Deriv\DerivBase.fs" />
     <Compile Include="Deriv\DerivTools.fs" />

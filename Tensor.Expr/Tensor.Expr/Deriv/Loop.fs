@@ -41,7 +41,7 @@ type LoopDeriv(op: Loop) =
                 | [] -> failwith "output derivatives invalid"
 
             /// argument of the derivative loop expression
-            let args = ResizeArray<Expr> originalArgs
+            let args = ResizeArray<UExpr> originalArgs
 
             /// adds an argument to the derivative loop expression and returns its index
             let addArg expr =
@@ -55,7 +55,7 @@ type LoopDeriv(op: Loop) =
             /// adds an argument with a value full of zeros for use with initial value of a PreviousChannel
             let addZeroInitialArg channelShp channelType channelDev sliceDim delay =
                 let shp = channelShp |> ShapeSpec.insertAxis sliceDim delay
-                let zeroExpr = Expr.zeros channelType channelDev shp
+                let zeroExpr = UExpr.zeros channelType channelDev shp
                 addArg zeroExpr
 
             /// Name of a channel.
@@ -91,8 +91,8 @@ type LoopDeriv(op: Loop) =
                         (funElems :: spec.Channels.[ch].Expr.Shape)
                         |> ShapeSpec.insertAxis (sliceDim + 1) spec.Length
                     dCh 
-                    |> Expr.reshape expShp
-                    |> Expr.reverseAxis (sliceDim + 1))
+                    |> UExpr.reshape expShp
+                    |> UExpr.reverseAxis (sliceDim + 1))
 
             // go through loop outputs and create variables representing their derivatives
             for KeyValue (outPort, dExpr) in dOutputs do
@@ -218,20 +218,20 @@ type LoopDeriv(op: Loop) =
                         seq { 
                             // derivative coming from external use of port's output slice
                             match dOutputVars.TryFind port with
-                            | Some dVar -> yield Expr.baseVar dVar
+                            | Some dVar -> yield UExpr.baseVar dVar
                             | None -> ()
 
                             // derivatives coming from PreviousPort uses of this port 
                             for dpv in dPreviousVars do
                                 let previousPort, dVar = dpv.Key, dpv.Value
-                                if previousPort.Channel = port then yield Expr.baseVar dVar
+                                if previousPort.Channel = port then yield UExpr.baseVar dVar
                         } |> Seq.reduce (+)
                     
                     // collapse Jacobian
-                    let incomingJacobian = incomingExpandedJacobian |> Expr.reshape [funElems; value.Expr.NElems]
+                    let incomingJacobian = incomingExpandedJacobian |> UExpr.reshape [funElems; value.Expr.NElems]
 
                     // calculate Jacobians w.r.t. all variables
-                    let chDeriv = Deriv.computeWithRootDeriv incomingJacobian (Expr value.Expr)
+                    let chDeriv = Deriv.computeWithRootDeriv incomingJacobian (UExpr value.Expr)
                     chDeriv
                     )    
                 |> Seq.reduce Deriv.merge
@@ -246,12 +246,12 @@ type LoopDeriv(op: Loop) =
                             // obtain Jacobians
                             for wrt in derivWrts do
                                 let wrtJacobian = portDerivs.Wrt wrt
-                                let wrtExpandedJacobian = wrtJacobian |> Expr.reshape (funElems :: wrt.Shape)
+                                let wrtExpandedJacobian = wrtJacobian |> UExpr.reshape (funElems :: wrt.Shape)
                                 yield wrtExpandedJacobian
                    
                             // obtain value, if any
                             match valueOf with
-                            | Some vs -> yield Expr.baseVar vs
+                            | Some vs -> yield UExpr.baseVar vs
                             | None -> ()
                         } |> Seq.reduce (+)
                     let value: Loop.Value = {Expr=expr.BaseExprCh; SliceDim=sliceDim}
@@ -273,7 +273,7 @@ type LoopDeriv(op: Loop) =
                         li
                     | Loop.SequenceArgSlice {ArgIdx=argIdx; SliceDim=sliceDim} ->
                         // sequence arguments must be reversed
-                        let revExpr = Expr.reverseAxis sliceDim args.[argIdx]
+                        let revExpr = UExpr.reverseAxis sliceDim args.[argIdx]
                         Loop.SequenceArgSlice {ArgIdx=addArg revExpr; SliceDim=sliceDim}
                     | Loop.PreviousChannel pp ->
                         // previous channel accesses the reversed output of the orignal loop
@@ -284,8 +284,8 @@ type LoopDeriv(op: Loop) =
                         let sliceDim = spec.Channels.[pp.Channel].SliceDim
 
                         let initialValues = originalArgs.[pp.InitialArg]
-                        let portSeq = Expr.concat sliceDim [initialValues; portOutput]
-                        let revPortSeq = portSeq |> Expr.reverseAxis sliceDim
+                        let portSeq = UExpr.concat sliceDim [initialValues; portOutput]
+                        let revPortSeq = portSeq |> UExpr.reverseAxis sliceDim
 
                         let delaySlice : RangesSpec = [
                             for d=0 to sliceDim-1 do yield RangeSpec.All 
@@ -307,7 +307,7 @@ type LoopDeriv(op: Loop) =
                 Length    = spec.Length
                 Vars      = Map.join originalVars varsFromDeriv
                 Channels  = ports
-                Xs        = args |> List.ofSeq |> List.map (Expr.baseExprCh)
+                Xs        = args |> List.ofSeq |> List.map (UExpr.baseExprCh)
             }
             let dLoopExpr = MultiChannelExpr dSpec
             //printfn "derivative loop spec is\n%A" dSpec
@@ -324,13 +324,13 @@ type LoopDeriv(op: Loop) =
                             let loopOutput = dLoopExpr.[port]
                             let sliced = loopOutput.[slice]
                             match reverseAxis with
-                            | Some ax -> sliced |> Expr.reverseAxis ax
+                            | Some ax -> sliced |> UExpr.reverseAxis ax
                             | None -> sliced)
                         |> Seq.reduce (+)
 
                     // collapse Jacobian
                     let wrtElems = ShapeSpec.nElem dExprExpanded.Shape.[1..] 
-                    let dExpr = dExprExpanded |> Expr.reshape [funElems; wrtElems]
+                    let dExpr = dExprExpanded |> UExpr.reshape [funElems; wrtElems]
                     dExpr)
 
             // output mapping from original argument to its derivative

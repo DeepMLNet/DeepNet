@@ -26,7 +26,7 @@ type ElementsDeriv(op: Elements) =
                 |> List.map (fun (x, dXElemExpr) -> 
                     let dXShp = env.FunElems :: x.Shape
                     let dXArgs = env.Xs @ [env.DOp]
-                    Expr.elements dXShp dXElemExpr dXArgs)
+                    UExpr.elements dXShp dXElemExpr dXArgs)
             DerivTools.nary dXs
 
 
@@ -42,7 +42,7 @@ type InterpolateDeriv(op: Interpolate) =
                     List.indexed env.Xs
                     |> List.map (fun (d, x) ->
                         let ipd = op.Interpolator |> Interpolator.getDerivative d 
-                        env.DOp * Expr.padLeft (Expr.interpolate ipd env.Xs))
+                        env.DOp * UExpr.padLeft (UExpr.interpolate ipd env.Xs))
                 | InterpolationMode.ToLeft -> 
                     env.Xs |> List.map (fun x -> env.Zeros x)
             DerivTools.nary dXs

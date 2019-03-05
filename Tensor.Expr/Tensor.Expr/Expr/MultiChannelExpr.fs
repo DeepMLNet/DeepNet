@@ -64,15 +64,15 @@ type MultiChannelExpr (baseExpr: BaseExpr) =
 
     /// Accesses the specified channel of this multi-channel expression as IExpr.
     member this.Item 
-        with get (channel: Ch) : Expr = 
-            Expr baseExpr.[channel]
+        with get (channel: Ch) : UExpr = 
+            UExpr baseExpr.[channel]
 
     /// Accesses the specified channel of this multi-channel expression as Expr<'T>.
     member this.Ch (channel: Ch) : Expr<'T> = 
         Expr<'T> baseExpr.[channel]
 
     /// Bundle single-channel expressions into a multi-channel expression. 
-    static member bundle (chExprs: Map<Ch, Expr>) =
+    static member bundle (chExprs: Map<Ch, UExpr>) =
         let chExprs = chExprs |> Map.map (fun _ expr -> expr.BaseExprCh)
         MultiChannelExpr {Bundle.ChExprs=chExprs}
 
@@ -80,13 +80,13 @@ type MultiChannelExpr (baseExpr: BaseExpr) =
     /// All variables occurs in the loop channel expressions must be defined as loop variables.
     /// The function `loop` performs automatic lifting of constants and thus allows for easy
     /// usage of variables external to the loop.
-    static member loopNoLift length vars channels (xs: Expr list) =
-        let xs = xs |> List.map Expr.baseExprCh
+    static member loopNoLift length vars channels (xs: UExpr list) =
+        let xs = xs |> List.map UExpr.baseExprCh
         Ops.Loop.noLift length vars channels xs |> MultiChannelExpr
 
     /// A loop provides iterative evaluation of one or multiple expresisons.
-    static member loop length vars channels (xs: Expr list) =
-        let xs = xs |> List.map Expr.baseExprCh
+    static member loop length vars channels (xs: UExpr list) =
+        let xs = xs |> List.map UExpr.baseExprCh
         Ops.Loop.withLift length vars channels xs |> MultiChannelExpr
 
     /// Evaluates all channels of the expression into numeric values.

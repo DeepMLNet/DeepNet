@@ -12,11 +12,11 @@ module MultiChannelExpr =
     let (|Bundle|_|) (expr: MultiChannelExpr) =
         match expr.Op with
         | :? Bundle as this ->
-            Some (this.ChExprs |> Map.map (fun _ e -> Expr e))
+            Some (this.ChExprs |> Map.map (fun _ e -> UExpr e))
         | _ -> None
 
     let (|Loop|_|) (expr: MultiChannelExpr) =
         match expr.Op with
-        | :? Loop as this -> Some (this.Length, this.Vars, this.Channels, this.Xs |> List.map Expr)
+        | :? Loop as this -> Some (this.Length, this.Vars, this.Channels, this.Xs |> List.map UExpr)
         | _ -> None
 

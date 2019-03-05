@@ -1,793 +1,513 @@
 ﻿namespace rec Tensor.Expr
 
-open System
-
 open DeepNet.Utils
 open Tensor.Expr.Ops
 open Tensor.Backend
 
 
 
-/// start plus the specified number of (symbolic elements)
-type internal PlusElems (elems: SizeSpec) =
-    new (intElems: int64) = PlusElems (SizeSpec.fix intElems)
-    member this.Elems = elems
-
-
-
-module internal ExprHelpers =
-
-    let (|SubtensorExpr|_|) (expr: BaseExpr) =
-        match expr.Op with
-        | :? Reshape as reshp ->
-            let subtensorExpr = reshp.X.Expr
-            match subtensorExpr.Op with
-            | :? Subtensor as subtensor ->
-                let trgtExpr = subtensor.X
-                Some (subtensor.Range, subtensorExpr, trgtExpr)
-            | _ -> None
-        | _ -> None
-
-
 /// An tensor-valued expression with a single output channel.
 [<StructuredFormatDisplay("{Pretty}")>]
-type Expr (baseExpr: BaseExpr) =    
+type Expr<'T> (baseExpr: BaseExpr) =    
+
     do 
-        if not (baseExpr.IsSingleChannel) then
-            failwithf "Expr is for single-channel expressions only, but got %A." baseExpr
+        if baseExpr.[Ch.Default].DataType <> typeof<'T> then
+            failwithf "Cannot use Expr<%A> for expression %A of data type %A." 
+                      typeof<'T> baseExpr baseExpr.[Ch.Default].DataType
     
     /// Create expression from specified single-channel op.
     new (op: IOp) =
-        Expr (BaseExpr.ofOp op)
+        Expr<'T> (BaseExpr.ofOp op)
 
     /// Create expression by accessing the specified channel of the BaseExpr.
     new (exprCh: BaseExprCh) =
         match exprCh with
-        | BaseExprCh (Ch.Default, baseExpr) -> Expr baseExpr
+        | BaseExprCh (Ch.Default, baseExpr) -> Expr<'T> baseExpr
         | BaseExprCh (ch, baseExpr) ->
-            Expr {Channel.X=baseExpr.[ch]}
+            Expr<'T> {Channel.X=baseExpr.[ch]}
+
+    /// Create typed expression from specified untyped expression.
+    new (expr: UExpr) =
+        Expr<'T> expr.BaseExpr
 
     /// Expression having the value of the specified variable.
-    static member baseVar (baseVar: Var) = 
-        Expr {VarArg.Var=baseVar}
+    static member var (var: Var<'T>) = 
+        UExpr.baseVar var.Var |> Expr<'T>
 
-    member this.BaseExpr = baseExpr
-    static member baseExpr (expr: Expr) = expr.BaseExpr
+    member this.Untyped = UExpr baseExpr
+    static member untyped (expr: Expr<'T>) = expr.Untyped
 
-    member this.BaseExprCh = baseExpr.[Ch.Default]
-    static member baseExprCh (expr: Expr) = expr.BaseExprCh
+    member this.BaseExpr = this.Untyped.BaseExpr
+    static member baseExpr (expr: Expr<'T>) = expr.BaseExpr
 
-    member this.Op = baseExpr.Op
-    static member op (expr: Expr) = expr.Op
+    member this.BaseExprCh = this.Untyped.BaseExprCh
+    static member baseExprCh (expr: Expr<'T>) = expr.BaseExprCh
 
-    member this.TypeName = baseExpr.[Ch.Default].TypeName
-    static member typeName (expr: Expr) = expr.TypeName
+    member this.Op = this.Untyped.Op
+    static member op (expr: Expr<'T>) = expr.Op
 
-    member this.DataType = baseExpr.[Ch.Default].DataType
-    static member dataType (expr: Expr) = expr.DataType
+    member this.TypeName = this.Untyped.TypeName
+    static member typeName (expr: Expr<'T>) = expr.TypeName
 
-    member this.Shape = baseExpr.[Ch.Default].Shape
-    static member shape (expr: Expr) = expr.Shape
+    member this.DataType = this.Untyped.DataType
+    static member dataType (expr: Expr<'T>) = expr.DataType
 
-    member this.NDims = baseExpr.[Ch.Default].NDims
-    static member nDims (expr: Expr) = expr.NDims
+    member this.Shape = this.Untyped.Shape
+    static member shape (expr: Expr<'T>) = expr.Shape
 
-    member this.NElems = baseExpr.[Ch.Default].NElems
-    static member nElems (expr: Expr) = expr.NElems
+    member this.NDims = this.Untyped.NDims
+    static member nDims (expr: Expr<'T>) = expr.NDims
 
-    member this.Dev = baseExpr.[Ch.Default].Dev
-    static member dev (expr: Expr) = expr.Dev
+    member this.NElems = this.Untyped.NElems
+    static member nElems (expr: Expr<'T>) = expr.NElems
 
-    member this.Args = baseExpr.Args |> Map.map (fun _ arg -> Expr arg)
-    static member args (expr: Expr) = expr.Args
+    member this.Dev = this.Untyped.Dev
+    static member dev (expr: Expr<'T>) = expr.Dev
 
-    member this.Vars = baseExpr.Vars
-    static member vars (expr: Expr) = expr.Vars
+    member this.Args = this.Untyped.Args
+    static member args (expr: Expr<'T>) = expr.Args
 
-    member this.CanEvalAllSymSizes = baseExpr.CanEvalAllSymSizes
-    static member canEvalAllSymSizes (expr: Expr) = expr.CanEvalAllSymSizes
+    /// Typed argument expression.
+    member this.Arg (arg: Arg) : Expr<'A> = Expr<'A> baseExpr.Args.[arg]
+    static member arg (arg: Arg) (expr: Expr<'T>) = expr.Arg arg
 
-    static member substSymSizes (env: SymSizeEnv) (expr: Expr) : Expr =
-        expr.BaseExpr |> BaseExpr.substSymSizes env |> Expr
+    member this.Vars = this.Untyped.Vars
+    static member vars (expr: Expr<'T>) = expr.Vars
 
-    interface System.IEquatable<Expr> with
+    member this.CanEvalAllSymSizes = this.Untyped.CanEvalAllSymSizes
+    static member canEvalAllSymSizes (expr: Expr<'T>) = expr.CanEvalAllSymSizes
+
+    static member substSymSizes (env: SymSizeEnv) (expr: Expr<'T>) : Expr<'T> =
+        UExpr.substSymSizes env expr.Untyped |> Expr<'T>
+
+    interface System.IEquatable<Expr<'T>> with
         member this.Equals other = this.BaseExpr = other.BaseExpr
 
     override this.Equals other =
         match other with
-        | :? Expr as other -> (this :> System.IEquatable<_>).Equals other
+        | :? Expr<'T> as other -> (this :> System.IEquatable<_>).Equals other
         | _ -> false
 
-    interface System.IComparable<Expr> with
+    interface System.IComparable<Expr<'T>> with
         member this.CompareTo other = compare this.BaseExpr other.BaseExpr
 
     interface System.IComparable with
         member this.CompareTo other =
             match other with
-            | :? Expr as other -> (this :> System.IComparable<_>).CompareTo other
-            | _ -> failwithf "Cannot compare Expr to type %A." (other.GetType())
+            | :? Expr<'T> as other -> (this :> System.IComparable<_>).CompareTo other
+            | _ -> failwithf "Cannot compare Expr<%A> to type %A." typeof<'T> (other.GetType())
 
     override this.GetHashCode() = hash this.BaseExpr
 
-    /// Converts expression to string with specified approximate maximum length.
-    member this.ToString maxLength =     
-        let opStr =
-            match this.Op with
-            | :? IOpFormat as opFormat -> opFormat.Text
-            | _ -> this.Op.GetType().Name
-        let args = this.Args
-        let argSet = args |> Map.keys
-        let argList, withLabel =
-            match argSet with
-            | _ when argSet = Set [Arg.Only] -> [Arg.Only], false
-            | _ when argSet = Set [Arg.X; Arg.Y] -> [Arg.X; Arg.Y], false
-            | _ when argSet |> Set.toSeq |> Seq.forall (function | Arg.N _ -> true | _ -> false) ->
-                argSet |> Set.toList |> List.sortBy (function | Arg.N n -> n | _ -> 0), false
-            | _ ->
-                argSet |> Set.toList |> List.sortBy (sprintf "%A"), true
-        String.limited maxLength [
-            yield String.Formatter (fun _ -> opStr)
-            if not argList.IsEmpty then
-                yield String.Delim " ("
-                for i, arg in List.indexed argList do
-                    if i > 0 then
-                        yield String.Delim ", "
-                    if withLabel then
-                        yield String.Formatter (fun _ -> sprintf "%A=" arg)
-                    yield String.Formatter (fun ml -> args.[arg].ToString ml)
-                yield String.Delim ")"
-        ]
-
-    /// Converts expression to string with unlimited length.
-    override this.ToString () = this.ToString System.Int32.MaxValue
-
-    /// Pretty string.
-    member this.Pretty = this.ToString 80
-
-    /// Checks that given axis is valid for specified expression
-    static member internal checkAxis ax (expr: Expr) =
-        if not (0 <= ax && ax < expr.NDims) then
-            failwithf "Specified axis %d is invalid for expression of shape %A." ax expr.Shape
+    member this.ToString maxLength = this.Untyped.ToString maxLength
+    override this.ToString () = this.Untyped.ToString ()
+    member this.Pretty = this.Untyped.Pretty
 
     /// Reshapes the expression into the given shape.
     /// The element count must not change.
-    static member reshape ss (expr: Expr) : Expr =
-        if ss = expr.Shape then expr 
-        else Expr {Reshape.Shape=ss; X=expr.BaseExprCh}
+    static member reshape ss (expr: Expr<'T>) =
+        UExpr.reshape ss expr.Untyped |> Expr<'T>
 
     /// Broadcasts the expression into the given shape.
-    static member broadcast ss (expr: Expr) : Expr =
-        if ss = expr.Shape then expr 
-        else Expr {DoBroadcast.Shape=ss; X=expr.BaseExprCh}
+    static member broadcast ss (expr: Expr<'T>) =
+        UExpr.broadcast ss expr.Untyped |> Expr<'T>
 
     /// Inserts a broadcast axis at the given dimension.
-    static member insertBroadcastAxis dim (expr: Expr) : Expr =
-        expr |> Expr.reshape (expr.Shape |> ShapeSpec.insertBroadcastAxis dim)
+    static member insertBroadcastAxis dim (expr: Expr<'T>) =
+        UExpr.insertBroadcastAxis dim expr.Untyped |> Expr<'T>
 
     /// adds one broadcastable dimension to the left
-    static member padLeft (a: Expr) : Expr =
-        a |> Expr.reshape (ShapeSpec.padLeft a.Shape)
+    static member padLeft (a: Expr<'T>) =
+        UExpr.padLeft a.Untyped |> Expr<'T>
 
     /// adds one broadcastable dimension to the right
-    static member padRight (a: Expr) : Expr =
-        a |> Expr.reshape (ShapeSpec.padRight a.Shape)
+    static member padRight (a: Expr<'T>) =
+        UExpr.padRight a.Untyped |> Expr<'T>
 
     /// Reshapes the expression so that a single dimension remains.
-    static member flatten (expr: Expr) =
-        expr |> Expr.reshape (ShapeSpec.flatten expr.Shape)
+    static member flatten (expr: Expr<'T>) =
+        UExpr.flatten expr.Untyped |> Expr<'T>
 
     /// pads from the left and broadcasts the argument to the given shape if possible
-    static member broadcastToShape shp (a: Expr) =
-        let psa = a.Shape |> ShapeSpec.padTo (ShapeSpec.nDim shp)
-        let bsa = psa |> ShapeSpec.broadcastToShape shp
-        a |> Expr.reshape psa |> Expr.broadcast bsa        
+    static member broadcastToShape shp (a: Expr<'T>) =
+        UExpr.broadcastToShape shp a.Untyped |> Expr<'T>      
 
     /// pads and broadcasts all arguments to same shape if possible
-    static member broadcastToSameMany (es: Expr list) =
-        let ss = es |> List.map Expr.shape
-        let ps = ShapeSpec.padToSameMany ss
-        let bs = ShapeSpec.broadcastToSameMany false ps
-        List.zip3 es ps bs
-        |> List.map (fun (e, p, b) -> e |> Expr.reshape p |> Expr.broadcast b)
+    static member broadcastToSameMany (es: Expr<'T> list) =
+        es
+        |> List.map (fun expr -> expr.Untyped)
+        |> UExpr.broadcastToSameMany
+        |> List.map (fun expr -> expr |> Expr<'T>)
 
     /// pads and broadcasts `a` and `b` to same shape if possible
-    static member broadcastToSame (a: Expr) (b: Expr) =
-        match Expr.broadcastToSameMany [a; b] with
-        | [bcA; bcB] -> bcA, bcB
-        | _ -> failwith "impossible"
+    static member broadcastToSame (a: Expr<'A>) (b: Expr<'B>) =
+        let bcA, bcB = UExpr.broadcastToSame a.Untyped b.Untyped 
+        bcA |> Expr<'A>, bcB |> Expr<'B>
 
     /// enables broadcasting in the given dimension, it must be of size one
-    static member enableBroadcast dim (a: Expr) = 
-        a |> Expr.reshape (a.Shape |> ShapeSpec.enableBroadcast dim)
+    static member enableBroadcast dim (a: Expr<'T>) = 
+        UExpr.enableBroadcast dim a.Untyped |> Expr<'T>
 
     /// disables broadcasting in the given dimension
-    static member disableBroadcast dim (a: Expr) =
-        a |> Expr.reshape (a.Shape |> ShapeSpec.disableBroadcast dim)
+    static member disableBroadcast dim (a: Expr<'T>) =
+        UExpr.disableBroadcast dim a.Untyped |> Expr<'T>
   
     /// scalar constant of given value
-    static member scalar dev (value: obj) : Expr = 
-        Expr {Scalar.Value=Const value; Dev=dev} 
-
-    /// scalar of given value converted to same type as given expression
-    static member scalarLike (expr: Expr) (value: obj) = 
-        let v = System.Convert.ChangeType (value, expr.DataType) 
-        Expr.scalar expr.Dev v
+    static member scalar dev (value: 'T) = 
+        UExpr.scalar dev value |> Expr<'T>
 
     /// Scalar with value of given size and type int64.
     static member size dev (size: SizeSpec) = 
-        Expr {SizeValue.Value=size; Dev=dev} 
+        UExpr.size dev size |> Expr<int64>
 
     /// Permutes the axes as specified.
     /// Each entry in the specified permutation specifies the *new* position of 
     /// the corresponding axis, i.e. to which position the axis should move.
-    static member permuteAxes permutation (expr: Expr) =
-        Expr {PermuteAxes.Permutation=permutation; X=expr.BaseExprCh}
+    static member permuteAxes permutation (expr: Expr<'T>) =
+        UExpr.permuteAxes permutation expr.Untyped |> Expr<'T>
 
     /// Swaps two dimensions of a tensor.
-    static member swapDim ax1 ax2 (expr: Expr) = 
-        expr |> Expr.checkAxis ax1
-        expr |> Expr.checkAxis ax2
-        if ax1 = ax2 then expr
-        else
-            let perm = 
-                [0 .. expr.NDims - 1]
-                |> List.map (function
-                             | d when d=ax1 -> ax2
-                             | d when d=ax2 -> ax1
-                             | d -> d)
-            expr |> Expr.permuteAxes perm
+    static member swapDim ax1 ax2 (expr: Expr<'T>) = 
+        UExpr.swapDim ax1 ax2 expr.Untyped |> Expr<'T>
 
     /// Transpose matrix.
     /// If the input has more than two dimensions, the last two axes are transposed.
-    static member transpose (expr: Expr) =
-        if expr.NDims < 2 then invalidArg "expr" "Need at least a matrix to transpose."
-        expr |> Expr.swapDim (expr.NDims - 2) (expr.NDims - 1)
+    static member transpose (expr: Expr<'T>) =
+        UExpr.transpose expr.Untyped |> Expr<'T>
 
     /// Transpose matrix.
     /// If the input has more than two dimensions, the last two axes are transposed.
-    member this.T = Expr.transpose this
+    member this.T = this.Untyped.T |> Expr<'T>
 
     // item / slicing
-    member this.GetSlice ([<System.ParamArray>] allArgs: obj []) : Expr =
-
-        /// converts ints to SizeSpecTs
-        let intToSizeSpec (arg: obj) =
-            match arg with
-            | :? int64 as f -> SizeSpec.fix f :> obj
-            | :? (int64 option) as fo -> 
-                match fo with
-                | Some f -> Some (SizeSpec.fix f) :> obj
-                | None -> None :> obj
-            | _ -> arg
-
-        /// converts argument list to range specification
-        let rec parseArgs (args: obj list) : RangesSpec =
-            match args with
-            // direct range specification
-            | [:? RangesSpec as rngs] -> rngs
-
-            // slices
-            | (:? (SizeSpec option) as so)  :: (:? (SizeSpec option) as fo)    :: rest ->
-                RangeSpec.SymStartSymEnd (so, fo) :: parseArgs rest
-            | (:? (SizeSpec option) as so)  :: null                            :: rest ->
-                RangeSpec.SymStartSymEnd (so, None) :: parseArgs rest
-            | null                          :: (:? (SizeSpec option) as fo)    :: rest ->
-                RangeSpec.SymStartSymEnd (None, fo) :: parseArgs rest
-            | (:? (Expr option) as so)      :: (:? (PlusElems option) as fo)   :: rest ->
-                if so.Value.TypeName <> TypeName.ofType<int64> then
-                    failwith "Need expression of type int64 for range start."
-                RangeSpec.DynStartSymSize (so.Value.BaseExprCh, fo.Value.Elems) :: parseArgs rest
-            | null                           :: null                           :: rest ->
-                RangeSpec.SymStartSymEnd (None, None) :: parseArgs rest
-
-            // items
-            | (:? SizeSpec as s)     :: rest -> RangeSpec.SymElem s :: parseArgs rest
-            | (:? int64 as s)        :: rest when s = Tensor.TensorVal.NewAxis -> RangeSpec.NewAxis :: parseArgs rest
-            | (:? int64 as s)        :: rest when s = Tensor.TensorVal.Fill    -> RangeSpec.AllFill :: parseArgs rest
-            | (:? Expr as e)         :: rest  -> if e.TypeName <> TypeName.ofType<int64> then
-                                                     failwith "Need expression of type int64 for element index." 
-                                                 RangeSpec.DynElem e.BaseExprCh :: parseArgs rest                                                             
-            | []                              -> []
-            | _                               -> failwithf "Invalid item/slice specification: %A" allArgs
-
-        /// converts a full range specification into a simple range specification
-        let rec splitFRS (rngs: RangesSpec) (shps: ShapeSpec) (simpleRs: SimpleRangesSpec) (newShape: ShapeSpec) =
-            match rngs, shps with
-            | RangeSpec.SymElem e :: rngs, _::shps -> splitFRS rngs shps (SimpleRangeSpec.SymStartSymEnd (e, Some e)::simpleRs) newShape
-            | RangeSpec.DynElem e :: rngs, _::shps -> splitFRS rngs shps (SimpleRangeSpec.DynStartSymSize (e, SizeSpec.one)::simpleRs) newShape
-            | RangeSpec.SymStartSymEnd (so, fo) :: rngs, size::shps -> 
-                let size = (fo |? (size-1L)) - (so |? SizeSpec.zero) + 1L
-                splitFRS rngs shps (SimpleRangeSpec.SymStartSymEnd (so |? SizeSpec.zero, fo)::simpleRs) (size::newShape)
-            | RangeSpec.DynStartSymSize (s, size) :: rngs, _::shps ->
-                splitFRS rngs shps (SimpleRangeSpec.DynStartSymSize (s, size)::simpleRs) (size::newShape)
-            | RangeSpec.NewAxis :: rngs, _ ->
-                splitFRS rngs shps simpleRs (SizeSpec.broadcastable::newShape)
-            | RangeSpec.AllFill :: rrngs, _ ->
-                if List.length rngs <= List.length shps then splitFRS (RangeSpec.All::rngs) shps simpleRs newShape
-                else splitFRS rrngs shps simpleRs newShape
-            | [], [] -> List.rev simpleRs, List.rev newShape
-            | _ -> failwith "Item/slice processing error."
-
-        // build full range specificaton
-        let argList = allArgs |> Array.toList |> List.map intToSizeSpec
-
-        let srs, reshp = 
-            match argList with
-            | [:? SimpleRangesSpec as srs] -> 
-                // simplified range specification was specified, use directly
-                srs, (Expr {Subtensor.Range=srs; X=this.BaseExprCh}).Shape
-            | [:? RangesSpec as frs] ->
-                // split into simplified range specification and reshape operation
-                splitFRS frs this.Shape [] []
-            | _ ->
-                // parse, then split into simplified range specification and reshape operation
-                splitFRS (argList |> parseArgs) this.Shape [] []
-
-        // emit expression
-        let sub = {Subtensor.Range=srs; X=this.BaseExprCh} |> Expr
-        let reshaped = {Reshape.Shape=reshp; X=sub.BaseExprCh} |> Expr
-        reshaped
+    member this.GetSlice ([<System.ParamArray>] allArgs: obj []) : Expr<'T> =
+        this.Untyped.GetSlice (allArgs) |> Expr<'T>
 
     member this.Item 
         with get ([<System.ParamArray>] allArgs: obj []) = 
             this.GetSlice (allArgs)
 
     /// Expression a with the specified subtensor replaced with b.
-    static member setSubtensor (trgt: Expr) (src: Expr) =
-        match trgt.BaseExpr with
-        | ExprHelpers.SubtensorExpr (range, subtensorExpr, trgtExpr) ->
-            let srcReshaped = Expr {Reshape.Shape=subtensorExpr.[Ch.Default].Shape; X=src.BaseExprCh}
-            Expr {SetSubtensor.Range=range; X=trgtExpr; Y=srcReshaped.BaseExprCh}
-        | _ ->
-            invalidArg "trgt" "The first argument of setSubtensor must be an item or slice of an expression, i.e. a.[...]."                 
+    static member setSubtensor (trgt: Expr<'T>) (src: Expr<'T>) =
+        UExpr.setSubtensor trgt.Untyped src.Untyped |> Expr<'T>
 
     /// emits an elementwise binary operation with broadcasting of the inputs if necessary
-    static member constructElementwise op (a: Expr) (b: Expr) =
-        let psa, psb = ShapeSpec.padToSame a.Shape b.Shape
-        let bsa, bsb = ShapeSpec.broadcastToSame false psa psb
-        let ba = a |> Expr.reshape psa |> Expr.broadcast bsa
-        let bb = b |> Expr.reshape psb |> Expr.broadcast bsb 
-        let opInst: IOp = op ba bb
-        Expr opInst
+    static member constructElementwise op (a: Expr<'I>) (b: Expr<'I>) =
+        UExpr.constructElementwise op a.Untyped b.Untyped |> Expr<'T>
 
     // elementwise unary arithmetic
-    static member (~+) (x: Expr) = Expr {UnaryPlus.X=x.BaseExprCh}
-    static member (~-) (x: Expr) = Expr {Negate.X=x.BaseExprCh}
-    static member Abs (x: Expr) = Expr {Abs.X=x.BaseExprCh}
-    static member SignT (x: Expr) = Expr {SignT.X=x.BaseExprCh}
-    static member Log (x: Expr) = Expr {Log.X=x.BaseExprCh}
-    static member Log10 (x: Expr) = Expr {Log10.X=x.BaseExprCh}
-    static member Exp (x: Expr) = Expr {Exp.X=x.BaseExprCh}
-    static member Sin (x: Expr) = Expr {Sin.X=x.BaseExprCh}
-    static member Cos (x: Expr) = Expr {Cos.X=x.BaseExprCh}
-    static member Tan (x: Expr) = Expr {Tan.X=x.BaseExprCh}
-    static member Asin (x: Expr) = Expr {Asin.X=x.BaseExprCh}
-    static member Acos (x: Expr) = Expr {Acos.X=x.BaseExprCh}
-    static member Atan (x: Expr) = Expr {Atan.X=x.BaseExprCh}
-    static member Sinh (x: Expr) = Expr {Sinh.X=x.BaseExprCh}
-    static member Cosh (x: Expr) = Expr {Cosh.X=x.BaseExprCh}
-    static member Tanh (x: Expr) = Expr {Tanh.X=x.BaseExprCh}
-    static member Sqrt (x: Expr) = Expr {Sqrt.X=x.BaseExprCh}
-    static member Ceiling (x: Expr) = Expr {Ceiling.X=x.BaseExprCh}
-    static member Floor (x: Expr) = Expr {Floor.X=x.BaseExprCh}
-    static member Round (x: Expr) = Expr {Round.X=x.BaseExprCh}
-    static member Truncate (x: Expr) = Expr {Truncate.X=x.BaseExprCh}
+    static member (~+) (x: Expr<'T>) = +(x.Untyped) |> Expr<'T>
+    static member (~-) (x: Expr<'T>) = -(x.Untyped) |> Expr<'T>
+    static member Abs (x: Expr<'T>) = abs (x.Untyped) |> Expr<'T>
+    static member SignT (x: Expr<'T>) = UExpr.SignT (x.Untyped) |> Expr<'T>
+    static member Log (x: Expr<'T>) = log (x.Untyped) |> Expr<'T>
+    static member Log10 (x: Expr<'T>) = log10 (x.Untyped) |> Expr<'T>
+    static member Exp (x: Expr<'T>) = exp (x.Untyped) |> Expr<'T>
+    static member Sin (x: Expr<'T>) = sin (x.Untyped) |> Expr<'T>
+    static member Cos (x: Expr<'T>) = cos (x.Untyped) |> Expr<'T>
+    static member Tan (x: Expr<'T>) = tan (x.Untyped) |> Expr<'T>
+    static member Asin (x: Expr<'T>) = asin (x.Untyped) |> Expr<'T>
+    static member Acos (x: Expr<'T>) = acos (x.Untyped) |> Expr<'T>
+    static member Atan (x: Expr<'T>) = atan (x.Untyped) |> Expr<'T>
+    static member Sinh (x: Expr<'T>) = sinh (x.Untyped) |> Expr<'T>
+    static member Cosh (x: Expr<'T>) = cosh (x.Untyped) |> Expr<'T>
+    static member Tanh (x: Expr<'T>) = tanh (x.Untyped) |> Expr<'T>
+    static member Sqrt (x: Expr<'T>) = sqrt (x.Untyped) |> Expr<'T>
+    static member Ceiling (x: Expr<'T>) = ceil (x.Untyped) |> Expr<'T>
+    static member Floor (x: Expr<'T>) = floor (x.Untyped) |> Expr<'T>
+    static member Round (x: Expr<'T>) = round (x.Untyped) |> Expr<'T>
+    static member Truncate (x: Expr<'T>) = truncate (x.Untyped) |> Expr<'T>
 
     // element-wise unary logic
-    static member (~~~~) (x: Expr) = Expr {Not.X=x.BaseExprCh}
+    static member (~~~~) (x: Expr<bool>) = ~~~~(x.Untyped) |> Expr<bool>
 
     // elementwise binary arithmetic
-    static member (+) (x: Expr, y: Expr) = Expr.constructElementwise (fun x y -> {Add.X=x.BaseExprCh; Y=y.BaseExprCh} :> IOp) x y
-    static member (-) (x: Expr, y: Expr) = Expr.constructElementwise (fun x y -> {Subtract.X=x.BaseExprCh; Y=y.BaseExprCh} :> IOp) x y
-    static member (*) (x: Expr, y: Expr) = Expr.constructElementwise (fun x y -> {Multiply.X=x.BaseExprCh; Y=y.BaseExprCh} :> IOp) x y
-    static member (/) (x: Expr, y: Expr) = Expr.constructElementwise (fun x y -> {Divide.X=x.BaseExprCh; Y=y.BaseExprCh} :> IOp) x y
-    static member (%) (x: Expr, y: Expr) = Expr.constructElementwise (fun x y -> {Modulo.X=x.BaseExprCh; Y=y.BaseExprCh} :> IOp) x y
-    static member Pow (x: Expr, y: Expr) = Expr.constructElementwise (fun x y -> {Pow.X=x.BaseExprCh; Y=y.BaseExprCh} :> IOp) x y   
-    static member ( *** ) (x: Expr, y: Expr) = x ** y
+    static member (+) (x: Expr<'T>, y: Expr<'T>) = (x.Untyped) + (y.Untyped) |> Expr<'T>
+    static member (-) (x: Expr<'T>, y: Expr<'T>) = (x.Untyped) - (y.Untyped) |> Expr<'T>
+    static member (*) (x: Expr<'T>, y: Expr<'T>) = (x.Untyped) * (y.Untyped) |> Expr<'T>
+    static member (/) (x: Expr<'T>, y: Expr<'T>) = (x.Untyped) / (y.Untyped) |> Expr<'T>
+    static member (%) (x: Expr<'T>, y: Expr<'T>) = (x.Untyped) % (y.Untyped) |> Expr<'T>
+    static member Pow (x: Expr<'T>, y: Expr<'T>) = (x.Untyped) ** (y.Untyped) |> Expr<'T>   
+    static member ( *** ) (x: Expr<'T>, y: Expr<'T>) = x ** y
 
     // element-wise binary logic
-    static member (&&&&) (x: Expr, y: Expr) = Expr.constructElementwise (fun x y -> {And.X=x.BaseExprCh; Y=y.BaseExprCh} :> IOp) x y
-    static member (||||) (x: Expr, y: Expr) = Expr.constructElementwise (fun x y -> {Or.X=x.BaseExprCh; Y=y.BaseExprCh} :> IOp) x y
+    static member (&&&&) (x: Expr<bool>, y: Expr<bool>) = (x.Untyped) &&&& (y.Untyped) |> Expr<bool>
+    static member (||||) (x: Expr<bool>, y: Expr<bool>) = (x.Untyped) |||| (y.Untyped) |> Expr<bool>
 
     // element-wise binary comparison
-    static member (====) (x: Expr, y: Expr) = Expr.constructElementwise (fun x y -> {Equal.X=x.BaseExprCh; Y=y.BaseExprCh} :> IOp) x y
-    static member (<<<<) (x: Expr, y: Expr) = Expr.constructElementwise (fun x y -> {Less.X=x.BaseExprCh; Y=y.BaseExprCh} :> IOp) x y
-    static member (<<==) (x: Expr, y: Expr) = Expr.constructElementwise (fun x y -> {LessOrEqual.X=x.BaseExprCh; Y=y.BaseExprCh} :> IOp) x y
-    static member (>>>>) (x: Expr, y: Expr) = Expr.constructElementwise (fun x y -> {Greater.X=x.BaseExprCh; Y=y.BaseExprCh} :> IOp) x y
-    static member (>>==) (x: Expr, y: Expr) = Expr.constructElementwise (fun x y -> {GreaterOrEqual.X=x.BaseExprCh; Y=y.BaseExprCh} :> IOp) x y
-    static member (<<>>) (x: Expr, y: Expr) = Expr.constructElementwise (fun x y -> {NotEqual.X=x.BaseExprCh; Y=y.BaseExprCh} :> IOp) x y
+    static member (====) (x: Expr<'T>, y: Expr<'T>) = (x.Untyped) ==== (y.Untyped) |> Expr<bool>
+    static member (<<<<) (x: Expr<'T>, y: Expr<'T>) = (x.Untyped) <<<< (y.Untyped) |> Expr<bool>
+    static member (<<==) (x: Expr<'T>, y: Expr<'T>) = (x.Untyped) <<== (y.Untyped) |> Expr<bool> 
+    static member (>>>>) (x: Expr<'T>, y: Expr<'T>) = (x.Untyped) >>>> (y.Untyped) |> Expr<bool>
+    static member (>>==) (x: Expr<'T>, y: Expr<'T>) = (x.Untyped) >>== (y.Untyped) |> Expr<bool>
+    static member (<<>>) (x: Expr<'T>, y: Expr<'T>) = (x.Untyped) <<>> (y.Untyped) |> Expr<bool>
 
     // element-wise binary logic with basetype
-    static member (&&&&) (x: Expr, y: bool) = x &&&& (Expr.scalar x.Dev y)
-    static member (||||) (x: Expr, y: bool) = x |||| (Expr.scalar x.Dev y)
+    static member (&&&&) (x: Expr<bool>, y: bool) = (x.Untyped) &&&& y
+    static member (||||) (x: Expr<bool>, y: bool) = (x.Untyped) |||| y
 
-    static member (&&&&) (x: bool, y: Expr) = (Expr.scalar y.Dev x) &&&& y
-    static member (||||) (x: bool, y: Expr) = (Expr.scalar y.Dev x) |||| y
+    static member (&&&&) (x: bool, y: Expr<bool>) = x &&&& (y.Untyped)
+    static member (||||) (x: bool, y: Expr<bool>) = x |||| (y.Untyped)
 
     // elementwise binary arithmetic with basetype
-    static member (+) (x: Expr, y: obj) = x + (Expr.scalar x.Dev y)
-    static member (-) (x: Expr, y: obj) = x - (Expr.scalar x.Dev y)
-    static member (*) (x: Expr, y: obj) = x * (Expr.scalar x.Dev y)
-    static member (/) (x: Expr, y: obj) = x / (Expr.scalar x.Dev y)
-    static member (%) (x: Expr, y: obj) = x % (Expr.scalar x.Dev y)
-    static member Pow (x: Expr, y: obj) = x ** (Expr.scalar x.Dev y)
-    static member ( *** ) (x: Expr, y: obj) = x ** (Expr.scalar x.Dev y)   
+    static member (+) (x: Expr<'T>, y: 'T) = (x.Untyped) + (UExpr.scalar x.Dev y) |> Expr<'T>   
+    static member (-) (x: Expr<'T>, y: 'T) = (x.Untyped) - (UExpr.scalar x.Dev y) |> Expr<'T>   
+    static member (*) (x: Expr<'T>, y: 'T) = (x.Untyped) * (UExpr.scalar x.Dev y) |> Expr<'T>   
+    static member (/) (x: Expr<'T>, y: 'T) = (x.Untyped) / (UExpr.scalar x.Dev y) |> Expr<'T>   
+    static member (%) (x: Expr<'T>, y: 'T) = (x.Untyped) % (UExpr.scalar x.Dev y) |> Expr<'T>   
+    static member Pow (x: Expr<'T>, y: 'T) = (x.Untyped) ** (UExpr.scalar x.Dev y) |> Expr<'T>   
+    static member ( *** ) (x: Expr<'T>, y: 'T) = (x.Untyped) ** (UExpr.scalar x.Dev y) |> Expr<'T>  
 
-    static member (+) (x: obj, y: Expr) = (Expr.scalar y.Dev x) + y
-    static member (-) (x: obj, y: Expr) = (Expr.scalar y.Dev x) - y
-    static member (*) (x: obj, y: Expr) = (Expr.scalar y.Dev x) * y
-    static member (/) (x: obj, y: Expr) = (Expr.scalar y.Dev x) / y
-    static member (%) (x: obj, y: Expr) = (Expr.scalar y.Dev x) % y
-    static member Pow (x: obj, y: Expr) = (Expr.scalar y.Dev x) ** y
-    static member ( *** ) (x: obj, y: Expr) = (Expr.scalar y.Dev x) ** y
+    static member (+) (x: 'T, y: Expr<'T>) = (UExpr.scalar y.Dev x) + (y.Untyped) |> Expr<'T>
+    static member (-) (x: 'T, y: Expr<'T>) = (UExpr.scalar y.Dev x) - (y.Untyped) |> Expr<'T>
+    static member (*) (x: 'T, y: Expr<'T>) = (UExpr.scalar y.Dev x) * (y.Untyped) |> Expr<'T>
+    static member (/) (x: 'T, y: Expr<'T>) = (UExpr.scalar y.Dev x) / (y.Untyped) |> Expr<'T>
+    static member (%) (x: 'T, y: Expr<'T>) = (UExpr.scalar y.Dev x) % (y.Untyped) |> Expr<'T>
+    static member Pow (x: 'T, y: Expr<'T>) = (UExpr.scalar y.Dev x) ** (y.Untyped) |> Expr<'T>
+    static member ( *** ) (x: 'T, y: Expr<'T>) = (UExpr.scalar y.Dev x) ** (y.Untyped) |> Expr<'T>
 
     // element-wise binary comparison with basetype
-    static member (====) (x: Expr, y: obj) = x ==== (Expr.scalar x.Dev y)
-    static member (<<<<) (x: Expr, y: obj) = x <<<< (Expr.scalar x.Dev y)
-    static member (<<==) (x: Expr, y: obj) = x <<== (Expr.scalar x.Dev y)
-    static member (>>>>) (x: Expr, y: obj) = x >>>> (Expr.scalar x.Dev y)
-    static member (>>==) (x: Expr, y: obj) = x >>== (Expr.scalar x.Dev y)
-    static member (<<>>) (x: Expr, y: obj) = x <<>> (Expr.scalar x.Dev y)
+    static member (====) (x: Expr<'T>, y: 'T) = (x.Untyped) ==== (UExpr.scalar x.Dev y) |> Expr<bool>
+    static member (<<<<) (x: Expr<'T>, y: 'T) = (x.Untyped) <<<< (UExpr.scalar x.Dev y) |> Expr<bool>
+    static member (<<==) (x: Expr<'T>, y: 'T) = (x.Untyped) <<== (UExpr.scalar x.Dev y) |> Expr<bool>
+    static member (>>>>) (x: Expr<'T>, y: 'T) = (x.Untyped) >>>> (UExpr.scalar x.Dev y) |> Expr<bool>
+    static member (>>==) (x: Expr<'T>, y: 'T) = (x.Untyped) >>== (UExpr.scalar x.Dev y) |> Expr<bool>
+    static member (<<>>) (x: Expr<'T>, y: 'T) = (x.Untyped) <<>> (UExpr.scalar x.Dev y) |> Expr<bool>
 
-    static member (====) (x: obj, y: Expr) = (Expr.scalar y.Dev x) ==== y
-    static member (<<<<) (x: obj, y: Expr) = (Expr.scalar y.Dev x) <<<< y
-    static member (<<==) (x: obj, y: Expr) = (Expr.scalar y.Dev x) <<== y
-    static member (>>>>) (x: obj, y: Expr) = (Expr.scalar y.Dev x) >>>> y
-    static member (>>==) (x: obj, y: Expr) = (Expr.scalar y.Dev x) >>== y
-    static member (<<>>) (x: obj, y: Expr) = (Expr.scalar y.Dev x) <<>> y
+    static member (====) (x: 'T, y: Expr<'T>) = (UExpr.scalar y.Dev x) ==== (y.Untyped) |> Expr<bool>
+    static member (<<<<) (x: 'T, y: Expr<'T>) = (UExpr.scalar y.Dev x) <<<< (y.Untyped) |> Expr<bool>
+    static member (<<==) (x: 'T, y: Expr<'T>) = (UExpr.scalar y.Dev x) <<== (y.Untyped) |> Expr<bool>
+    static member (>>>>) (x: 'T, y: Expr<'T>) = (UExpr.scalar y.Dev x) >>>> (y.Untyped) |> Expr<bool>
+    static member (>>==) (x: 'T, y: Expr<'T>) = (UExpr.scalar y.Dev x) >>== (y.Untyped) |> Expr<bool>
+    static member (<<>>) (x: 'T, y: Expr<'T>) = (UExpr.scalar y.Dev x) <<>> (y.Untyped) |> Expr<bool>
 
     /// Dot product.
-    /// Behavior depends on the dimensionality of the arguments.
-    /// Cases: 
-    /// (1, 1) -> vector-vector dot product resulting in a scalar
-    /// (2, 1) -> matrix-vector dot product resulting in a vector
-    /// (2, 2) -> matrix-matrix dot product resulting in a matrix
-    /// (n, n) with n>2 -> batched matrix-matrix dot product resulting in a matrix
-    /// (n+1, n) with n>2 -> batched matrix-vector dot product resulting in a vector.
-    static member ( .* ) (a: Expr, b: Expr) = 
-        let sa, sb = a.Shape, b.Shape
-        match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
-        | 1, 1 -> 
-            // vector-vector dot product
-            Expr.sum (a * b)
-        | 2, 1 -> 
-            // matrix-vector dot product
-            let bm = b |> Expr.reshape (ShapeSpec.padRight sb)
-            Expr {Dot.X=a.BaseExprCh; Y=bm.BaseExprCh} |> Expr.reshape [sa.[0]]
-        | 2, 2 -> 
-            // matrix-matrix dot product
-            Expr {Dot.X=a.BaseExprCh; Y=b.BaseExprCh} 
-        | na, nb when na = nb -> 
-            // batched matrix-matrix dot product
-            let bsa, bsb = ShapeSpec.broadcastToSameInDims [0 .. na-3] false sa sb
-            let ba = a |> Expr.broadcast bsa
-            let bb = b |> Expr.broadcast bsb    
-            Expr {Dot.X=ba.BaseExprCh; Y=bb.BaseExprCh} 
-        | na, nb when na = nb + 1 ->
-            // batched matrix-vector dot product
-            let psb = ShapeSpec.padRight sb
-            let bsa, bsb = ShapeSpec.broadcastToSameInDims [0 .. na-3] false sa psb
-            let ba = a |> Expr.broadcast bsa
-            let bb = b |> Expr.reshape psb |> Expr.broadcast bsb    
-            Expr {Dot.X=ba.BaseExprCh; Y=bb.BaseExprCh} |> Expr.reshape bsa.[0 .. na-2]
-        | _ -> failwithf "Cannot compute dot product between tensors of shapes %A and %A." sa sb  
+    static member ( .* ) (x: Expr<'T>, y: Expr<'T>) = 
+        (x.Untyped) .* (y.Untyped) |> Expr<'T>
 
     /// Sign keeping type.
-    static member signt (expr: Expr) =
-        Expr.SignT expr
+    static member signt (expr: Expr<'T>) =
+        UExpr.signt expr.Untyped |> Expr<'T>
 
     /// Square root.
-    static member sqrtt (expr: Expr) =
-        Expr.Sqrt expr
+    static member sqrtt (expr: Expr<'T>) =
+        UExpr.sqrtt expr.Untyped |> Expr<'T>
 
     /// Elementwise maximum.
-    static member maxElemwise (x: Expr) (y: Expr) =
-        Expr.constructElementwise (fun x y -> {MaxElemwise.X=x.BaseExprCh; Y=y.BaseExprCh} :> IOp) x y
+    static member maxElemwise (x: Expr<'T>) (y: Expr<'T>) =
+        UExpr.maxElemwise x.Untyped y.Untyped |> Expr<'T>
 
     /// Elementwise minimum.
-    static member minElemwise (x: Expr) (y: Expr) =
-        Expr.constructElementwise (fun x y -> {MinElemwise.X=x.BaseExprCh; Y=y.BaseExprCh} :> IOp) x y
+    static member minElemwise (x: Expr<'T>) (y: Expr<'T>) =
+        UExpr.minElemwise x.Untyped y.Untyped |> Expr<'T>
 
     /// Ensures that all elements are between minVal and maxVal.
     /// Values outside these limits are capped to the limits.
-    static member limit (x: Expr, ?minVal: obj, ?maxVal: obj) =
-        let checkType (value: obj) =
-            if value.GetType() <> x.DataType then
-                failwithf "Limit value has type %A but expression data type is %A."
-                          (value.GetType()) x.DataType
-        let x =
-            match minVal with
-            | Some minVal -> 
-                checkType minVal
-                Expr.maxElemwise (Expr.scalar x.Dev minVal) x
-            | None -> x
-        let x =
-            match maxVal with
-            | Some maxVal -> 
-                checkType maxVal
-                Expr.minElemwise (Expr.scalar x.Dev maxVal) x
-            | None -> x
-        x
+    static member limit (x: Expr<'T>, ?minVal: 'T, ?maxVal: 'T) =
+        UExpr.limit (x.Untyped, ?minVal=Option.map box minVal, ?maxVal=Option.map box maxVal) |> Expr<'T> 
 
     /// Tensor of given shape filled with specified value.
-    static member filled (dev: ITensorDevice) (shp: ShapeSpec) (value: obj) =
-        let bcShp = shp |> List.map (fun _ -> SizeSpec.broadcastable)
-        Expr.scalar dev value |> Expr.reshape bcShp |> Expr.broadcast shp
+    static member filled (dev: ITensorDevice) (shp: ShapeSpec) (value: 'T) =
+        UExpr.filled dev shp (box value) |> Expr<'T>
 
-    /// Zero tensor of given type and shape.
-    static member zeros dataType dev (shp: ShapeSpec) =
-        Expr.filled dev shp (zeroOf dataType)
+    /// Zero tensor of given shape.
+    static member zeros dev (shp: ShapeSpec) =
+        UExpr.zeros typeof<'T> dev shp |> Expr<'T>
 
-    /// zero tensor with same shape and type as given tensor
-    static member zerosLike (expr: Expr) = 
-        Expr.zeros expr.DataType expr.Dev expr.Shape
-
-    /// Identity matrix of given type and size.
-    static member identity dataType dev size =
-        Expr {Identity.Size=size; Type=TypeName.ofTypeInst dataType; Dev=dev}
+    /// Identity matrix of given size.
+    static member identity dev size = 
+        UExpr.identity typeof<'T> dev size |> Expr<'T>
 
     /// Computes the inverse of a matrix.
     /// If the input has more than two dimensions, the inverses
     /// along the last two dimensions are returned.
     /// The inverse of a singular matrix is undefinied.
     /// No error is raised in that case.
-    static member invert (x: Expr) =
-        Expr {Invert.X=x.BaseExprCh}
+    static member invert (x: Expr<'T>) =
+        UExpr.invert x.Untyped |> Expr<'T>
 
     /// Reverses the tensor in the specified dimension.
-    static member reverseAxis axis (x: Expr) =
-        Expr {ReverseAxis.Axis=axis; X=x.BaseExprCh} 
+    static member reverseAxis axis (x: Expr<'T>) =
+        UExpr.reverseAxis axis x.Untyped |> Expr<'T>
 
     /// Concatenates the sequence of tensors in the specified dimension.
-    static member concat dim (es: Expr seq) =
-        // check that arguments are correctly sized
-        let es = List.ofSeq es
-        let shps = es |> List.map Expr.shape
-        match es with
-        | [] -> failwithf "need at least one tensor to concatenate"
-        | h :: ts ->
-            if not (0 <= dim && dim < h.NDims) then
-                failwithf "cannot concatenate over non-existant dimension %d given shapes %A" dim shps
-            for t in ts do
-                if t.TypeName <> h.TypeName then
-                    failwithf "all arguments must have same type but got types %A" (es |> List.map (fun e -> e.DataType))
-                if t.NDims <> h.NDims then
-                    failwithf "all arguments must have same number of dimensions but shapes %A were specifed" shps                        
-                for i, (sa, sb) in List.indexed (List.zip h.Shape t.Shape) do
-                    if i <> dim && sa .<> sb then
-                        failwithf "all arguments must have same shape expect in concatenation dimension %d but \
-                                   shapes %A were specified" dim shps
-                    
-        // calculate shape of concatenation
-        let totalElems = es |> Seq.sumBy (fun e -> e.Shape.[dim])
-        let shp = es.Head.Shape |> ShapeSpec.set dim totalElems
-
-        // build concatenation using iterative subtensor replacement
-        let concatenated, _ =
-            ((Expr.zeros es.Head.DataType es.Head.Dev shp, SizeSpec.zero), es)
-            ||> List.fold (fun (concatSoFar, pos) e ->
-                let len = e.Shape.[dim]
-                let slice: RangesSpec = 
-                    List.replicate e.NDims RangeSpec.All
-                    |> List.set dim (RangeSpec.SymStartSymEnd (Some pos, Some (pos + len - 1L)))
-                Expr.setSubtensor concatSoFar.[slice] e, pos + len)
-        concatenated
+    static member concat dim (es: Expr<'T> seq) =
+        let es = es |> Seq.map (fun expr -> expr.Untyped)
+        UExpr.concat dim es |> Expr<'T>
 
     /// Extracts the diagonal along the given axes.
-    static member diagAxis ax1 ax2 (x: Expr) = 
-        let ax1, ax2 = if ax1 < ax2 then ax1, ax2 else ax2, ax1
-        Expr {Diag.Axis1=ax1; Axis2=ax2; Diag.X=x.BaseExprCh} 
+    static member diagAxis ax1 ax2 (x: Expr<'T>) = 
+        UExpr.diagAxis ax1 ax2 x.Untyped |> Expr<'T>
                              
     /// Extracts the diagonal of a matrix.
     /// If the expression has more than two dimensions, the diagonals
     /// are extracted along the last two dimensions.
-    static member diag (x: Expr) = 
-        if x.NDims < 2 then 
-            failwithf "Need at least a matrix to extract diagonal but got shape: %A" x.Shape
-        x |> Expr.diagAxis (x.NDims-2) (x.NDims-1)
+    static member diag (x: Expr<'T>) = 
+        UExpr.diag x.Untyped |> Expr<'T>
 
     /// Creates a diagonal matrix by duplicating the given dimension.
-    static member diagMatAxis ax1 ax2 (x: Expr) = 
-        let ax1, ax2 = if ax1 < ax2 then ax1, ax2 else ax2, ax1
-        Expr {DiagMat.Axis1=ax1; Axis2=ax2; X=x.BaseExprCh} 
+    static member diagMatAxis ax1 ax2 (x: Expr<'T>) = 
+        UExpr.diagMatAxis ax1 ax2 x.Untyped |> Expr<'T>
 
     /// Creates a matrix with the given vector on its diagonal. 
     /// All other elements are zeros.
     /// If the input has more than one dimension, the operation is
     /// performed batch-wise on the last dimension.
-    static member diagMat (x: Expr) =
-        if x.NDims < 1 then 
-            failwithf "Need at least a vector to build diagonal matrix but got shape: %A" x.Shape
-        x |> Expr.diagMatAxis (x.NDims-1) x.NDims
+    static member diagMat (x: Expr<'T>) =
+        UExpr.diagMat x.Untyped |> Expr<'T>
 
     /// summation over given dimension
-    static member sumAxis (axis: int) (x: Expr) = 
-        Expr {SumAxis.Axis=axis; X=x.BaseExprCh} 
+    static member sumAxis (axis: int) (x: Expr<'T>) = 
+        UExpr.sumAxis axis x.Untyped |> Expr<'T>
 
     /// summation over given dimension, while keeping the axis with one (broadcastable) element
-    static member sumKeepingAxis (axis: int) (x: Expr) =
-        x |> Expr.sumAxis axis |> Expr.insertBroadcastAxis axis
+    static member sumKeepingAxis (axis: int) (x: Expr<'T>) =
+        UExpr.sumKeepingAxis axis x.Untyped |> Expr<'T>
 
     /// summaiton of all elements
-    static member sum (x: Expr) = 
-        x |> Expr.flatten |> Expr.sumAxis 0
+    static member sum (x: Expr<'T>) = 
+        UExpr.sum x.Untyped |> Expr<'T>
 
     /// Computes the traces along the given axes.
-    static member traceAxis (ax1: int) (ax2: int) (x: Expr) =
-        let tax = if ax1 < ax2 then ax1 else ax1 + 1
-        x |> Expr.diagAxis ax1 ax2 |> Expr.sumAxis tax
+    static member traceAxis (ax1: int) (ax2: int) (x: Expr<'T>) =
+        UExpr.traceAxis ax1 ax2 x.Untyped |> Expr<'T>
 
     /// Computes the trace of a matrix.
     /// If the input has more than two dimensions, the traces
     /// along the last two dimensions are returned.
-    static member trace (x: Expr) =
-        if x.NDims < 2 then
-            failwithf "Need at least a matrix for trace but got shape: %A" x.Shape      
-        x |> Expr.traceAxis (x.NDims-2) (x.NDims-1) 
+    static member trace (x: Expr<'T>) =
+        UExpr.trace x.Untyped |> Expr<'T>
     
     /// product over given dimension
-    static member productAxis (axis: int) (x: Expr) = 
-        Expr {ProductAxis.Axis=axis; X=x.BaseExprCh} 
+    static member productAxis (axis: int) (x: Expr<'T>) = 
+        UExpr.productAxis axis x.Untyped |> Expr<'T>
 
     /// product over given dimension, while keeping the axis with one (broadcastable) element
-    static member productKeepingAxis (axis: int) (x: Expr) =
-        x |> Expr.productAxis axis |> Expr.insertBroadcastAxis axis
+    static member productKeepingAxis (axis: int) (x: Expr<'T>) =
+        UExpr.productKeepingAxis axis x.Untyped |> Expr<'T>
 
     /// product of all elements
-    static member product (x: Expr) = 
-        x |> Expr.flatten |> Expr.productAxis 0
+    static member product (x: Expr<'T>) = 
+        UExpr.product x.Untyped |> Expr<'T>
 
     /// Maximum over given dimension.
-    static member maxAxis (axis: int) (x: Expr) = 
-        Expr {MaxAxis.Axis=axis; X=x.BaseExprCh} 
+    static member maxAxis (axis: int) (x: Expr<'T>) = 
+        UExpr.maxAxis axis x.Untyped |> Expr<'T>
 
     /// Maximum over given dimension, while keeping the axis with one (broadcastable) element.
-    static member maxKeepingAxis (axis: int) (x: Expr) =
-        x |> Expr.maxAxis axis |> Expr.insertBroadcastAxis axis
+    static member maxKeepingAxis (axis: int) (x: Expr<'T>) =
+        UExpr.maxKeepingAxis axis x.Untyped |> Expr<'T>
 
     /// Maximum of all elements.
-    static member max (x: Expr) = 
-        x |> Expr.flatten |> Expr.maxAxis 0
+    static member max (x: Expr<'T>) = 
+        UExpr.max x.Untyped |> Expr<'T>
 
     /// Minimum over given dimension.
-    static member minAxis (axis: int) (x: Expr) = 
-        Expr {MinAxis.Axis=axis; X=x.BaseExprCh} 
+    static member minAxis (axis: int) (x: Expr<'T>) = 
+        UExpr.minAxis axis x.Untyped |> Expr<'T>
 
     /// Minimum over given dimension, while keeping the axis with one (broadcastable) element.
-    static member minKeepingAxis (axis: int) (x: Expr) =
-        x |> Expr.minAxis axis |> Expr.insertBroadcastAxis axis
+    static member minKeepingAxis (axis: int) (x: Expr<'T>) =
+        UExpr.minKeepingAxis axis x.Untyped |> Expr<'T>
 
     /// Minimum of all elements.
-    static member min (x: Expr) = 
-        x |> Expr.flatten |> Expr.minAxis 0
+    static member min (x: Expr<'T>) = 
+        UExpr.min x.Untyped |> Expr<'T>
 
     /// Index of maximum over given dimension.
-    static member argMaxAxis (axis: int) (x: Expr) = 
-        Expr {ArgMaxAxis.Axis=axis; X=x.BaseExprCh} 
+    static member argMaxAxis (axis: int) (x: Expr<'T>) = 
+        UExpr.argMaxAxis axis x.Untyped |> Expr<'T>
 
     /// Index of maximum over given dimension, while keeping the axis with one (broadcastable) element.
-    static member argMaxKeepingAxis (axis: int) (x: Expr) =
-        x |> Expr.argMaxAxis axis |> Expr.insertBroadcastAxis axis
+    static member argMaxKeepingAxis (axis: int) (x: Expr<'T>) =
+        UExpr.argMaxKeepingAxis axis x.Untyped |> Expr<'T>
 
     /// Index of minimum over given dimension.
-    static member argMinAxis (axis: int) (x: Expr) = 
-        Expr {MinAxis.Axis=axis; X=x.BaseExprCh} 
+    static member argMinAxis (axis: int) (x: Expr<'T>) = 
+        UExpr.argMinAxis axis x.Untyped |> Expr<'T>
 
     /// Index of minimum over given dimension, while keeping the axis with one (broadcastable) element.
-    static member argMinKeepingAxis (axis: int) (x: Expr) =
-        x |> Expr.minAxis axis |> Expr.insertBroadcastAxis axis
+    static member argMinKeepingAxis (axis: int) (x: Expr<'T>) =
+        UExpr.argMinKeepingAxis axis x.Untyped |> Expr<'T>
 
     /// Select elements according to the specified index tensors.
-    static member gather (indices: Expr option list) (x: Expr) =
-        let someIndices = indices |> List.choose id
-        if List.isEmpty someIndices then
-            failwith "Gather needs at least one specified index tensor."
-        let bcSomeIndices = Expr.broadcastToSameMany someIndices
-        let rec rebuild idxs repIdxs =
-            match idxs, repIdxs with
-            | Some idx :: rIdxs, repIdx :: rRepIdxs ->
-                Some repIdx :: rebuild rIdxs rRepIdxs
-            | None :: rIdxs, _ -> None :: rebuild rIdxs repIdxs
-            | [], [] -> []
-            | _ -> failwith "unbalanced idxs"
-        let bcIndices = rebuild indices bcSomeIndices
-        let bcIndices = bcIndices |> List.map (Option.map Expr.baseExprCh)
-        Expr {Gather.Indices=bcIndices; X=x.BaseExprCh} 
+    static member gather (indices: Expr<int64> option list) (x: Expr<'T>) =
+        let indices = indices |> List.map (Option.map (fun expr -> expr.Untyped))
+        UExpr.gather indices x.Untyped |> Expr<'T>
 
     /// Disperses elements according to the specified index tensors.
-    static member scatter (indices: Expr option list) (trgtShp: ShapeSpec) (x: Expr) =
-        let indices = indices |> List.map (Option.map (Expr.broadcastToShape x.Shape))
-        let indices = indices |> List.map (Option.map Expr.baseExprCh)
-        Expr {Scatter.Indices=indices; Shape=trgtShp; X=x.BaseExprCh} 
+    static member scatter (indices: Expr<int64> option list) (trgtShp: ShapeSpec) (x: Expr<'T>) =
+        let indices = indices |> List.map (Option.map (fun expr -> expr.Untyped))
+        UExpr.scatter indices trgtShp x.Untyped |> Expr<'T>
 
     /// Nullifies the Jacobian of its argument when calculating derivatives.
-    static member assumeZeroDeriv (x: Expr) =
-        Expr {AssumeZeroDeriv.X=x.BaseExprCh} 
+    static member assumeZeroDeriv (x: Expr<'T>) =
+        UExpr.assumeZeroDeriv x.Untyped |> Expr<'T>
 
     /// Assumes the specified Jacobian when calculating derivatives.
-    static member assumeDeriv (deriv: Expr) (x: Expr) =
-        Expr {AssumeDeriv.Deriv=deriv.BaseExprCh; X=x.BaseExprCh} 
+    static member assumeDeriv (deriv: Expr<'T>) (x: Expr<'T>) =
+        UExpr.assumeDeriv deriv.Untyped x.Untyped |> Expr<'T>
 
     /// Annotated expression (no influence on value).
-    static member annotate label (x: Expr) = 
-        Expr {Annotated.Label=label; X=x.BaseExprCh} 
+    static member annotate label (x: Expr<'T>) = 
+        UExpr.annotate label x.Untyped |> Expr<'T>
 
     /// Print the result with the given label when evaluated.
-    static member print (label: string) (x: Expr) =
-        Expr {Print.Label=label; X=x.BaseExprCh} 
+    static member print (label: string) (x: Expr<'T>) =
+        UExpr.print label x.Untyped |> Expr<'T>
 
     /// Dumps the result into the given dataset in the active HDF5 dump file.
-    static member dump (dataset: string) (x: Expr) =
-        Expr {Dump.Dataset=dataset; X=x.BaseExprCh} 
+    static member dump (dataset: string) (x: Expr<'T>) =
+        UExpr.dump dataset x.Untyped |> Expr<'T>
 
     /// If the value contains NaNs or infinities, outputs their location and 
     /// stops the computation.
-    static member checkFinite (label: string) (x: Expr) =
-        Expr {CheckFinite.Label=label; X=x.BaseExprCh} 
+    static member checkFinite (label: string) (x: Expr<'T>) =
+        UExpr.checkFinite label x.Untyped |> Expr<'T>
 
     /// Tensor product.
-    static member tensorProduct (x: Expr) (y: Expr) =
-        Expr {TensorProduct.X=x.BaseExprCh; Y=y.BaseExprCh} 
+    static member tensorProduct (x: Expr<'T>) (y: Expr<'T>) =
+        UExpr.tensorProduct x.Untyped y.Untyped |> Expr<'T>
 
    /// Elementwise uses elements from `ifTrue` if `cond` is true for that element, otherwise elements from `ifFalse`.
-    static member ifThenElse (cond: Expr) (ifTrue: Expr) (ifFalse: Expr) =
-        let shps = [cond.Shape; ifTrue.Shape; ifFalse.Shape]
-        let pShps = ShapeSpec.padToSameMany shps
-        let bcShps = ShapeSpec.broadcastToSameMany false pShps           
-        match pShps, bcShps with
-        | [condPShp; ifTruePShp; ifFalsePShp], [condBcShp; ifTrueBcShp; ifFalseBcShp] -> 
-            let condBc = cond |> Expr.reshape condPShp |> Expr.broadcast condBcShp
-            let ifTrueBc = ifTrue |> Expr.reshape ifTruePShp |> Expr.broadcast ifTrueBcShp
-            let ifFalseBc = ifFalse |> Expr.reshape ifFalsePShp |> Expr.broadcast ifFalseBcShp
-            Expr {IfThenElse.Cond=condBc.BaseExprCh; IfTrue=ifTrueBc.BaseExprCh; IfFalse=ifFalseBc.BaseExprCh} 
-        | _ -> failwith "impossible"
-
-    /// Discards the results of all arguments.
-    static member discard (xs: Expr list) =
-        let xs = xs |> List.map Expr.baseExprCh
-        Expr {Discard.Xs=xs} 
+    static member ifThenElse (cond: Expr<bool>) (ifTrue: Expr<'T>) (ifFalse: Expr<'T>) =
+        UExpr.ifThenElse cond.Untyped ifTrue.Untyped ifFalse.Untyped |> Expr<'T>
 
     /// Build tensor from numeric ranges.
-    static member internal buildTensor shape ranges (xs: Expr list) =
-        let xs = xs |> List.map Expr.baseExprCh
-        Expr {BuildTensor.Shape=shape; Ranges=ranges; Xs=xs} 
+    static member internal buildTensor shape ranges (xs: Expr<'T> list) =
+        let xs = xs |> List.map (fun expr -> expr.Untyped)
+        UExpr.buildTensor shape ranges xs |> Expr<'T>
     
     /// Calculates a tensor elementwise using the given element expression and result shape.
-    static member elements shape elemExpr (xs: Expr list) =
-        let xs = xs |> List.map Expr.baseExprCh
-        Expr {Elements.Shape=shape; ElemExpr=elemExpr; Xs=xs} 
+    static member elements shape elemExpr (xs: Expr<'T> list) =
+        let xs = xs |> List.map (fun expr -> expr.Untyped)
+        UExpr.elements shape elemExpr xs |> Expr<'T>
 
     /// Element-wise n-dimensional interpolation using the specified interpolator.
     /// The interpolator is created using the Interpolator.create function.
-    static member interpolate interpolator (xs: Expr list) =
-        let xs = Expr.broadcastToSameMany xs
-        let xs = xs |> List.map Expr.baseExprCh
-        Expr {Interpolate.Interpolator=interpolator; Xs=xs} 
+    static member interpolate interpolator (xs: Expr<'T> list) =
+        let xs = xs |> List.map (fun expr -> expr.Untyped)
+        UExpr.interpolate interpolator xs |> Expr<'T>
 
     /// Element-wise one-dimensional interpolation using the specified interpolator.
     /// The interpolator is created using the Interpolator.create function.
-    static member interpolate1D interpolator (x: Expr) =
-        Expr.interpolate interpolator [x]
+    static member interpolate1D interpolator (x: Expr<'T>) =
+        UExpr.interpolate1D interpolator x.Untyped |> Expr<'T>
 
     /// Element-wise two-dimensional interpolation using the specified interpolator.
     /// The interpolator is created using the Interpolator.create function.
-    static member interpolate2D interpolator (x: Expr) (y: Expr) =
-        Expr.interpolate interpolator [x; y]
+    static member interpolate2D interpolator (x: Expr<'T>) (y: Expr<'T>) =
+        UExpr.interpolate2D interpolator x.Untyped y.Untyped |> Expr<'T>
 
     /// Element-wise three-dimensional interpolation using the specified interpolator.
     /// The interpolator is created using the Interpolator.create function.
-    static member interpolate3D interpolator (x: Expr) (y: Expr) (z: Expr) =
-        Expr.interpolate interpolator [x; y; z]
-
-    /// Evaluates the expression into a numeric value using the specified evaluation envirnoment.
-    static member evalWithEnv (evalEnv: EvalEnv) (expr: Expr) : Tensor.ITensor = 
-        let chVals = BaseExprEval.eval evalEnv expr.BaseExpr
-        chVals.[Ch.Default]        
+    static member interpolate3D interpolator (x: Expr<'T>) (y: Expr<'T>) (z: Expr<'T>) =
+        UExpr.interpolate3D interpolator x.Untyped y.Untyped z.Untyped |> Expr<'T>
 
     /// Evaluates the expression into a numeric value.
-    static member eval (varEnv: VarEnv) (expr: Expr) : Tensor.ITensor = 
-        let evalEnv : EvalEnv = {VarEnv=varEnv; Tracer=NoTracer()}
-        Expr.evalWithEnv evalEnv expr
+    static member eval (varEnv: VarEnv) (expr: Expr<'T>) : Tensor.Tensor<'T> = 
+        UExpr.eval varEnv expr.Untyped :?> Tensor.Tensor<'T>
+
 
 
 

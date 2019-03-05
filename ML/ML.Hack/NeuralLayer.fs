@@ -33,7 +33,7 @@ with
     /// sigmoid activation function
     static member sigmoid (x: Expr<'T>) =
         let one = Expr<_>.scalar x.Dev (conv<'T> 1)
-        let two = Expr<_>.scalar x.Dev (conv<'T> 2)
+        let two = Expr.scalar x.Dev (conv<'T> 2)
         (tanh (x / two) + one) / two
 
     /// Soft-max activation function.

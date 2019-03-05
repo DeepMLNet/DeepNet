@@ -4,7 +4,7 @@ open Tensor.Utils
 open Tensor
 open Tensor.Expr
 
-let dumpExpr (expr: Expr) =
+let dumpExpr (expr: UExpr) =
     printfn "Expr: %A" expr
     printfn "==== DataType:           %A" expr.DataType
     printfn "==== Shape:              %A" expr.Shape

@@ -16,7 +16,7 @@ type IDerivableOp =
     ///
     /// The outgoing derivatives should be of shape NxK1xK2x...xKD where K1xK2x...xKD is the
     /// shape of the respective argument.
-    abstract Deriv: dOp:Map<Ch, Expr> -> Map<Arg, Expr>
+    abstract Deriv: dOp:Map<Ch, UExpr> -> Map<Arg, UExpr>
 
     
 
@@ -26,13 +26,13 @@ type Deriv = private {
     _FunElems:   SizeSpec
     /// The derivatives w.r.t. the variables occuring in the expression.
     /// They are of the shape _FunElems x (shape of variable).
-    _WrtVar:     Map<Var, Expr>
+    _WrtVar:     Map<Var, UExpr>
 } with
 
     static member private log = Log "Deriv"
 
     static member private add (x: BaseExprCh) (y: BaseExprCh) =
-        (Expr x) + (Expr y) |> Expr.baseExprCh
+        (UExpr x) + (UExpr y) |> UExpr.baseExprCh
 
     /// Merges two derivative maps by summing derivatives for variables they both have in common.
     static member merge (a: Deriv) (b: Deriv) : Deriv =
@@ -54,7 +54,7 @@ type Deriv = private {
             match OpExtender.tryGet<IDerivableOp> expr.Op with
             | Some d -> d
             | None -> failwithf "The op %A is not derivable." expr.Op
-        let dExpr = dExpr |> Map.map (fun _ e -> Expr e)
+        let dExpr = dExpr |> Map.map (fun _ e -> UExpr e)
         let dArgs = deriver.Deriv dExpr |> Map.map (fun _ e -> e.BaseExprCh)
         let dArgExprs =
             expr.Args
@@ -120,8 +120,8 @@ type Deriv = private {
             // get op with computed derivative
             let expr = exprsWithFullDeriv.Dequeue ()
 
-            match Expr expr with
-            | Expr.VarArg vs ->
+            match UExpr expr with
+            | UExpr.VarArg vs ->
                 // arrived at a variable: save its derivative
                 varDerivs <- varDerivs |> Map.add vs incomingDeriv.[expr].[Ch.Default]
             | _ -> 
@@ -135,7 +135,7 @@ type Deriv = private {
 
     /// Computes the derivative expression w.r.t. all variables occuring in it using the specified
     /// value for the derivative of the specified expression.
-    static member computeWithRootDeriv (rootDeriv: Expr) (rootExpr: Expr) : Deriv =
+    static member computeWithRootDeriv (rootDeriv: UExpr) (rootExpr: UExpr) : Deriv =
         let funElems = ShapeSpec.nElem rootExpr.Shape
         let rootDerivShp = funElems :: rootExpr.Shape
         if not (ShapeSpec.equalWithoutBroadcastability rootDerivShp rootDeriv.Shape) then
@@ -150,15 +150,15 @@ type Deriv = private {
 
         {
             _FunElems = funElems
-            _WrtVar = varDerivs |> Map.map (fun _ deriv -> Expr deriv)
+            _WrtVar = varDerivs |> Map.map (fun _ deriv -> UExpr deriv)
         }    
 
 
     /// Computes the derivative expression w.r.t. all variables occuring in it.
-    static member compute (rootExpr: Expr) : Deriv =
+    static member compute (rootExpr: UExpr) : Deriv =
         let funElems = ShapeSpec.nElem rootExpr.Shape 
-        let rootJac = Expr.identity rootExpr.DataType rootExpr.Dev funElems
-        let rootDeriv = rootJac |> Expr.reshape (funElems :: rootExpr.Shape)
+        let rootJac = UExpr.identity rootExpr.DataType rootExpr.Dev funElems
+        let rootDeriv = rootJac |> UExpr.reshape (funElems :: rootExpr.Shape)
         let deriv = Deriv.computeWithRootDeriv rootDeriv rootExpr
         deriv
 
@@ -173,7 +173,7 @@ type Deriv = private {
         match this._WrtVar |> Map.tryFind var with
         | Some d -> d
         | None -> 
-            Expr.zeros var.DataType var.Dev [this.FunElems; ShapeSpec.nElem var.Shape]
+            UExpr.zeros var.DataType var.Dev [this.FunElems; ShapeSpec.nElem var.Shape]
 
 
     /// Returns the derivatives of the specified typed variable.

@@ -8,9 +8,9 @@ open Tensor.Expr.Ops
 /// Evaluates a set of expressions and updates variables.
 type EvalUpdateBundle = {
     /// Expressions to evaluate.
-    Exprs:       Map<Ch, Expr>
+    Exprs:       Map<Ch, UExpr>
     /// New values for variables.
-    Updates:     Map<Var, Expr>
+    Updates:     Map<Var, UExpr>
 } 
 
 
