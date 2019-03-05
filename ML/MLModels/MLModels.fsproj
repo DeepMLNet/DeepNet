@@ -8,21 +8,21 @@
 
   <ItemGroup>
     <ProjectReference Include="../../Tensor/Tensor/Tensor.fsproj" />
-    <ProjectReference Include="../../Symbolic/SymTensor/SymTensor.fsproj" />
+    <ProjectReference Include="..\..\Tensor.Expr\Tensor.Expr\Tensor.Expr.fsproj" />
     <ProjectReference Include="..\MLDatasets\MLDatasets.fsproj" />
     <ProjectReference Include="..\MLOptimizers\MLOptimizers.fsproj" />
   </ItemGroup>
 
   <ItemGroup>
     <Compile Include="..\..\Utils\Utils.fs" Link="Utils.fs" />
-    <Compile Include="Util.fs" />
-    <Compile Include="Pickle.fs" />
-    <Compile Include="Linear.fs" />
+    <None Include="Util.fs" />
+    <None Include="Pickle.fs" />
+    <None Include="Linear.fs" />
     <Compile Include="Neural.fs" />
-    <Compile Include="Config.fs" />
-    <Compile Include="Train.fs" />
-    <Compile Include="Quality.fs" />
-    <Compile Include="GaussianProcess.fs" />
+    <None Include="Config.fs" />
+    <None Include="Train.fs" />
+    <None Include="Quality.fs" />
+    <None Include="GaussianProcess.fs" />
   </ItemGroup>
 
   <ItemGroup>

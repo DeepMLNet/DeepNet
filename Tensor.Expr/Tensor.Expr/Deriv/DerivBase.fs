@@ -163,6 +163,11 @@ type Deriv = private {
         deriv
 
 
+    /// Computes the derivative expression w.r.t. all variables occuring in it.
+    static member compute (rootExpr: Expr<'T>) =
+        Deriv.compute rootExpr.Untyped
+
+
     /// Returns the derivatives of the specified untyped variable.
     member this.Wrt (var: Var) = 
         match this._WrtVar |> Map.tryFind var with

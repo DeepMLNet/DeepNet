@@ -71,3 +71,7 @@
 	- they would then modify the effective variable name
 	- but this would require keeping track of the context during evaluation
 
+
+
+- Deriving Expr<'T> from Expr is not possible, because compiler sees both methods as overloads and cannot resolve them anymore
+=> Get rid of inheritiance and instead add function to convert to untyped expression
