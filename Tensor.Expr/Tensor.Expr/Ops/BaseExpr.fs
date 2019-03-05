@@ -61,6 +61,8 @@ type TraceEvent =
     | EvalStart of DateTime
     /// Evaluation end time.
     | EvalEnd of DateTime
+    /// Loop iteration.
+    | LoopIter of int64
     /// Custom data.
     | Custom of key:string * data:TraceCustomData
     /// Event assoicated with an expression.

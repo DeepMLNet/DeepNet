@@ -52,9 +52,9 @@ type Loop = {
         |> Option.defaultValue HostTensor.Dev
 
     /// build strides information for loop sources and targets
-    static member buildStrides (vars: Map<Var, Loop.Input>) (args: TensorLayout list) 
-                               (channels: Map<Ch, LoopChannelLayoutInfoT>) 
-                               : VarStrides * ChannelStridesT * int list option list =
+    static member internal buildStrides (vars: Map<Var, Loop.Input>) (args: TensorLayout list) 
+                                        (channels: Map<Ch, LoopChannelLayoutInfoT>) 
+                                        : VarStrides * ChannelStridesT * int list option list =
 
         let mutable argRequiredStrideOrder = List.replicate args.Length None
 
@@ -104,10 +104,10 @@ type Loop = {
         varStrides, channelStrides, argRequiredStrideOrder
 
     /// builds inputs and outputs for one loop iteration 
-    static member buildInOut (nIters: int64) (iter: int64) (iterAry: ITensor) (itersRemainingAry: ITensor)
-                             (vars: Map<Var, Loop.Input>)
-                             (args: ITensor list) (channels: Map<Ch, LoopChannelInfoT>)
-                             : Map<Var, ITensor> * Map<Ch, ITensor> =
+    static member internal buildInOut (nIters: int64) (iter: int64) (iterAry: ITensor) 
+                                      (itersRemainingAry: ITensor) (vars: Map<Var, Loop.Input>)
+                                      (args: ITensor list) (channels: Map<Ch, LoopChannelInfoT>)
+                                      : VarEnv * Map<Ch, ITensor> =
 
         /// RngAll in all dimensions but specified one
         let rngAllBut ary dim dimSlice = 
@@ -129,7 +129,7 @@ type Loop = {
         // build variable environment for value sources
         let srcVarEnv = 
             vars
-            |> Map.map (fun vs li ->
+            |> Map.mapKeyValue (fun vs li ->
                 // get value for variable
                 let value = 
                     match li with
@@ -159,13 +159,13 @@ type Loop = {
                 if vs.DataType <> value.DataType then
                     failwithf "loop variable %A got value with data type %A" vs value.DataType
                     
-                value)
+                vs.Name, value)
 
         // slice outputs into channel targets
         let targets =
             channels |> Map.map (fun ch _ -> targetSlice ch iter)
 
-        srcVarEnv, targets
+        VarEnv srcVarEnv, targets
 
 
     interface IOp with       
@@ -275,6 +275,7 @@ type Loop = {
             
         member this.Eval evalEnv argVals = 
             let args = ArgValue.naryXs argVals
+            let thisExpr = BaseExpr.ofOp this
 
             // iteration index variables
             let nIters = SizeSpec.eval this.Length
@@ -295,8 +296,8 @@ type Loop = {
                     })
 
             // perform loop
-            for iter in 0L .. nIters-1L do            
-                //if Trace.isActive () then Trace.setLoopIter iter
+            for iter in 0L .. nIters-1L do     
+                evalEnv.Tracer.Log (TraceEvent.ForExpr (thisExpr, TraceEvent.LoopIter iter))
                    
                 // set iteration indices
                 iterAry.[[]] <- iter
@@ -305,9 +306,11 @@ type Loop = {
                 // calculate and store channel values
                 let iterVarEnv, iterChannelEnv =
                     Loop.buildInOut nIters iter iterAry itersRemAry this.Vars args channelInfos
-                let iterEvalEnv = {evalEnv with VarEnv=iterVarEnv}
                 for KeyValue(ch, lv) in this.Channels do
-                    iterChannelEnv.[ch].[Fill] <- EvalT.EvalTypeNeutral (iterEvalEnv, lv.Expr)
+                    let iterEvalEnv = {evalEnv with VarEnv=iterVarEnv; Tracer=evalEnv.Tracer.GetSubTracer()}
+                    iterEvalEnv.Tracer.Log (TraceEvent.ParentExpr thisExpr)
+                    let lvVal = BaseExprEval.eval iterEvalEnv lv.Expr.Expr
+                    iterChannelEnv.[ch].[Fill] <- lvVal.[Ch.Default]
 
             // return outputs
             channelInfos |> Map.map (fun ch ci -> ci.Target)   

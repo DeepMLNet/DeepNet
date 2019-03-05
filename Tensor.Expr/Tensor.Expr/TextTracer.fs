@@ -72,6 +72,8 @@ type TextTracer private (writeFn: string -> unit, limits: TextTracerLimits, leve
                 let duration = endTime - startTime
                 state, Some (sprintf "Duration: %.3f s" duration.TotalSeconds)
             | None -> state, None
+        | TraceEvent.LoopIter iter ->
+            newState, Some (sprintf "Loop iteration: %d" iter)
         | TraceEvent.Custom (key, data) ->
             newState, Some (sprintf "%s: %A" key data)
         | TraceEvent.ForExpr (expr, exprEvent) ->
