@@ -20,9 +20,13 @@ type Var<'T> (_var: Var) =
     new (name, dev, shape) =
         Var<'T> ({Name=name; TypeName=TypeName.ofType<'T>; Dev=dev; Shape=shape})
 
-    /// Create variable using name, shape and storage device.
-    new (name, dev, shape) =
-        Var<'T> ({Name=VarName name; TypeName=TypeName.ofType<'T>; Dev=dev; Shape=shape})
+    /// Create variable using name in root context, shape and storage device.
+    new (name: string, dev, shape) =
+        Var<'T> ({Name=VarName.from name; TypeName=TypeName.ofType<'T>; Dev=dev; Shape=shape})
+
+    /// Create variable using context and shape.
+    new (ctx: Context, shape) =
+        Var<'T> ({Name=VarName.from ctx.Path; TypeName=TypeName.ofType<'T>; Dev=ctx.Dev; Shape=shape})
 
     interface System.IEquatable<Var<'T>> with
         member this.Equals other = this.Var = other.Var

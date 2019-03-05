@@ -343,7 +343,7 @@ type Loop = {
             | Some vs -> vs
             | None ->
                 let rec genName i =
-                    let name = VarName (sprintf "CONST%d" i)
+                    let name = VarName (VarPath.root / "LoopConst", sprintf "%d" i)
                     match vars |> Map.tryFindKey (fun vs _ -> vs.Name = name) with
                     | Some _ -> genName (i + 1)
                     | None -> name

@@ -2,11 +2,12 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
+    <Platforms>AnyCPU;x64</Platforms>
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="ModelContext.fs" />
-    <None Include="RecordParams.fs" />
+    <Compile Include="ModelContext.fs" />
+    <Compile Include="RecordParams.fs" />
   </ItemGroup>
 
   <ItemGroup />

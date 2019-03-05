@@ -2,7 +2,7 @@
 
 open Tensor.Utils
 open Tensor
-open SymTensor
+open Tensor.Expr
 
 
 [<AutoOpen>]

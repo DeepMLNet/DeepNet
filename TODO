@@ -42,3 +42,32 @@
 
 1. First get done with simple eval of loop expressions.
 2. Then check what to do about ModelContext and RecordParams.
+
+- how to fit optimizer into model?
+	- it has its own state and configuration, which both need to be taken care of
+	- basically user should provide expressions for parameters, but what about state?
+	- so far the optimizers seem to be hard coded to use a variables for configuration and state
+	- also they don't use EvalUpdateBundles
+	- would be good to allow user to pass in expressions for optimizer parameters
+	- it does not really make sense for the user to specify the state
+	- so the optimizer could allocate its own variables for the state, but how to make sure they are unique?
+	= well, the namespacing solution is not that bad
+	- perhaps just define a namespace object like modelbuilder
+	- can be used to generate variables names and allocate associated storage
+	- is just the question if not having it build into expression would make life easier for users
+	- but if we allow values on Expr, then they will be held directly on the expression and allocated during expression creation
+	- it also means we need a method to initialize, load and save them
+	- what about dropout?
+	- it needs to be turned off after training
+	- thus expr either needs to be stateful on ops, encode then on/off as another variable or rebuilt the graph
+	- so having it on Expr is actually not a good idea
+	- but somehow associating would be good
+	- define an ExprState that an op can use?
+	- add method to uniquely generate a variable name? => bad if graph changes and state should be reapplied
+	- so actually current architecture is not bad, only problem might be modelbuilder naming etc.
+	- perhaps each Var should allow direct specification of context
+	- might be a good idea, then we could use that to define associated variables
+	- could also think about adding context blocks into graph
+	- they would then modify the effective variable name
+	- but this would require keeping track of the context during evaluation
+

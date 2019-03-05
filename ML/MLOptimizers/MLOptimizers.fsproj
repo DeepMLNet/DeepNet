@@ -8,7 +8,8 @@
 
   <ItemGroup>
     <ProjectReference Include="../../Tensor/Tensor/Tensor.fsproj" />
-    <ProjectReference Include="../../Symbolic/SymTensor/SymTensor.fsproj" />
+    <ProjectReference Include="../../Tensor.Expr/Tensor.Expr/Tensor.Expr.fsproj" />
+    <ProjectReference Include="../../Tensor.Expr/Tensor.Expr.Model/Tensor.Expr.Model.fsproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -16,7 +17,7 @@
     <Compile Include="Optimizer.fs" />
     <Compile Include="GradientDescent.fs" />
     <Compile Include="Adam.fs" />
-    <Compile Include="RMSprop.fs" />
+    <None Include="RMSprop.fs" />
   </ItemGroup>
 
 </Project>

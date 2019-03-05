@@ -20,6 +20,7 @@
     <Compile Include="Size/Env.fs" />
     <Compile Include="Data/TypeName.fs" />
     <Compile Include="Data/Const.fs" />
+    <Compile Include="Data\Context.fs" />
     <Compile Include="Data/Var.fs" />
     <Compile Include="Data\VarT.fs" />
     <Compile Include="Data/VarEnv.fs" />

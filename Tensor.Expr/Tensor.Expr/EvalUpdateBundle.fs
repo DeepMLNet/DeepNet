@@ -18,8 +18,7 @@ type EvalUpdateBundle = {
 module EvalUpdateBundle =
 
     let internal varToCh (var: Var) =
-        let (VarName name) = var.Name
-        let chName = sprintf "VarUpdate:%s" name
+        let chName = sprintf "VarUpdate:%s" var.Name.Str
         Ch.Custom chName
 
     /// Executes an EvalUpdateBundle. 

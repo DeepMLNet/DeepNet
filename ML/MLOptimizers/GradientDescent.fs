@@ -2,7 +2,7 @@
 
 open DeepNet.Utils
 open Tensor
-open SymTensor
+open Tensor.Expr
 
     
 module GradientDescent = 

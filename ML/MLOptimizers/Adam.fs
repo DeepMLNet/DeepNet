@@ -2,28 +2,32 @@
 
 open DeepNet.Utils
 open Tensor
-open SymTensor
+open Tensor.Expr
 
 
 module Adam =
 
-    type Cfg<'T> = {
-        Step:           'T
-        Momentum:       'T
-        Decay:          'T
-        DecayMom1:      'T
-        DecayMom2:      'T
-        Offset:         'T
+    type Cfg = {
+        Step:           Tensor<float32>
+        Momentum:       Tensor<float32>
+        Decay:          Tensor<float32>
+        DecayMom1:      Tensor<float32>
+        DecayMom2:      Tensor<float32>
+        Offset:         Tensor<float32>
     } 
 
     type CfgExpr = {
-        Step:           Expr
-        Momentum:       Expr
-        Decay:          Expr
-        DecayMom1:      Expr
-        DecayMom2:      Expr
-        Offset:         Expr
-    }
+        Step:           Expr<float32>
+        Momentum:       Expr<float32>
+        Decay:          Expr<float32>
+        DecayMom1:      Expr<float32>
+        DecayMom2:      Expr<float32>
+        Offset:         Expr<float32>
+    } with 
+        static member create (ctx: Context) = {
+            Step = Var<float32> (ctx / "Step", )
+        }
+            
 
     type State<'T> = {
         Iter:           Tensor<'T>  
@@ -46,7 +50,7 @@ module Adam =
 open Adam
 
 type Adam<'T when 'T: equality and 'T: comparison> 
-        (loss:  Expr, pars:  Expr, dev:   IDevice) =
+        (loss:  Expr, pars:  Expr,  cfg: CfgExpr,  state: StateExpr) =
 
     do Util.checkProperType<'T> ()
     do if loss.NDims <> 0 then failwith "loss must be a scalar"
