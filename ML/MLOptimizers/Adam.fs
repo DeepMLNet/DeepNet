@@ -7,6 +7,27 @@ open Tensor.Expr
 
 module Adam =
 
+    type VarTensorExpr<'T> = {
+        Var: Var<'T> option
+        mutable Tensor: Tensor<'T> option
+        Expr: Expr<'T>
+    } with 
+        static member make (ctx, shp) =
+            let var = Var<'T> (ctx, shp)
+            {
+                Var = Some var
+                Tensor = None
+                Expr = Expr.var var
+            }
+
+        member this.Inst (symSizes: SymSizeEnv) =
+            match this.Var with
+            | Some var ->
+                let nShp = var.Shape |> ShapeSpec.substSymbols symSizes |> ShapeSpec.eval
+                this.Tensor <- Some (Tensor<'T>.zeros var.Dev nShp)
+            | None -> failwith "Can only instantiate when Var is present."    
+            
+
     type Cfg = {
         Step:           Tensor<float32>
         Momentum:       Tensor<float32>
@@ -14,10 +35,18 @@ module Adam =
         DecayMom1:      Tensor<float32>
         DecayMom2:      Tensor<float32>
         Offset:         Tensor<float32>
-    } 
+    } with 
+        static member create (ctx: Context) = {
+            Step      = Tensor.zeros ctx.Dev []
+            Momentum  = Tensor.zeros ctx.Dev []
+            Decay     = Tensor.zeros ctx.Dev []
+            DecayMom1 = Tensor.zeros ctx.Dev []
+            DecayMom2 = Tensor.zeros ctx.Dev []
+            Offset    = Tensor.zeros ctx.Dev []
+        }
 
     type CfgExpr = {
-        Step:           Expr<float32>
+        Step:           Expr<float32> * Tensor<float32>
         Momentum:       Expr<float32>
         Decay:          Expr<float32>
         DecayMom1:      Expr<float32>
@@ -25,7 +54,12 @@ module Adam =
         Offset:         Expr<float32>
     } with 
         static member create (ctx: Context) = {
-            Step = Var<float32> (ctx / "Step", )
+            Step      = Var<float32> (ctx / "Step",      ShapeSpec.scalar) |> Expr.var
+            Momentum  = Var<float32> (ctx / "Momentum",  ShapeSpec.scalar) |> Expr.var
+            Decay     = Var<float32> (ctx / "Decay",     ShapeSpec.scalar) |> Expr.var
+            DecayMom1 = Var<float32> (ctx / "DecayMom1", ShapeSpec.scalar) |> Expr.var
+            DecayMom2 = Var<float32> (ctx / "DecayMom2", ShapeSpec.scalar) |> Expr.var
+            Offset    = Var<float32> (ctx / "Offset",    ShapeSpec.scalar) |> Expr.var
         }
             
 
