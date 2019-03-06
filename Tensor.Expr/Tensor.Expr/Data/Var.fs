@@ -1,6 +1,7 @@
 ﻿namespace Tensor.Expr
 
 open DeepNet.Utils
+open Tensor
 open Tensor.Backend
 
 
@@ -86,5 +87,25 @@ type Var = {
     /// substitutes the size symbol environment into the variable
     static member substSymSizes symSizes (vs: Var) = 
         {vs with Shape=SymSizeEnv.substShape symSizes vs.Shape} 
+
+
+[<StructuralComparison; StructuralEquality>]
+type Data = {
+    Name:    VarName
+    /// data type
+    TypeName:  TypeName
+    /// storage device
+    Dev:       ITensorDevice
+    /// symbolic shape
+    Shape:     ShapeSpec
+    Value:   OrdRef<ITensor> option
+    Init:   OrdRef<ITensor -> unit>
+} with
+
+    static member inst (data: Data) =
+        let shp = ShapeSpec.eval data.Shape
+        let value = Tensor.NewOfType (shp, data.TypeName.Type, data.Dev)
+        data.Init.Value value 
+        {data with Value=Some (OrdRef value)}
 
 

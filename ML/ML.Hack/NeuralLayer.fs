@@ -170,5 +170,6 @@ module User =
         printfn "%A" pred
 
         // Now, no way to initialize pars.
-
+        // Cannot create data when expr is constructed, because sizes are not known.
+        // 
         ()

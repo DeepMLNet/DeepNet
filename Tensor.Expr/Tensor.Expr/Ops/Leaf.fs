@@ -128,3 +128,24 @@ type VarArg = { Var: Var } with
         member this.Text =
             sprintf "%A" this.Var
 
+
+/// Argument (placeholder for a variable).
+type DataArg = { Data: Data } with
+    interface IOp with       
+        member this.Check () = ()
+        member this.Channels = Ch.onlyOne
+        member this.Devs = this.Data.Dev |> Ch.only
+        member this.TypeNames = this.Data.TypeName |> Ch.only
+        member this.Shapes = this.Data.Shape |> Ch.only
+        member this.Args = Map.empty
+        member this.ReplaceArgs args = this :> _
+        member this.SubstSymSizes env = 
+            {Data={this.Data with Shape=SymSizeEnv.substShape env this.Data.Shape}} :> _
+        member this.CanEvalAllSymSizes = ShapeSpec.canEval this.Data.Shape
+        member this.Eval env argVals = 
+            this.Data.Value.Value.Value |> Ch.only       
+
+
+    interface IOpFormat with
+        member this.Text =
+            sprintf "%A" this.Data
