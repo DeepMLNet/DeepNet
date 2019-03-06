@@ -208,3 +208,5 @@ type ITensor =
     abstract DiagMatAxis: ax1:int -> ax2:int -> ITensor
     abstract DiagMat: unit -> ITensor
 
+    abstract DiffAxis: ax:int -> ITensor
+

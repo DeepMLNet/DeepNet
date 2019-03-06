@@ -81,7 +81,7 @@ module Regul =
 module NeuralLayer = 
 
     /// Neural layer hyper-parameters.
-    type HyperPars = {
+    type HyperPars<'T> = {
         /// number of inputs
         NInput:             SizeSpec
         /// number of outputs
@@ -92,16 +92,14 @@ module NeuralLayer =
         L1Regul:            float 
         /// l2 regularization weight
         L2Regul:            float 
-    }
-
-
-    let defaultHyperPars = {
-        NInput     = SizeSpec.fix 0L
-        NOutput    = SizeSpec.fix 0L
-        ActFunc    = ActFunc.Tanh
-        L1Regul    = 0.0
-        L2Regul    = 0.0
-    }
+    } with 
+        static member standard: HyperPars<'T> = {
+            NInput     = SizeSpec.fix 0L
+            NOutput    = SizeSpec.fix 0L
+            ActFunc    = ActFunc.Tanh
+            L1Regul    = 0.0
+            L2Regul    = 0.0
+        }
 
 
     /// Neural layer parameters.
@@ -111,7 +109,7 @@ module NeuralLayer =
         /// expression for the biases
         Bias:           Expr<'T>
         /// hyper-parameters
-        HyperPars:      HyperPars
+        HyperPars:      HyperPars<'T>
     }
 
     let internal initWeights seed (shp: int64 list) : Tensor<'T> = 
@@ -130,11 +128,13 @@ module NeuralLayer =
     /// distribution with support [-r, r] where
     /// r = 4 * sqrt (6 / (hp.NInput + hp.NOutput)).
     /// The biases are initialized to zero.
-    //let pars (mb: ModelBuilder<_>) hp = {
-    //    Weights   = mb.Param ("Weights", [hp.NOutput; hp.NInput], initWeights)
-    //    Bias      = mb.Param ("Bias",    [hp.NOutput],            initBias)
-    //    HyperPars = hp
-    //}
+    let pars (ctx: Context) (hp: HyperPars<'T>) = {
+        //Weights   = mb.Param ("Weights", [hp.NOutput; hp.NInput], initWeights)
+        //Bias      = mb.Param ("Bias",    [hp.NOutput],            initBias)
+        Weights     = Expr.var (Var<'T> (ctx / "Weights", [hp.NOutput; hp.NInput]))
+        Bias        = Expr.var (Var<'T> (ctx / "Bias",    [hp.NOutput]))
+        HyperPars   = hp
+    }
 
     /// Returns an expression for the output (predictions) of the
     /// neural layer with parameters `pars` given the input `input`.
@@ -153,3 +153,22 @@ module NeuralLayer =
         let l1reg = Regul.lRegul pars.HyperPars.L1Regul 1.0 pars.Weights
         let l2reg = Regul.lRegul pars.HyperPars.L2Regul 2.0 pars.Weights
         l1reg + l2reg
+
+
+
+module User =
+
+    let build() =
+        let ctx = Context.root HostTensor.Dev
+        let nSamples = SizeSpec.symbol "nSamples"
+        let nFeatures = SizeSpec.symbol "nFeatures"
+        let inputVar = Var<float32> (ctx / "input", [nSamples; nFeatures])
+        let input = Expr.var inputVar
+        let hyperPars = NeuralLayer.HyperPars.standard
+        let pars = NeuralLayer.pars ctx hyperPars
+        let pred = NeuralLayer.pred pars input
+        printfn "%A" pred
+
+        // Now, no way to initialize pars.
+
+        ()

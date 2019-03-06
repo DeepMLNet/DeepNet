@@ -41,7 +41,7 @@ type InterpolateDeriv(op: Interpolate) =
                 | InterpolationMode.Linear ->
                     List.indexed env.Xs
                     |> List.map (fun (d, x) ->
-                        let ipd = op.Interpolator |> Interpolator.getDerivative d 
+                        let ipd = op.Interpolator |> Interpolator.getDeriv d 
                         env.DOp * UExpr.padLeft (UExpr.interpolate ipd env.Xs))
                 | InterpolationMode.ToLeft -> 
                     env.Xs |> List.map (fun x -> env.Zeros x)

@@ -4,6 +4,9 @@ open Tensor
 open DeepNet.Utils
 
 
+// TODO: move to Tensor along with CUDA implementation.
+
+
 /// extrapolation behaviour
 [<RequireQualifiedAccess>]
 type OutsideInterpolatorRange =
@@ -23,10 +26,8 @@ type InterpolationMode =
 /// one dimensional linear interpoator
 type Interpolator = 
     {
-        /// ID
-        Id:         int
-        /// data type
-        TypeName:   TypeName
+        /// interpolation table
+        Table:      OrdRef<ITensor>
         /// minimum argument value
         MinArg:     float list
         /// maximum argument value
@@ -49,15 +50,15 @@ type Interpolator =
 module Interpolator =
 
     /// interpolator tables
-    let private tables = new Dictionary<Interpolator, ITensor>()
+    //let private tables = new Dictionary<Interpolator, ITensor>()
 
-    /// numerically calculated derivatives
-    let private numDerivatives = new Dictionary<Interpolator, Interpolator list>()
+    /// Cache of numerically calculated derivatives.
+    let private cachedDerivs = ConditionalWeakTable<Interpolator, Interpolator list> ()
 
     /// Creates an n-dimensional linear interpolator,
     /// where table contains the equally spaced function values between minArg and maxArg.
     /// Optionally, an interpolator for the derivative can be specified.
-    let create (tbl: Tensor<'T>) (minArg: float list) (maxArg: float list) 
+    let create (tbl: ITensor) (minArg: float list) (maxArg: float list) 
                (outside: OutsideInterpolatorRange list) (mode: InterpolationMode) 
                (derivative: Interpolator list option) =
         
@@ -77,8 +78,7 @@ module Interpolator =
 
         // create interpolator
         let ip = {
-            Id = tables.Count
-            TypeName = TypeName.ofType<'T>
+            Table = OrdRef tbl
             MinArg = minArg
             MaxArg = maxArg
             Resolution = List.zip3 minArg maxArg tbl.Shape
@@ -88,81 +88,51 @@ module Interpolator =
             Derivative = derivative
         }
 
-        // store interpolation table
-        tables.LockedAdd (ip, tbl)
         ip
 
-    /// Gets the function value table for the specified one-dimensional interpolator as an IArrayNDT.
-    let getTableAsIArrayNDT ip =
-        match tables.LockedTryFind ip with
-        | Some ip -> ip
-        | None -> failwithf "interpolator %A is unknown" ip
+    /// Computes the derivative interpolators for the specified interpolator.
+    let private computeDerivs (ip: Interpolator) =
+        let tbl = ip.Table.Value    
 
-    /// Gets the function value table for the specified one-dimensional interpolator.
-    let getTable<'T> ip =
-        getTableAsIArrayNDT ip :?> Tensor<'T>
+        // Compute derivative for each dimension.
+        [0 .. ip.NDims-1]
+        |> List.map (fun dd -> 
+            let diffTbl =
+                match ip.Mode with
+                | InterpolationMode.Linear ->
+                    let diffFac = ITensor.scalar tbl.Dev (convTo tbl.DataType ip.Resolution.[dd]) 
+                    let diffTbl = (ITensor.diffAxis dd tbl).Divide diffFac                                            
+                    let zeroShp =
+                        [for d, s in List.indexed tbl.Shape do
+                            if d = dd then yield 1L
+                            else yield s]
+                    let zero = ITensor.zeros diffTbl.DataType diffTbl.Dev zeroShp 
+                    ITensor.concat dd [diffTbl; zero]
+                | InterpolationMode.ToLeft ->
+                    ITensor.zeros tbl.DataType tbl.Dev tbl.Shape
 
-    type private GetDerivative =
-        static member Do<'T> (derivDim: int, ip: Interpolator) =
-            if not (0 <= derivDim && derivDim < ip.NDims) then
-                invalidArg "derivDim" "derivative dimension out of range"
-
-            let ipds = 
-                match ip.Derivative with
-                | Some ipds -> ipds  // use provided derivative tables
-                | None ->            // create derivative table by numeric differentiation
-                    match numDerivatives.LockedTryFind ip with
-                    | Some ipds -> ipds // use cached derivate table
-                    | None ->           // build derivative tables
-                        let tbl : Tensor<'T> = getTable ip    
-
-                        // hack to work around slow ArrayNDCuda operations
-                        let tbl, wasOnDev = 
-                            match tbl.Dev with
-                            | dev when dev=CudaTensor.Dev -> HostTensor.transfer tbl, true
-                            | _ -> tbl, false
-
-                        let ipds = 
-                            [0 .. ip.NDims-1]
-                            |> List.map (fun dd -> 
-                                let diffTbl =
-                                    match ip.Mode with
-                                    | InterpolationMode.Linear ->
-                                        let diffFac = Tensor.scalarLike tbl (conv<'T> ip.Resolution.[dd]) 
-                                        let diffTbl = Tensor.diffAxis dd tbl / diffFac                                            
-                                        let zeroShp =
-                                            [for d, s in List.indexed tbl.Shape do
-                                                if d = dd then yield 1L
-                                                else yield s]
-                                        let zero = Tensor.zeros diffTbl.Dev zeroShp 
-                                        Tensor.concat dd [diffTbl; zero]
-                                    | InterpolationMode.ToLeft ->
-                                        Tensor.zerosLike tbl
-
-                                // hack to work around slow ArrayNDCuda operations
-                                let diffTbl =
-                                    if wasOnDev then CudaTensor.transfer diffTbl
-                                    else diffTbl
-
-                                let outside =
-                                    List.indexed ip.Outside
-                                    |> List.map (fun (d, o) -> if d = dd then OutsideInterpolatorRange.Zero else o)
-                                create diffTbl ip.MinArg ip.MaxArg outside InterpolationMode.ToLeft None
-                            )
-
-                        // cache built tables
-                        numDerivatives.LockedAdd (ip, ipds)
-                        ipds
-            ipds.[derivDim]
-
+            let outside =
+                List.indexed ip.Outside
+                |> List.map (fun (d, o) -> if d = dd then OutsideInterpolatorRange.Zero else o)
+            create diffTbl ip.MinArg ip.MaxArg outside InterpolationMode.ToLeft None)
+            
     /// Gets the interpolator for the derivative of the specified one-dimensional interpolator.
     /// If no derivative was specified at creation of the interpolator, it is calculated numerically.
-    let getDerivative (derivDim: int) (ip: Interpolator) =
-        callGeneric<GetDerivative, Interpolator> "Do" [ip.TypeName.Type] (derivDim, ip)                
+    let getDeriv (derivDim: int) (ip: Interpolator) =
+        if not (0 <= derivDim && derivDim < ip.NDims) then
+            invalidArg "derivDim" "derivative dimension out of range"
+
+        let ipds = 
+            match ip.Derivative with
+            | Some ipds -> ipds  // use provided derivative tables
+            | None ->            // create derivative table by numeric differentiation
+                cachedDerivs.GetValue(ip, fun _ -> computeDerivs ip)              
+
+        ipds.[derivDim]         
 
     /// Performs interpolation on host.
     let interpolate (ip: Interpolator) (es: Tensor<'T> list) : Tensor<'T> =
-        let tbl : Tensor<'T> = getTable ip
+        let tbl = ip.Table.Value :?> Tensor<'T>
 
         /// returns interpolation in dimensions to the right of leftIdxs
         let rec interpolateInDim (leftIdxs: int64 list) (x: float list) =

@@ -356,7 +356,49 @@ module ITensor =
         x.Value <- value
         x        
 
+    let diffAxis (ax: int) (a: ITensor) : ITensor =
+        a.DiffAxis ax
 
+    /// <summary>Concatenates tensors along an axis.</summary>
+    let concat (ax: int) (ts: ITensor seq) =
+        let ts = List.ofSeq ts
+        if List.isEmpty ts then
+            invalidArg "ts" "Cannot concatenate empty sequence of tensors."
+
+        let dev = ts.Head.Dev
+        let typ = ts.Head.DataType
+        let shp = ts.Head.Shape
+
+        // check for compatibility
+        if ts |> List.exists (fun ary -> ary.Dev <> dev) then
+            invalidArg "ts" "Tensors for concatenation must all be stored on the same device."
+        if ts |> List.exists (fun ary -> ary.DataType <> typ) then
+            invalidArg "ts" "Tensors for concatenation must all be of same data type."
+        if not (0 <= ax && ax < shp.Length) then
+            invalidArg "ax" "Concatenation axis %d is out of range for shape %A." ax shp
+        for aryIdx, ary in List.indexed ts do
+            if List.without ax ary.Shape <> List.without ax shp then
+                invalidArg "ts" "Concatentation element with index %d with shape %A must 
+                                 be equal to shape %A of the first element, except in the concatenation axis %d" 
+                                 aryIdx ary.Shape shp ax
+
+        // calculate shape of concatenated tensors
+        let totalSize = ts |> List.sumBy (fun ary -> ary.Shape.[ax])
+        let concatShape = shp |> List.set ax totalSize
+
+        // copy tensors into concatenated tensor
+        let cc = Tensor.NewOfType (concatShape, typ, dev)
+        let mutable pos = 0L
+        for ary in ts do
+            let aryLen = ary.Shape.[ax]
+            if aryLen > 0L then
+                let ccRng = 
+                    List.init shp.Length (fun idx ->
+                        if idx = ax then Rng.Rng (Some pos, Some (pos + aryLen - 1L))
+                        else Rng.All)
+                cc.[ccRng] <- ary
+                pos <- pos + aryLen
+        cc
 
 /// <summary>An N-dimensional array with elements of type 'T.</summary>
 /// <typeparam name="'T">The type of the data stored within the tensor.</typeparam>
@@ -4025,6 +4067,9 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         member a.DiagMatAxis ax1 ax2 = Tensor<'T>.diagMatAxis ax1 ax2 a :> ITensor
         member a.DiagMat () = Tensor<'T>.diagMat a :> ITensor
 
+        member a.DiffAxis ax = Tensor<'T>.diffAxis ax a :> ITensor
+
+
     /// <summary>Tests for equality to another object.</summary>
     /// <param name="other">The other object.</param>
     /// <returns>true if the objects are equal. Otherwise false.</returns>
@@ -4833,37 +4878,8 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// </remarks>    
     /// <seealso cref="ofBlocks"/>
     static member concat (ax: int) (ts: Tensor<'T> seq) =
-        let ts = List.ofSeq ts
-        if List.isEmpty ts then
-            invalidArg "ts" "Cannot concatenate empty sequence of tensors."
-
-        // check for compatibility
-        let shp = ts.Head.Shape
-        if not (0 <= ax && ax < shp.Length) then
-            invalidArg "ax" "Concatenation axis %d is out of range for shape %A." ax shp
-        for aryIdx, ary in List.indexed ts do
-            if List.without ax ary.Shape <> List.without ax shp then
-                invalidArg "ts" "Concatentation element with index %d with shape %A must 
-                                 be equal to shape %A of the first element, except in the concatenation axis %d" 
-                                 aryIdx ary.Shape shp ax
-
-        // calculate shape of concatenated tensors
-        let totalSize = ts |> List.sumBy (fun ary -> ary.Shape.[ax])
-        let concatShape = shp |> List.set ax totalSize
-
-        // copy tensors into concatenated tensor
-        let cc = Tensor(concatShape, ts.Head.Dev)
-        let mutable pos = 0L
-        for ary in ts do
-            let aryLen = ary.Shape.[ax]
-            if aryLen > 0L then
-                let ccRng = 
-                    List.init shp.Length (fun idx ->
-                        if idx = ax then Rng.Rng (Some pos, Some (pos + aryLen - 1L))
-                        else Rng.All)
-                cc.[ccRng] <- ary
-                pos <- pos + aryLen
-        cc
+        let ts = ts |> Seq.map (fun t -> t :> ITensor)
+        ITensor.concat ax ts :?> Tensor<'T>
 
     /// <summary>Repeats the tensor along an axis.</summary>
     /// <param name="ax">The axis to repeat along.</param>        
