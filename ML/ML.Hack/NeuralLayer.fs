@@ -7,7 +7,8 @@ open Tensor.Expr
 
 
 /// Activation functions.
-type ActivationFunc =
+[<RequireQualifiedAccess>]
+type ActFunc =
     /// tanh transfer function
     | Tanh
     /// sigmoid transfer function
@@ -32,7 +33,7 @@ with
 
     /// sigmoid activation function
     static member sigmoid (x: Expr<'T>) =
-        let one = Expr<_>.scalar x.Dev (conv<'T> 1)
+        let one = Expr.scalar x.Dev (conv<'T> 1)
         let two = Expr.scalar x.Dev (conv<'T> 2)
         (tanh (x / two) + one) / two
 
@@ -51,48 +52,104 @@ with
 
     /// Rectifier Unit function: max(x, 0)
     static member relu (x: Expr<'T>) =
-        x |> Expr.zerosLike |> Expr.maxElemwise x
+        let zeros = Expr.zeros x.Dev x.Shape
+        Expr.maxElemwise zeros x
 
     /// applies the specified activation function
-    static member apply af (x: Expr<'T>) =
-        match af with
-        | Tanh       -> ActivationFunc.tanh x
-        | Sigmoid    -> ActivationFunc.sigmoid x
-        | SoftMax    -> ActivationFunc.softmax x
-        | LogSoftmax -> ActivationFunc.logSoftmax x
-        | Relu       -> ActivationFunc.relu x
-        | Identity   -> ActivationFunc.id x
+    static member apply actFunc (x: Expr<'T>) =
+        match actFunc with
+        | Tanh       -> ActFunc.tanh x
+        | Sigmoid    -> ActFunc.sigmoid x
+        | SoftMax    -> ActFunc.softmax x
+        | LogSoftmax -> ActFunc.logSoftmax x
+        | Relu       -> ActFunc.relu x
+        | Identity   -> ActFunc.id x
+
 
 /// Regularization expressions.
-module Regularization =
+module Regul =
 
-    let lqRegularization (weights:Expr) (q:int) =
-        Expr.sum (abs(weights) *** (single q))
-
-    let l1Regularization weights =
-        lqRegularization weights 1
-
-    let l2Regularization weights =
-        lqRegularization weights 1
+    let lRegul (fac: float) (q: float) (w: Expr<'T>) =
+        if fac <> 0.0 then 
+            Expr.scalar w.Dev (conv<'T> fac) * Expr.sum (abs w *** Expr.scalar w.Dev (conv<'T> q))
+        else
+            Expr.scalar w.Dev (conv<'T> 0)
 
 
 
-/// Neural layer hyper-parameters.
-type HyperPars = {
-    /// number of inputs
-    NInput:             SizeSpec
-    /// number of outputs
-    NOutput:            SizeSpec
-    /// transfer (activation) function
-    TransferFunc:       ActivationFunc
-    /// weights trainable
-    WeightsTrainable:   bool
-    /// bias trainable
-    BiasTrainable:      bool
-    /// l1 regularization weight
-    L1Regularization:   single option
-    /// l2 regularization weight
-    L2Regularization:   single option
-}
+/// A layer of neurons (perceptrons).
+module NeuralLayer = 
+
+    /// Neural layer hyper-parameters.
+    type HyperPars = {
+        /// number of inputs
+        NInput:             SizeSpec
+        /// number of outputs
+        NOutput:            SizeSpec
+        /// transfer (activation) function
+        ActFunc:            ActFunc
+        /// l1 regularization weight
+        L1Regul:            float 
+        /// l2 regularization weight
+        L2Regul:            float 
+    }
 
 
+    let defaultHyperPars = {
+        NInput     = SizeSpec.fix 0L
+        NOutput    = SizeSpec.fix 0L
+        ActFunc    = ActFunc.Tanh
+        L1Regul    = 0.0
+        L2Regul    = 0.0
+    }
+
+
+    /// Neural layer parameters.
+    type Pars<'T> = {
+        /// expression for the weights
+        Weights:        Expr<'T>
+        /// expression for the biases
+        Bias:           Expr<'T>
+        /// hyper-parameters
+        HyperPars:      HyperPars
+    }
+
+    let internal initWeights seed (shp: int64 list) : Tensor<'T> = 
+        let rng = System.Random seed
+        let fanOut = shp.[0] |> float
+        let fanIn = shp.[1] |> float
+        let r = 4.0 * sqrt (6.0 / (fanIn + fanOut)) 
+        HostTensor.randomUniform rng (conv<'T> -r, conv<'T> r) shp
+        
+    let internal initBias seed (shp: int64 list) : Tensor<'T> =
+        HostTensor.zeros shp
+
+    /// Creates the parameters for the neural-layer in the supplied
+    /// model builder `mb` using the hyper-parameters `hp`.
+    /// The weights are initialized using random numbers from a uniform
+    /// distribution with support [-r, r] where
+    /// r = 4 * sqrt (6 / (hp.NInput + hp.NOutput)).
+    /// The biases are initialized to zero.
+    //let pars (mb: ModelBuilder<_>) hp = {
+    //    Weights   = mb.Param ("Weights", [hp.NOutput; hp.NInput], initWeights)
+    //    Bias      = mb.Param ("Bias",    [hp.NOutput],            initBias)
+    //    HyperPars = hp
+    //}
+
+    /// Returns an expression for the output (predictions) of the
+    /// neural layer with parameters `pars` given the input `input`.
+    /// If the soft-max transfer function is used, the normalization
+    /// is performed over axis 0.
+    let pred (pars: Pars<'T>) (input: Expr<'T>) =
+        // weights [outUnit, inUnit]
+        // bias    [outUnit]
+        // input   [smpl, inUnit]
+        // pred    [smpl, outUnit]
+        let act = input .* pars.Weights.T + pars.Bias
+        ActFunc.apply pars.HyperPars.ActFunc act
+
+    /// The regularization term for this layer.
+    let regul (pars: Pars<'T>) =
+        let l1reg = Regul.lRegul pars.HyperPars.L1Regul 1.0 pars.Weights
+        let l2reg = Regul.lRegul pars.HyperPars.L2Regul 2.0 pars.Weights
+        l1reg + l2reg

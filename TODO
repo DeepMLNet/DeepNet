@@ -75,3 +75,8 @@
 
 - Deriving Expr<'T> from Expr is not possible, because compiler sees both methods as overloads and cannot resolve them anymore
 => Get rid of inheritiance and instead add function to convert to untyped expression
+
+
+- first step is to continue writing the model
+
+-
