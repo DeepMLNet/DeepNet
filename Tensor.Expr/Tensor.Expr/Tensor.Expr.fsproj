@@ -24,7 +24,6 @@
     <Compile Include="Data/Var.fs" />
     <Compile Include="Data/VarEnv.fs" />
     <Compile Include="Data\Data.fs" />
-    <Compile Include="Data\UninstData.fs" />
     <Compile Include="Elem/Expr.fs" />
     <Compile Include="Elem/Unified.fs" />
     <Compile Include="Elem/Interpreter.fs" />

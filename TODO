@@ -80,3 +80,10 @@
 - first step is to continue writing the model
 
 - now try to use the model
+
+- how to handle initialization seed?
+- well, perhaps we don't need to care?
+
+- but now the prediction function is using the uninstated graph, even if we instantiate everything...
+- that is a problem with immutability
+- and instantiating two times is also bad, since this will create two different tensors

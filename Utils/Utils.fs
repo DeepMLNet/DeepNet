@@ -89,6 +89,13 @@ module internal Map =
         |> Seq.map fst
         |> Set.ofSeq
 
+    /// Set of all values contained in the map.
+    let values m =
+        m
+        |> Map.toSeq
+        |> Seq.map snd
+        |> Set.ofSeq
+
 
 /// Functions for working with permutations.
 module internal Permutation =

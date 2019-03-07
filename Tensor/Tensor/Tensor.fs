@@ -1135,6 +1135,16 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     member trgt.FillConst (value: 'T) =
         trgt.Backend.FillConst (value=value, trgt=trgt)
 
+    /// <summary>Fills this tensor with zeros.</summary>
+    /// <seealso cref="zeros"/>
+    member trgt.FillZeros () =
+        trgt.FillConst zero<'T>
+
+    /// <summary>Fills this tensor with ones.</summary>
+    /// <seealso cref="ones"/>
+    member trgt.FillOnes () =
+        trgt.FillConst one<'T>
+
     /// <summary>Fills this vector with an equispaced sequence of elements.</summary>
     /// <param name="start">The starting value.</param>
     /// <param name="incr">The increment between successive elements.</param>    

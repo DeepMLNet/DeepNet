@@ -135,43 +135,23 @@ type DataArg = { Data: Data } with
         member this.Check () = ()
         member this.Channels = Ch.onlyOne
         member this.Devs = 
-            this.Data.Value.Dev |> Ch.only
-        member this.TypeNames = 
-            TypeName.ofTypeInst this.Data.Value.DataType |> Ch.only
-        member this.Shapes = 
-            this.Data.Value.Shape |> List.map SizeSpec.fix |> Ch.only
-        member this.Args = Map.empty
-        member this.ReplaceArgs args = this :> _
-        member this.SubstSymSizes env = this :> _
-        member this.CanEvalAllSymSizes = true
-        member this.Eval env argVals = 
-            this.Data.Value |> Ch.only       
-
-    interface IOpFormat with
-        member this.Text =
-            sprintf "%A" this.Data
-
-
-/// Uninstantiated data.
-type UninstDataArg = { Data: UninstData } with
-    interface IOp with       
-        member this.Check () = ()
-        member this.Channels = Ch.onlyOne
-        member this.Devs = 
             this.Data.Dev |> Ch.only
         member this.TypeNames = 
-            this.Data.TypeName |> Ch.only
+            TypeName.ofTypeInst this.Data.DataType |> Ch.only
         member this.Shapes = 
             this.Data.Shape |> Ch.only
         member this.Args = Map.empty
         member this.ReplaceArgs args = this :> _
         member this.SubstSymSizes env = 
-            {this with Data={this.Data with Shape=this.Data.Shape |> ShapeSpec.substSymbols env}} :> _
+            {Data = this.Data |> Data.substSymSizes env} :> _
         member this.CanEvalAllSymSizes = 
-            ShapeSpec.canEval this.Data.Shape
-        member this.Eval env argVals = 
-            failwithf "Cannot evaluate uninstantiated data %A." this.Data       
+            this.Data |> Data.canEvalAllSymSizes
+        member this.Eval env argVals =
+            this.Data.Check ()
+            this.Data.InstValue |> Ch.only       
 
     interface IOpFormat with
         member this.Text =
             sprintf "%A" this.Data
+
+

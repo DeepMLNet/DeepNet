@@ -4,8 +4,13 @@ open DeepNet.Utils
 
 
 /// A symbolic size.
-[<Struct; StructuredFormatDisplay ("\"{Name}\"")>]
+[<Struct; StructuredFormatDisplay("{Pretty}")>]
 type SizeSymbol = SizeSymbol of string with
+
+    /// pretty string
+    member this.Pretty = 
+        let (SizeSymbol name) = this
+        sprintf "\"%s\"" name
 
     /// identifier
     static member name (SizeSymbol name) = name
@@ -16,7 +21,7 @@ type SizeSymbol = SizeSymbol of string with
 
 /// Elementary size specification
 /// Can be either a symbol or a fixed quantity.
-[<RequireQualifiedAccess; StructuredFormatDisplay ("{Pretty}")>]
+[<RequireQualifiedAccess; StructuredFormatDisplay("{Pretty}")>]
 type BaseSize =
     /// symbolic size
     | Sym of SizeSymbol

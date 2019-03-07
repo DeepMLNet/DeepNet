@@ -159,10 +159,42 @@ type IVarContainingOp =
     abstract Vars: Set<Var>
 
 
+/// An op that contains data.
+type IDataContainingOp =
+    /// Data contained in that op.
+    abstract Data: Set<Data>
+
+
 /// An op that has a custom print format.
 type IOpFormat =
     /// Text to output for this op when expression is printed.
     abstract Text: string
+
+
+module private BaseExprTools =
+
+    let collectMap (getOp: IOp -> 'V seq) (getExpr: BaseExpr -> Map<'K,'V>) (getKey: 'V -> 'K) (op: IOp) =
+        let add (map: Map<'K, 'V>) (value: 'V) =
+            match map |> Map.tryFind (getKey value) with
+            | Some otherVar when otherVar = value -> map
+            | Some otherVar ->
+                failwithf "Expression is inconsistent in %A with specifications %A and %A."
+                    (getKey value) value otherVar
+            | None -> map |> Map.add (getKey value) value
+
+        let merge (a: Map<'K, 'V>) b =
+            (a, Map.toSeq b)||> Seq.fold (fun map (key, value) -> add map value)
+
+        let opMap = (Map.empty, getOp op) ||> Seq.fold add
+        let argMaps = 
+            op.Args
+            |> Map.toSeq
+            |> Seq.map (fun (_, BaseExprCh (_, argExpr)) -> getExpr argExpr)
+
+        if Seq.isEmpty argMaps then 
+            opMap
+        else
+            Seq.append argMaps [opMap] |> Seq.reduce merge
 
 
 
@@ -181,30 +213,22 @@ type BaseExpr private (op: IOp) =
     let _devs = lazy (op.Devs)
 
     let _varMap = 
-        let add (m: Map<VarName, Var>) (var: Var) =
-            match m |> Map.tryFind var.Name with
-            | Some otherVar when otherVar = var -> m
-            | Some otherVar ->
-                failwithf "Expression contains inconsistent variable %A with specifications %A and %A."
-                          var.Name var otherVar
-            | None -> m |> Map.add var.Name var
-        let merge (a: Map<VarName, Var>) b =
-            (a, Map.toSeq b)||> Seq.fold (fun m (varName, var) -> add m var)
-
-        let opVarSet =
+        let getOp (op: IOp) =
             match op with
-            | :? IVarContainingOp as op -> op.Vars
-            | _ -> Set.empty
-        let opVars = (Map.empty, Set.toSeq opVarSet) ||> Seq.fold add
-        let argVars = 
-            op.Args
-            |> Map.toSeq
-            |> Seq.map (fun (_, BaseExprCh (_, argExpr)) -> argExpr.VarMap)
+            | :? IVarContainingOp as op -> Set.toSeq op.Vars
+            | _ -> Seq.empty
+        let getExpr (expr: BaseExpr) = expr.VarMap
+        let getKey (var: Var) = var.Name
+        BaseExprTools.collectMap getOp getExpr getKey op
 
-        if Seq.isEmpty argVars then 
-            opVars
-        else
-            Seq.append argVars [opVars] |> Seq.reduce merge
+    let _dataMap = 
+        let getOp (op: IOp) =
+            match op with
+            | :? IDataContainingOp as op -> Set.toSeq op.Data
+            | _ -> Seq.empty
+        let getExpr (expr: BaseExpr) = expr.DataMap
+        let getKey (data: Data) = data.Name
+        BaseExprTools.collectMap getOp getExpr getKey op
 
     let _canEvalAllSymSizes = lazy (
         let argsEvalable =
@@ -274,12 +298,16 @@ type BaseExpr private (op: IOp) =
     static member isSingleChannel (expr: BaseExpr) = expr.IsSingleChannel
     
     /// Returns all variables contained in an op and its arguments as a map from variable name to variable.
-    member private this.VarMap = _varMap
+    member this.VarMap = _varMap
 
     /// Returns all variables contained in an op and its arguments.
-    member this.Vars = this.VarMap |> Map.toSeq |> Seq.map snd |> Set.ofSeq
+    member this.Vars = this.VarMap |> Map.values
     /// Returns all variables contained in an op and its arguments.
     static member vars (expr: BaseExpr) = expr.Vars
+
+    member this.DataMap = _dataMap
+
+    member this.Data = this.DataMap |> Map.values
 
     /// Returns true, if all symbolic sizes of the op and its arguments can be evaluated to numeric values.
     member this.CanEvalAllSymSizes = _canEvalAllSymSizes.Force()

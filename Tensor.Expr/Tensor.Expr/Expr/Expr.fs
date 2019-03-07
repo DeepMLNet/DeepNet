@@ -37,9 +37,6 @@ type Expr<'T> (baseExpr: BaseExpr) =
     new (data: Data<'T>) =
         Expr<'T> (UExpr data.Untyped)
 
-    new (uninstData: UninstData<'T>) =
-        Expr<'T> (UExpr uninstData.Untyped)
-
     member this.Untyped = UExpr baseExpr
     static member untyped (expr: Expr<'T>) = expr.Untyped
 
@@ -77,8 +74,17 @@ type Expr<'T> (baseExpr: BaseExpr) =
     member this.Arg (arg: Arg) : Expr<'A> = Expr<'A> baseExpr.Args.[arg]
     static member arg (arg: Arg) (expr: Expr<'T>) = expr.Arg arg
 
+    member this.VarMap = baseExpr.VarMap
+    static member varMap (expr: Expr<'T>) = expr.VarMap
+
     member this.Vars = this.Untyped.Vars
     static member vars (expr: Expr<'T>) = expr.Vars
+
+    member this.DataMap = baseExpr.DataMap
+    static member dataMap (expr: Expr<'T>) = expr.DataMap
+
+    member this.Data = baseExpr.Data
+    static member data (expr: Expr<'T>) = expr.Data
 
     member this.CanEvalAllSymSizes = this.Untyped.CanEvalAllSymSizes
     static member canEvalAllSymSizes (expr: Expr<'T>) = expr.CanEvalAllSymSizes

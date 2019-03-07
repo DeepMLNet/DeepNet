@@ -54,9 +54,6 @@ type UExpr (baseExpr: BaseExpr) =
     new (data: Data) =
         UExpr {DataArg.Data=data}
 
-    new (uninstData: UninstData) =
-        UExpr {UninstDataArg.Data=uninstData}
-
     member this.BaseExpr = baseExpr
     static member baseExpr (expr: UExpr) = expr.BaseExpr
 
@@ -87,8 +84,17 @@ type UExpr (baseExpr: BaseExpr) =
     member this.Args = baseExpr.Args |> Map.map (fun _ arg -> UExpr arg)
     static member args (expr: UExpr) = expr.Args
 
+    member this.VarMap = baseExpr.VarMap
+    static member varMap (expr: UExpr) = expr.VarMap
+
     member this.Vars = baseExpr.Vars
     static member vars (expr: UExpr) = expr.Vars
+
+    member this.DataMap = baseExpr.DataMap
+    static member dataMap (expr: UExpr) = expr.DataMap
+
+    member this.Data = baseExpr.Data
+    static member data (expr: UExpr) = expr.Data
 
     member this.CanEvalAllSymSizes = baseExpr.CanEvalAllSymSizes
     static member canEvalAllSymSizes (expr: UExpr) = expr.CanEvalAllSymSizes
@@ -795,6 +801,20 @@ type UExpr (baseExpr: BaseExpr) =
         let evalEnv : EvalEnv = {VarEnv=varEnv; Tracer=NoTracer()}
         UExpr.evalWithEnv evalEnv expr
 
+    /// Instantiates all data contained in the expression.
+    static member instData (expr: UExpr) =
+        for data in expr.Data do
+            data |> Data.inst
+
+    /// Instantiates all data contained in the expression.
+    static member instDataOnce (expr: UExpr) =
+        for data in expr.Data do
+            data |> Data.instOnce        
+
+    /// Initializes all data contained in the expression.
+    static member initData (expr: UExpr) =
+        for data in expr.Data do
+            data |> Data.init    
 
 
 

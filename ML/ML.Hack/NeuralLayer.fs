@@ -93,9 +93,9 @@ module NeuralLayer =
         /// l2 regularization weight
         L2Regul:            float 
     } with 
-        static member standard: HyperPars<'T> = {
-            NInput     = SizeSpec.fix 0L
-            NOutput    = SizeSpec.fix 0L
+        static member standard nInput nOutput : HyperPars<'T> = {
+            NInput     = nInput
+            NOutput    = nOutput
             ActFunc    = ActFunc.Tanh
             L1Regul    = 0.0
             L2Regul    = 0.0
@@ -112,15 +112,16 @@ module NeuralLayer =
         HyperPars:      HyperPars<'T>
     }
 
-    let internal initWeights seed (shp: int64 list) : Tensor<'T> = 
-        let rng = System.Random seed
-        let fanOut = shp.[0] |> float
-        let fanIn = shp.[1] |> float
-        let r = 4.0 * sqrt (6.0 / (fanIn + fanOut)) 
-        HostTensor.randomUniform rng (conv<'T> -r, conv<'T> r) shp
+    let internal initWeights (rng: System.Random) (weights: Tensor<'T>) = 
+        let fanOut = weights.Shape.[0] |> float
+        let fanIn = weights.Shape.[1] |> float
+        let r = 4.0 * sqrt (6.0 / (fanIn + fanOut))
+        let weightsHost = 
+            HostTensor.randomUniform rng (conv<'T> -r, conv<'T> r) weights.Shape
+        weights.TransferFrom weightsHost
         
-    let internal initBias seed (shp: int64 list) : Tensor<'T> =
-        HostTensor.zeros shp
+    let internal initBias (rng: System.Random) (bias: Tensor<'T>) =
+        bias.FillZeros ()
 
     /// Creates the parameters for the neural-layer in the supplied
     /// model builder `mb` using the hyper-parameters `hp`.
@@ -128,11 +129,9 @@ module NeuralLayer =
     /// distribution with support [-r, r] where
     /// r = 4 * sqrt (6 / (hp.NInput + hp.NOutput)).
     /// The biases are initialized to zero.
-    let pars (ctx: Context) (hp: HyperPars<'T>) = {
-        //Weights   = mb.Param ("Weights", [hp.NOutput; hp.NInput], initWeights)
-        //Bias      = mb.Param ("Bias",    [hp.NOutput],            initBias)
-        Weights     = Expr (UninstData<'T> (ctx / "Weights", [hp.NOutput; hp.NInput]))
-        Bias        = Expr (Var<'T> (ctx / "Bias",    [hp.NOutput]))
+    let pars (ctx: Context) rng (hp: HyperPars<'T>) = {
+        Weights     = Expr (Data<'T> (ctx / "Weights", [hp.NOutput; hp.NInput], initWeights rng))
+        Bias        = Expr (Data<'T> (ctx / "Bias",    [hp.NOutput],            initBias rng))
         HyperPars   = hp
     }
 
@@ -159,15 +158,17 @@ module NeuralLayer =
 module User =
 
     let build() =
+        let rng = System.Random 1
         let ctx = Context.root HostTensor.Dev
         let nSamples = SizeSpec.symbol "nSamples"
         let nFeatures = SizeSpec.symbol "nFeatures"
+        let nOutputs = SizeSpec.symbol "nOutputs"
         let inputVar = Var<float32> (ctx / "input", [nSamples; nFeatures])
         let input = Expr inputVar
-        let hyperPars = NeuralLayer.HyperPars.standard
-        let pars = NeuralLayer.pars ctx hyperPars
+        let hyperPars = NeuralLayer.HyperPars.standard nFeatures nOutputs
+        let pars = NeuralLayer.pars ctx rng hyperPars
         let pred = NeuralLayer.pred pars input
-        printfn "%A" pred
+        printfn "%s" (pred.ToString())
 
         // Now, no way to initialize pars.
         // Cannot create data when expr is constructed, because sizes are not known.

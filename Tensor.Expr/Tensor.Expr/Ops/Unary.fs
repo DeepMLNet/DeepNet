@@ -424,7 +424,9 @@ type PermuteAxes = {X: BaseExprCh; Permutation: int list} with
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.unaryX argVals) |> ITensor.permuteAxes this.Permutation |> Ch.only
-
+    interface IOpFormat with
+        member this.Text =
+            sprintf "PermuteAxes%A" this.Permutation
 
 /// Read a slice from a tensor.
 type Subtensor = {X: BaseExprCh; Range: SimpleRangesSpec} with
