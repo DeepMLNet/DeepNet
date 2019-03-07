@@ -25,6 +25,14 @@ module internal SpecialIdx =
     let NotFound = Int64.MinValue + 4L
 
 
+/// Shape type.
+type Shape = int64 list
+
+/// Shape constants.
+module Shape =
+    /// Shape of a scalar (0-dimensional tensor).
+    let scalar: Shape = []
+
 
 /// Range over a dimension of a tensor.
 [<RequireQualifiedAccess; StructuredFormatDisplay("{Pretty}")>]

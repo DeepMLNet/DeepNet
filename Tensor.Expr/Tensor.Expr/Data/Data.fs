@@ -186,8 +186,16 @@ type Data<'T> (data: Data) =
         Data<'T> (Data.from (name, typeof<'T>, dev, shape, ?init=init))
 
     /// Create uninstantiated data.
-    new (ctx: Context, shape, ?init) =
+    new (ctx: Context, shape: ShapeSpec, ?init) =
         Data<'T> (DataName ctx.Path, ctx.Dev, shape, ?init=init)
+
+    /// Creates instantiated and initialized data of the specified shape.
+    new (ctx: Context, shape: int64 list, ?init) =
+        let value = Tensor<'T>.zeros ctx.Dev shape
+        match init with
+        | Some init -> init value
+        | None -> ()
+        Data<'T> (ctx, value, ?init=init)
 
     interface System.IEquatable<Data<'T>> with
         member this.Equals other = this.Untyped = other.Untyped

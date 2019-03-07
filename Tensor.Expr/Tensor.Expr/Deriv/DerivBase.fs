@@ -27,6 +27,9 @@ type Deriv = private {
     /// The derivatives w.r.t. the variables occuring in the expression.
     /// They are of the shape _FunElems x (shape of variable).
     _WrtVar:     Map<Var, UExpr>
+    /// The derivatives w.r.t. the data occuring in the expression.
+    /// They are of the shape _FunElems x (shape of data).
+    _WrtData:    Map<Data, UExpr>
 } with
 
     static member private log = Log "Deriv"
@@ -34,18 +37,23 @@ type Deriv = private {
     static member private add (x: BaseExprCh) (y: BaseExprCh) =
         (UExpr x) + (UExpr y) |> UExpr.baseExprCh
 
+
     /// Merges two derivative maps by summing derivatives for variables they both have in common.
     static member merge (a: Deriv) (b: Deriv) : Deriv =
         if a.FunElems <> b.FunElems then
             failwithf "Cannot merge derivatives with different number of function elements: %A and %A."
                       a.FunElems b.FunElems
-        let derivs =
-            (a._WrtVar, b._WrtVar)
+        let mergeMap a b =
+            (a, b)
             ||> Map.fold (fun m v vg -> 
                 match Map.tryFind v m with
                 | Some ovg -> m |> Map.add v (vg + ovg)
                 | None -> m |> Map.add v vg) 
-        {_FunElems=a.FunElems; _WrtVar=derivs}
+        {
+            _FunElems=a.FunElems
+            _WrtVar=mergeMap a._WrtVar b._WrtVar
+            _WrtData=mergeMap a._WrtData b._WrtData
+        }
 
 
     /// Computes the derivatives of all arguments of an expression given the derivative of the expression.
@@ -65,7 +73,7 @@ type Deriv = private {
 
 
     /// Computes the derivatives of the specified expression w.r.t. all variables occuring in it.
-    static member baseCompute (rootDeriv: Map<Ch, BaseExprCh>) (rootExpr: BaseExpr) : Map<Var, BaseExprCh> =
+    static member baseCompute (rootDeriv: Map<Ch, BaseExprCh>) (rootExpr: BaseExpr) =
         
         // build expression info 
         let exprInfo = BaseExprGroup [rootExpr]
@@ -116,21 +124,25 @@ type Deriv = private {
 
         // process derivatives in loop
         let mutable varDerivs = Map.empty
+        let mutable dataDerivs = Map.empty
         while exprsWithFullDeriv.Count > 0 do
             // get op with computed derivative
             let expr = exprsWithFullDeriv.Dequeue ()
+            let exprDeriv = incomingDeriv.[expr]
 
             match UExpr expr with
             | UExpr.VarArg vs ->
                 // arrived at a variable: save its derivative
-                varDerivs <- varDerivs |> Map.add vs incomingDeriv.[expr].[Ch.Default]
+                varDerivs <- varDerivs |> Map.add vs exprDeriv.[Ch.Default]
+            | UExpr.DataArg ds ->
+                dataDerivs <- dataDerivs |> Map.add ds exprDeriv.[Ch.Default]
             | _ -> 
                 // propagate derivative to arguments of op
-                let argDerivs = Deriv.derivOp expr incomingDeriv.[expr]
+                let argDerivs = Deriv.derivOp expr exprDeriv
                 for KeyValue(arg, argDeriv) in argDerivs do
                     transmitDeriv expr arg argDeriv
 
-        varDerivs
+        varDerivs, dataDerivs
 
 
     /// Computes the derivative expression w.r.t. all variables occuring in it using the specified
@@ -145,12 +157,13 @@ type Deriv = private {
 
         Deriv.log.Info "Comptuing derivatives for %A with root derivative %A" rootExpr rootDeriv
         let sw = Stopwatch.StartNew()
-        let varDerivs = Deriv.baseCompute rootDeriv rootExpr.BaseExpr
+        let varDerivs, dataDerivs = Deriv.baseCompute rootDeriv rootExpr.BaseExpr
         Deriv.log.Info "Computing derivatives took %A" sw.Elapsed
 
         {
             _FunElems = funElems
             _WrtVar = varDerivs |> Map.map (fun _ deriv -> UExpr deriv)
+            _WrtData = dataDerivs |> Map.map (fun _ deriv -> UExpr deriv)
         }    
 
 
@@ -179,6 +192,19 @@ type Deriv = private {
     /// Returns the derivatives of the specified typed variable.
     member this.Wrt (var: Var<'T>) = 
         this.Wrt var.Untyped |> Expr<'T>
+
+
+    /// Returns the derivatives of the specified untyped data.
+    member this.Wrt (data: Data) = 
+        match this._WrtData |> Map.tryFind data with
+        | Some d -> d
+        | None -> 
+            UExpr.zeros data.DataType data.Dev [this.FunElems; ShapeSpec.nElem data.Shape]
+
+
+    /// Returns the derivatives of the specified typed data.
+    member this.Wrt (data: Data<'T>) = 
+        this.Wrt data.Untyped |> Expr<'T>
 
 
     /// Number of function elements.

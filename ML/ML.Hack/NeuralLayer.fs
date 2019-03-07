@@ -170,7 +170,6 @@ module User =
         let pred = NeuralLayer.pred pars input
         printfn "%s" (pred.ToString())
 
-        // Now, no way to initialize pars.
-        // Cannot create data when expr is constructed, because sizes are not known.
-        // 
+        // next step: calculate derivatives and get optimizer working.
+
         ()

@@ -1,8 +1,10 @@
 namespace Tensor
 
 
-/// <summary>Special constants that can be passed instead of indicies or parameter values or be returned 
-/// from methods.</summary>
+/// <summary>
+/// Special constants that can be passed instead of indicies or parameter values or be returned 
+/// from methods.
+/// </summary>
 [<AutoOpen>]
 module TensorVal =
 

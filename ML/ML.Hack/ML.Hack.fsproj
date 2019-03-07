@@ -7,6 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Adam.fs" />
     <Compile Include="NeuralLayer.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

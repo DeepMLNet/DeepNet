@@ -37,6 +37,11 @@ module UExpr =
         | VarArg v -> v
         | _ -> failwithf "Not an expression consisting solely of a variable."
 
+    let (|DataArg|_|) (expr: UExpr) =
+        match expr.Op with
+        | :? DataArg as this -> Some this.Data
+        | _ -> None
+
     let (|UnaryPlus|_|) (expr: UExpr) =
         match expr.Op with
         | :? UnaryPlus as this -> Some (UExpr this.X)
