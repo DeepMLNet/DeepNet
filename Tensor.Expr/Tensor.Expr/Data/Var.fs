@@ -7,32 +7,18 @@ open Tensor.Backend
 
 /// Variable name.
 [<Struct; StructuredFormatDisplay("{Pretty}")>]
-type VarName = VarName of VarPath * string with
+type VarName = VarName of ContextPath with
 
     /// Pretty string.
     member this.Pretty =
-        let (VarName (context, name)) = this
-        context.Parts @ [name] |> String.concat "/"
+        let (VarName cp) = this
+        cp.Pretty
 
     /// Unique variable path string.
     member this.Str =
-        let (VarName (context, name)) = this
-        context.Parts @ [name] 
-        |> List.map (fun part -> "[" + part + "]")
-        |> String.concat "/"        
+        let (VarName cp) = this
+        cp.Str  
 
-    /// Create variable name from context and name.
-    static member from (vp: VarPath, name: string) =
-        VarName (vp, name)
-
-    /// Create variable name in root context.
-    static member from (name: string) = 
-        VarName (VarPath.root, name)
-
-    /// Create variable name by treating last part of context as variable name.
-    static member from (vp: VarPath) =
-        let ctx, name = VarPath.splitLast vp
-        VarName (ctx, name)
 
 
 /// Variable specification (not generic over data type).
@@ -64,7 +50,7 @@ type Var = {
 
     /// Create variable using context, data type and shape.
     static member make (ctx: Context, dataType, shape) : Var =
-        {Name=VarName.from ctx.Path; TypeName=TypeName.ofTypeInst dataType; Shape=shape; Dev=ctx.Dev}
+        {Name=VarName ctx.Path; TypeName=TypeName.ofTypeInst dataType; Shape=shape; Dev=ctx.Dev}
 
     /// name of variable
     static member name (vs: Var) = vs.Name
@@ -89,23 +75,87 @@ type Var = {
         {vs with Shape=SymSizeEnv.substShape symSizes vs.Shape} 
 
 
-[<StructuralComparison; StructuralEquality>]
-type Data = {
-    Name:    VarName
-    /// data type
-    TypeName:  TypeName
-    /// storage device
-    Dev:       ITensorDevice
-    /// symbolic shape
-    Shape:     ShapeSpec
-    Value:   OrdRef<ITensor> option
-    Init:   OrdRef<ITensor -> unit>
-} with
 
-    static member inst (data: Data) =
-        let shp = ShapeSpec.eval data.Shape
-        let value = Tensor.NewOfType (shp, data.TypeName.Type, data.Dev)
-        data.Init.Value value 
-        {data with Value=Some (OrdRef value)}
+/// Variable specification.
+[<StructuredFormatDisplay("{Pretty}")>]
+type Var<'T> (_var: Var) =
+    do
+        if typeof<'T> <> _var.DataType then
+            failwithf "Cannot use Var<%A> for variable of data type %A."
+                      typeof<'T> _var.DataType
 
+    /// Non-generic variable specification.
+    member this.Untyped = _var
+
+    /// Create variable using name, shape and storage device.
+    new (name, dev, shape) =
+        Var<'T> ({Name=name; TypeName=TypeName.ofType<'T>; Dev=dev; Shape=shape})
+
+    /// Create variable using context and shape.
+    new (ctx: Context, shape) =
+        Var<'T> ({Name=VarName ctx.Path; TypeName=TypeName.ofType<'T>; Dev=ctx.Dev; Shape=shape})
+
+    interface System.IEquatable<Var<'T>> with
+        member this.Equals other = this.Untyped = other.Untyped
+
+    override this.Equals other =
+        match other with
+        | :? Var<'T> as other -> (this :> System.IEquatable<_>).Equals other
+        | _ -> false
+
+    interface System.IComparable<Var<'T>> with
+        member this.CompareTo other = compare this.Untyped other.Untyped
+
+    interface System.IComparable with
+        member this.CompareTo other =
+            match other with
+            | :? Var<'T> as other -> (this :> System.IComparable<_>).CompareTo other
+            | _ -> failwithf "Cannot compare %A to type %A." (this.GetType()) (other.GetType())
+
+    override this.GetHashCode() = hash this.Untyped
+        
+    /// name of variable
+    member this.Name = this.Untyped.Name
+    /// name of variable    
+    static member name (vs: Var<'T>) = vs.Name
+
+    /// storage device of variable
+    member this.Dev = this.Untyped.Dev
+    /// storage device of variable    
+    static member dev (vs: Var<'T>) = vs.Dev
+
+    /// shape of variable
+    member this.Shape = this.Untyped.Shape
+    /// shape of variable    
+    static member shape (vs: Var<'T>) = vs.Shape
+
+    /// data type of variable
+    member this.DataType = this.Untyped.DataType
+    /// type of variable
+    static member dataType (vs: Var<'T>) = vs.DataType
+
+    /// pretty string representation
+    member this.Pretty = this.Untyped.Pretty 
+
+    /// number of dimensions of variable
+    static member nDims vs = Var.shape vs |> ShapeSpec.nDim
+
+    /// substitutes the size symbol environment into the variable
+    static member substSymSizes symSizes (vs: Var<'T>) = 
+        vs.Untyped |> Var.substSymSizes symSizes |> Var<'T>
+
+
+
+    ///// gets variable by name
+    //static member tryFindByName (vs: Var) map =
+    //    map |> Map.tryPick 
+    //        (fun cvs value -> 
+    //            if Var.name cvs = Var.name vs then Some value
+    //            else None)
+
+    ///// gets variable by name
+    //static member findByName vs map =
+    //    match Var.tryFindByName vs map with
+    //    | Some value -> value
+    //    | None -> raise (System.Collections.Generic.KeyNotFoundException())
 

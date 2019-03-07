@@ -31,8 +31,14 @@ type Expr<'T> (baseExpr: BaseExpr) =
         Expr<'T> expr.BaseExpr
 
     /// Expression having the value of the specified variable.
-    static member var (var: Var<'T>) = 
-        UExpr.baseVar var.Var |> Expr<'T>
+    new (var: Var<'T>) = 
+        Expr<'T> (UExpr var.Untyped)
+
+    new (data: Data<'T>) =
+        Expr<'T> (UExpr data.Untyped)
+
+    new (uninstData: UninstData<'T>) =
+        Expr<'T> (UExpr uninstData.Untyped)
 
     member this.Untyped = UExpr baseExpr
     static member untyped (expr: Expr<'T>) = expr.Untyped

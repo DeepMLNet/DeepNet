@@ -14,13 +14,14 @@ let dumpExpr (expr: UExpr) =
 
 
 module Vars =
-    let a = Var<float32> ("a", HostTensor.Dev, [SizeSpec.fix 10L; SizeSpec.fix 20L])
-    let b = Var<float32> ("b", HostTensor.Dev, [SizeSpec.fix 10L; SizeSpec.fix 20L])
+    let ctx = Context.root HostTensor.Dev
+    let a = Var<float32> (ctx / "a", [SizeSpec.fix 10L; SizeSpec.fix 20L])
+    let b = Var<float32> (ctx / "b", [SizeSpec.fix 10L; SizeSpec.fix 20L])
 
 
 let ``Deriv: a + b`` () =
     printfn "Deriv a+b:"
-    let expr = Expr.var Vars.a + Expr.var Vars.b
+    let expr = Expr Vars.a + Expr Vars.b
     let derivs = Deriv.compute expr
     printfn "wrt a: %s" ((derivs.Wrt Vars.a).ToString())
     printfn "wrt b: %s" ((derivs.Wrt Vars.a).ToString())
@@ -28,7 +29,7 @@ let ``Deriv: a + b`` () =
 
 let ``Deriv: sin a * exp b`` () =
     printfn "Deriv sin a * exp b:"
-    let expr = sin (Expr.var Vars.a) * exp (Expr.var Vars.b)
+    let expr = sin (Expr Vars.a) * exp (Expr Vars.b)
     let derivs = Deriv.compute expr
     printfn "wrt a: %s" ((derivs.Wrt Vars.a).ToString())
     printfn "wrt b: %s" ((derivs.Wrt Vars.a).ToString())

@@ -129,22 +129,48 @@ type VarArg = { Var: Var } with
             sprintf "%A" this.Var
 
 
-/// Argument (placeholder for a variable).
+/// A reference to data.
 type DataArg = { Data: Data } with
     interface IOp with       
         member this.Check () = ()
         member this.Channels = Ch.onlyOne
-        member this.Devs = this.Data.Dev |> Ch.only
-        member this.TypeNames = this.Data.TypeName |> Ch.only
-        member this.Shapes = this.Data.Shape |> Ch.only
+        member this.Devs = 
+            this.Data.Value.Dev |> Ch.only
+        member this.TypeNames = 
+            TypeName.ofTypeInst this.Data.Value.DataType |> Ch.only
+        member this.Shapes = 
+            this.Data.Value.Shape |> List.map SizeSpec.fix |> Ch.only
+        member this.Args = Map.empty
+        member this.ReplaceArgs args = this :> _
+        member this.SubstSymSizes env = this :> _
+        member this.CanEvalAllSymSizes = true
+        member this.Eval env argVals = 
+            this.Data.Value |> Ch.only       
+
+    interface IOpFormat with
+        member this.Text =
+            sprintf "%A" this.Data
+
+
+/// Uninstantiated data.
+type UninstDataArg = { Data: UninstData } with
+    interface IOp with       
+        member this.Check () = ()
+        member this.Channels = Ch.onlyOne
+        member this.Devs = 
+            this.Data.Dev |> Ch.only
+        member this.TypeNames = 
+            this.Data.TypeName |> Ch.only
+        member this.Shapes = 
+            this.Data.Shape |> Ch.only
         member this.Args = Map.empty
         member this.ReplaceArgs args = this :> _
         member this.SubstSymSizes env = 
-            {Data={this.Data with Shape=SymSizeEnv.substShape env this.Data.Shape}} :> _
-        member this.CanEvalAllSymSizes = ShapeSpec.canEval this.Data.Shape
+            {this with Data={this.Data with Shape=this.Data.Shape |> ShapeSpec.substSymbols env}} :> _
+        member this.CanEvalAllSymSizes = 
+            ShapeSpec.canEval this.Data.Shape
         member this.Eval env argVals = 
-            this.Data.Value.Value.Value |> Ch.only       
-
+            failwithf "Cannot evaluate uninstantiated data %A." this.Data       
 
     interface IOpFormat with
         member this.Text =

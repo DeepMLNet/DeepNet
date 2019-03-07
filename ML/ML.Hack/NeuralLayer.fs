@@ -131,8 +131,8 @@ module NeuralLayer =
     let pars (ctx: Context) (hp: HyperPars<'T>) = {
         //Weights   = mb.Param ("Weights", [hp.NOutput; hp.NInput], initWeights)
         //Bias      = mb.Param ("Bias",    [hp.NOutput],            initBias)
-        Weights     = Expr.var (Var<'T> (ctx / "Weights", [hp.NOutput; hp.NInput]))
-        Bias        = Expr.var (Var<'T> (ctx / "Bias",    [hp.NOutput]))
+        Weights     = Expr (UninstData<'T> (ctx / "Weights", [hp.NOutput; hp.NInput]))
+        Bias        = Expr (Var<'T> (ctx / "Bias",    [hp.NOutput]))
         HyperPars   = hp
     }
 
@@ -163,7 +163,7 @@ module User =
         let nSamples = SizeSpec.symbol "nSamples"
         let nFeatures = SizeSpec.symbol "nFeatures"
         let inputVar = Var<float32> (ctx / "input", [nSamples; nFeatures])
-        let input = Expr.var inputVar
+        let input = Expr inputVar
         let hyperPars = NeuralLayer.HyperPars.standard
         let pars = NeuralLayer.pars ctx hyperPars
         let pred = NeuralLayer.pred pars input

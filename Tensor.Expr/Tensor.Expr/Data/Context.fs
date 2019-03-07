@@ -4,47 +4,59 @@ open DeepNet.Utils
 open Tensor.Backend
 
 
-/// A path for a variable.
+/// A path for a named resource within an expression (variable, data, random variable).
 [<StructuredFormatDisplay("{Pretty}")>]
-type VarPath = VarPath of string list with
+type ContextPath = ContextPath of string list with
     
-    /// The parts of the context.
+    /// The parts of the context path.
     member this.Parts =
-        let (VarPath parts) = this
+        let (ContextPath parts) = this
         parts
 
     /// The parts of the context.
-    static member parts (vp: VarPath) = vp.Parts
+    static member parts (vp: ContextPath) = vp.Parts
 
-    /// Root (empty) context.
-    static member root = VarPath []
-
-    /// Split off last part of context.
-    static member splitLast (vp: VarPath) = 
+    /// Split off last part of context path.
+    static member splitLast (vp: ContextPath) = 
         match vp.Parts with
-        | [] -> failwith "Cannot split root context."
+        | [] -> failwith "Cannot split root context path."
         | parts ->
-            VarPath parts.[0 .. parts.Length-2], List.last parts
+            ContextPath parts.[0 .. parts.Length-2], List.last parts
 
     /// Sub-context with specified name.
-    static member (/) (vp: VarPath, name: string) =
-        VarPath (vp.Parts @ [name])
+    static member (/) (vp: ContextPath, name: string) =
+        ContextPath (vp.Parts @ [name])
     
-    /// Appends one context to another.
-    static member (/) (a: VarPath, b: VarPath) =
-        VarPath (a.Parts @ b.Parts)
+    /// Appends one context path to another.
+    static member (/) (a: ContextPath, b: ContextPath) =
+        ContextPath (a.Parts @ b.Parts)
 
-    /// Pretty string.
+    /// A string that is unique for each context path.
+    member this.Str =
+        this.Parts 
+        |> List.map (fun part -> "[" + part + "]")
+        |> String.concat "/"  
+        
+    /// A string that is unique for each context path.
+    static member str (cp: ContextPath) = cp.Str
+
+    /// Pretty string (not necessarily unique).
     member this.Pretty =
         this.Parts |> String.concat "/"
 
+    /// Root (empty) context path.
+    static member root = ContextPath []
+
+    /// A resource in the root context of the specified name.
+    static member from (name: string) = ContextPath.root / name
 
 
-/// A context for variable creation.
+
+/// A context for named resource creation.
 [<StructuredFormatDisplay("{Pretty}")>]
 type Context = {
-    /// Path.
-    Path: VarPath
+    /// Context path.
+    Path: ContextPath
     /// Device.
     Dev: ITensorDevice
 } with 
@@ -57,14 +69,14 @@ type Context = {
 
     /// Root context on specified device.
     static member root dev = 
-        {Path=VarPath.root; Dev=dev}
+        {Path=ContextPath.root; Dev=dev}
 
     /// Append name to context path.
     static member (/) (ctx: Context, name: string) =
         {ctx with Path=ctx.Path / name}
 
     /// Append another path to context path.
-    static member (/) (ctx: Context, path: VarPath) =
+    static member (/) (ctx: Context, path: ContextPath) =
         {ctx with Path=ctx.Path / path}
 
     /// Pretty string.

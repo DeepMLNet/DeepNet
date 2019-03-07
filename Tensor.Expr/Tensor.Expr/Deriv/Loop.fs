@@ -28,7 +28,7 @@ type LoopDeriv(op: Loop) =
             let dOutputs = env.DOp
             let originalArgs = env.Xs
             let spec = op
-            let derivCtx = VarPath.root / "LoopDeriv"
+            let derivCtx = ContextPath.root / "LoopDeriv"
 
             /// number of elments of the function we take the derivative of
             let funElems = 
@@ -98,7 +98,7 @@ type LoopDeriv(op: Loop) =
             for KeyValue (outPort, dExpr) in dOutputs do
                 // create variable for incoming Jacobian
                 let value = spec.Channels.[outPort]
-                let dName = VarName (derivCtx, sprintf "d_%s" (chName outPort))
+                let dName = VarName (derivCtx / sprintf "d_%s" (chName outPort))
                 let dVar =
                     Var.make (dName, value.Expr.DataType, value.Expr.Dev, funElems :: value.Expr.Shape)
                 dOutputVars.[outPort] <- dVar
@@ -122,7 +122,7 @@ type LoopDeriv(op: Loop) =
                 match li with
                 | Loop.ConstArg argIdx ->
                     // create a variable for the sum of the accumulated Jacobian so far
-                    let dAccumName = VarName (derivCtx, sprintf "dSum_ConstArg%d[-1]" argIdx)
+                    let dAccumName = VarName (derivCtx / sprintf "dSum_ConstArg%d[-1]" argIdx)
                     let dAccumVar = Var.make (dAccumName, liType, liDev, funElems :: liShape)
 
                     // create loop port exposing the step Jacobian plus the accumulated Jacobian w.r.t. ConstArg argIdx
@@ -177,7 +177,7 @@ type LoopDeriv(op: Loop) =
                     portContents.[dPort].DerivWrt.Add usingVar
 
                     // create a variable for Jacobian coming from a PreviousPort in a (future) loop iteration
-                    let dVar = Var.make (VarName (derivCtx, dPortName), liType, liDev, funElems :: liShape)
+                    let dVar = Var.make (VarName (derivCtx / dPortName), liType, liDev, funElems :: liShape)
                     dPreviousVars.[pp] <- dVar
 
                     // create corresponding variable input specification:
@@ -218,13 +218,13 @@ type LoopDeriv(op: Loop) =
                         seq { 
                             // derivative coming from external use of port's output slice
                             match dOutputVars.TryFind port with
-                            | Some dVar -> yield UExpr.baseVar dVar
+                            | Some dVar -> yield UExpr dVar
                             | None -> ()
 
                             // derivatives coming from PreviousPort uses of this port 
                             for dpv in dPreviousVars do
                                 let previousPort, dVar = dpv.Key, dpv.Value
-                                if previousPort.Channel = port then yield UExpr.baseVar dVar
+                                if previousPort.Channel = port then yield UExpr dVar
                         } |> Seq.reduce (+)
                     
                     // collapse Jacobian
@@ -251,7 +251,7 @@ type LoopDeriv(op: Loop) =
                    
                             // obtain value, if any
                             match valueOf with
-                            | Some vs -> yield UExpr.baseVar vs
+                            | Some vs -> yield UExpr vs
                             | None -> ()
                         } |> Seq.reduce (+)
                     let value: Loop.Value = {Expr=expr.BaseExprCh; SliceDim=sliceDim}

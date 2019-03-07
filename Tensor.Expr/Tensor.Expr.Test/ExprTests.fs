@@ -58,8 +58,9 @@ module ExprTestCase =
 
 
 module Vars =
-    let a = Var<float> ("a", HostTensor.Dev, [SizeSpec.fix 2L; SizeSpec.fix 3L])
-    let b = Var<float> ("b", HostTensor.Dev, [SizeSpec.fix 2L; SizeSpec.fix 3L])
+    let ctx = Context.root HostTensor.Dev
+    let a = Var<float> (ctx / "a", [SizeSpec.fix 2L; SizeSpec.fix 3L])
+    let b = Var<float> (ctx / "b", [SizeSpec.fix 2L; SizeSpec.fix 3L])
 
 
 module VarVals =
@@ -75,7 +76,7 @@ module VarVals =
 
 module ExprTestCases =
     let ``a + b`` () = {
-        Expr = Expr.var Vars.a + Expr.var Vars.b |> Expr.untyped
+        Expr = Expr Vars.a + Expr Vars.b |> Expr.untyped
         DataType = typeof<float>
         Dev = HostTensor.Dev
         Shape = [SizeSpec.fix 2L; SizeSpec.fix 3L]
@@ -83,7 +84,7 @@ module ExprTestCases =
     }
 
     let ``sin a + cos b`` () = {
-        Expr = sin (Expr.var Vars.a) + cos (Expr.var Vars.b) |> Expr.untyped
+        Expr = sin (Expr Vars.a) + cos (Expr Vars.b) |> Expr.untyped
         DataType = typeof<float>
         Dev = HostTensor.Dev
         Shape = [SizeSpec.fix 2L; SizeSpec.fix 3L]

@@ -45,7 +45,7 @@ type VarEnv = VarEnv of Map<VarName, ITensor> with
 
     /// Add variable value to environment.
     static member add (var: Var<'T>) (value: ITensor) (varEnv: VarEnv)  =
-        varEnv |> VarEnv.addBaseVar var.Var value
+        varEnv |> VarEnv.addBaseVar var.Untyped value
 
     /// Remove variable by name from environment.
     static member remove (varName: VarName) (varEnv: VarEnv) : VarEnv =

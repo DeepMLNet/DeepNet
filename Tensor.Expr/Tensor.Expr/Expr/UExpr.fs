@@ -48,8 +48,14 @@ type UExpr (baseExpr: BaseExpr) =
             UExpr {Channel.X=baseExpr.[ch]}
 
     /// Expression having the value of the specified variable.
-    static member baseVar (baseVar: Var) = 
+    new (baseVar: Var) = 
         UExpr {VarArg.Var=baseVar}
+
+    new (data: Data) =
+        UExpr {DataArg.Data=data}
+
+    new (uninstData: UninstData) =
+        UExpr {UninstDataArg.Data=uninstData}
 
     member this.BaseExpr = baseExpr
     static member baseExpr (expr: UExpr) = expr.BaseExpr
