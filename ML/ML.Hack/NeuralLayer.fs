@@ -3,6 +3,9 @@
 open DeepNet.Utils
 open Tensor
 open Tensor.Expr
+open Tensor.Backend
+
+
 
 
 

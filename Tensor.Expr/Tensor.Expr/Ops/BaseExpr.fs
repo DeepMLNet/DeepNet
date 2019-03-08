@@ -155,14 +155,11 @@ module IOp =
 
 /// An op that contains variables.
 type IVarContainingOp =
-    /// Variables contained in that op.
+    /// Variables contained in this op.
     abstract Vars: Set<Var>
+    /// Substitutes the variables contained in this op.
+    abstract SubstVars: Map<VarName, BaseExprCh> -> IOp
 
-
-/// An op that contains data.
-type IDataContainingOp =
-    /// Data contained in that op.
-    abstract Data: Set<Data>
 
 
 /// An op that has a custom print format.
@@ -183,7 +180,7 @@ module private BaseExprTools =
             | None -> map |> Map.add (getKey value) value
 
         let merge (a: Map<'K, 'V>) b =
-            (a, Map.toSeq b)||> Seq.fold (fun map (key, value) -> add map value)
+            (a, Map.toSeq b) ||> Seq.fold (fun map (key, value) -> add map value)
 
         let opMap = (Map.empty, getOp op) ||> Seq.fold add
         let argMaps = 
@@ -219,15 +216,6 @@ type BaseExpr private (op: IOp) =
             | _ -> Seq.empty
         let getExpr (expr: BaseExpr) = expr.VarMap
         let getKey (var: Var) = var.Name
-        BaseExprTools.collectMap getOp getExpr getKey op
-
-    let _dataMap = 
-        let getOp (op: IOp) =
-            match op with
-            | :? IDataContainingOp as op -> Set.toSeq op.Data
-            | _ -> Seq.empty
-        let getExpr (expr: BaseExpr) = expr.DataMap
-        let getKey (data: Data) = data.Name
         BaseExprTools.collectMap getOp getExpr getKey op
 
     let _canEvalAllSymSizes = lazy (
@@ -299,28 +287,18 @@ type BaseExpr private (op: IOp) =
     
     /// Returns all variables contained in an op and its arguments as a map from variable name to variable.
     member this.VarMap = _varMap
+    /// Returns all variables contained in an op and its arguments as a map from variable name to variable.
+    static member varMap (expr: BaseExpr) = expr.VarMap
 
     /// Returns all variables contained in an op and its arguments.
     member this.Vars = this.VarMap |> Map.values
     /// Returns all variables contained in an op and its arguments.
     static member vars (expr: BaseExpr) = expr.Vars
 
-    member this.DataMap = _dataMap
-
-    member this.Data = this.DataMap |> Map.values
-
     /// Returns true, if all symbolic sizes of the op and its arguments can be evaluated to numeric values.
     member this.CanEvalAllSymSizes = _canEvalAllSymSizes.Force()
     /// Returns true, if all symbolic sizes of the op and its arguments can be evaluated to numeric values.
     static member canEvalAllSymSizes (expr: BaseExpr) = expr.CanEvalAllSymSizes
-
-    /// Substitutes the symbolic sizes within this expression and all its subexpressions.
-    static member substSymSizes (env: SymSizeEnv) (expr: BaseExpr) =
-        let op = expr.Op.SubstSymSizes env
-        let subsArgs = 
-            op.Args 
-            |> Map.map (fun _ arg -> arg |> BaseExprCh.map (BaseExpr.substSymSizes env))
-        op.ReplaceArgs subsArgs |> BaseExpr.ofOp
 
     /// Maps the arguments of this expression using the specified function.
     static member mapArgs (fn: BaseExprCh -> BaseExprCh) (expr: BaseExpr) =
@@ -329,6 +307,31 @@ type BaseExpr private (op: IOp) =
         |> expr.Op.ReplaceArgs 
         |> BaseExpr.ofOp
 
+    /// Recursively applies a function to each op in the expression tree.
+    /// Mapping is performed depth-first, i.e. first the arguments of an expression are mapped, 
+    /// then the expression itself.
+    /// The function is called only once per unique subexpression.
+    static member mapOpRec (fn: IOp -> IOp) (expr: BaseExpr) =
+        let replacement = Dictionary<BaseExpr, BaseExpr> ()
+        let rec mapStep (subExpr: BaseExpr) =
+            replacement.GetOrAdd subExpr (fun _ ->
+                subExpr.Op.Args
+                |> Map.map (fun _ arg -> arg |> BaseExprCh.map mapStep)
+                |> expr.Op.ReplaceArgs 
+                |> fn
+                |> BaseExpr.ofOp)
+        mapStep expr
+
+    /// Substitutes the symbolic sizes within this expression and all its subexpressions.
+    static member substSymSizes (env: SymSizeEnv) (expr: BaseExpr) =
+        expr |> BaseExpr.mapOpRec (fun op -> op.SubstSymSizes env)
+
+    static member substVars (env: Map<VarName, BaseExprCh>) (expr: BaseExpr) = 
+        expr |> BaseExpr.mapOpRec (fun op ->
+            match op with
+            | :? IVarContainingOp as op -> op.SubstVars env
+            | _ -> op)
+ 
     /// Access to specified channel of this expression.
     member this.Item
         with get (channel: Ch) = BaseExprCh.make channel this

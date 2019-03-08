@@ -39,7 +39,7 @@ module UExpr =
 
     let (|DataArg|_|) (expr: UExpr) =
         match expr.Op with
-        | :? DataArg as this -> Some this.Data
+        | :? DataArg as this -> Some this.Data.Value
         | _ -> None
 
     let (|UnaryPlus|_|) (expr: UExpr) =

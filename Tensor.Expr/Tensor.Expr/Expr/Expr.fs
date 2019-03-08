@@ -34,8 +34,10 @@ type Expr<'T> (baseExpr: BaseExpr) =
     new (var: Var<'T>) = 
         Expr<'T> (UExpr var.Untyped)
 
-    new (data: Data<'T>) =
-        Expr<'T> (UExpr data.Untyped)
+    /// Expression having the value of the specified tensor.
+    /// A reference to that tensor is stored.
+    new (tensor: Tensor.Tensor<'T>) =
+        Expr<'T> {DataArg.Data=OrdRef (tensor :> Tensor.ITensor)}
 
     member this.Untyped = UExpr baseExpr
     static member untyped (expr: Expr<'T>) = expr.Untyped
@@ -79,12 +81,6 @@ type Expr<'T> (baseExpr: BaseExpr) =
 
     member this.Vars = this.Untyped.Vars
     static member vars (expr: Expr<'T>) = expr.Vars
-
-    member this.DataMap = baseExpr.DataMap
-    static member dataMap (expr: Expr<'T>) = expr.DataMap
-
-    member this.Data = baseExpr.Data
-    static member data (expr: Expr<'T>) = expr.Data
 
     member this.CanEvalAllSymSizes = this.Untyped.CanEvalAllSymSizes
     static member canEvalAllSymSizes (expr: Expr<'T>) = expr.CanEvalAllSymSizes

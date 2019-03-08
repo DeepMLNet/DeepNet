@@ -58,6 +58,11 @@ module internal Map =
     let join (p:Map<'a,'b>) (q:Map<'a,'b>) = 
         Map(Seq.concat [(Map.toSeq p); (Map.toSeq q)])    
 
+    /// Joins all maps.
+    let joinMany (ps: Map<'a, 'b> seq) =
+        (Map.empty, ps)
+        ||> Seq.fold join
+
     /// merges two maps by adding the values of the same key
     let inline addSameKeys (p:Map<'a,'b>) (q:Map<'a,'b>) = 
         (p, q) ||> Map.fold (fun res key value ->
@@ -170,6 +175,14 @@ module internal CollectionExtensions =
             match this.TryFind key with
             | Some v -> v
             | None -> dflt
+
+        member this.GetOrAdd key createFn =
+            match this.TryFind key with
+            | Some v -> v
+            | None ->
+                let v = createFn key
+                this.[key] <- v
+                v
 
         member this.LockedAdd (key, value) =
             lock this (fun () -> this.Add (key, value))

@@ -27,9 +27,6 @@ type Deriv = private {
     /// The derivatives w.r.t. the variables occuring in the expression.
     /// They are of the shape _FunElems x (shape of variable).
     _WrtVar:     Map<Var, UExpr>
-    /// The derivatives w.r.t. the data occuring in the expression.
-    /// They are of the shape _FunElems x (shape of data).
-    _WrtData:    Map<Data, UExpr>
 } with
 
     static member private log = Log "Deriv"
@@ -52,7 +49,6 @@ type Deriv = private {
         {
             _FunElems=a.FunElems
             _WrtVar=mergeMap a._WrtVar b._WrtVar
-            _WrtData=mergeMap a._WrtData b._WrtData
         }
 
 
@@ -124,7 +120,6 @@ type Deriv = private {
 
         // process derivatives in loop
         let mutable varDerivs = Map.empty
-        let mutable dataDerivs = Map.empty
         while exprsWithFullDeriv.Count > 0 do
             // get op with computed derivative
             let expr = exprsWithFullDeriv.Dequeue ()
@@ -134,15 +129,13 @@ type Deriv = private {
             | UExpr.VarArg vs ->
                 // arrived at a variable: save its derivative
                 varDerivs <- varDerivs |> Map.add vs exprDeriv.[Ch.Default]
-            | UExpr.DataArg ds ->
-                dataDerivs <- dataDerivs |> Map.add ds exprDeriv.[Ch.Default]
             | _ -> 
                 // propagate derivative to arguments of op
                 let argDerivs = Deriv.derivOp expr exprDeriv
                 for KeyValue(arg, argDeriv) in argDerivs do
                     transmitDeriv expr arg argDeriv
 
-        varDerivs, dataDerivs
+        varDerivs
 
 
     /// Computes the derivative expression w.r.t. all variables occuring in it using the specified
@@ -157,13 +150,12 @@ type Deriv = private {
 
         Deriv.log.Info "Comptuing derivatives for %A with root derivative %A" rootExpr rootDeriv
         let sw = Stopwatch.StartNew()
-        let varDerivs, dataDerivs = Deriv.baseCompute rootDeriv rootExpr.BaseExpr
+        let varDerivs = Deriv.baseCompute rootDeriv rootExpr.BaseExpr
         Deriv.log.Info "Computing derivatives took %A" sw.Elapsed
 
         {
             _FunElems = funElems
             _WrtVar = varDerivs |> Map.map (fun _ deriv -> UExpr deriv)
-            _WrtData = dataDerivs |> Map.map (fun _ deriv -> UExpr deriv)
         }    
 
 
@@ -192,19 +184,6 @@ type Deriv = private {
     /// Returns the derivatives of the specified typed variable.
     member this.Wrt (var: Var<'T>) = 
         this.Wrt var.Untyped |> Expr<'T>
-
-
-    /// Returns the derivatives of the specified untyped data.
-    member this.Wrt (data: Data) = 
-        match this._WrtData |> Map.tryFind data with
-        | Some d -> d
-        | None -> 
-            UExpr.zeros data.DataType data.Dev [this.FunElems; ShapeSpec.nElem data.Shape]
-
-
-    /// Returns the derivatives of the specified typed data.
-    member this.Wrt (data: Data<'T>) = 
-        this.Wrt data.Untyped |> Expr<'T>
 
 
     /// Number of function elements.

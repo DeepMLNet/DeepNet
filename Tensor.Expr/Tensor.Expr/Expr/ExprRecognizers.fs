@@ -1,6 +1,7 @@
 ﻿namespace Tensor.Expr
 
 open Tensor.Expr.Ops
+open Tensor
 
 
 /// Active recognizers for typed single-channel expressions.
@@ -39,7 +40,7 @@ module Expr =
 
     let (|DataArg|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? DataArg as this -> Some (Data<'T> this.Data)
+        | :? DataArg as this -> Some (this.Data.Value :?> Tensor<'T>)
         | _ -> None
 
     let (|UnaryPlus|_|) (expr: Expr<'T>) =

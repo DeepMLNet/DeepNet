@@ -29,45 +29,77 @@ module Adam =
             
 
     type Cfg = {
-        Step:           Data<float32>
-        Momentum:       Data<float32>
-        Decay:          Data<float32>
-        DecayMom1:      Data<float32>
-        DecayMom2:      Data<float32>
-        Offset:         Data<float32>
+        StepData:           Data<float32>
+        MomentumData:       Data<float32>
+        DecayData:          Data<float32>
+        DecayMom1Data:      Data<float32>
+        DecayMom2Data:      Data<float32>
+        OffsetData:         Data<float32>
     } with 
-        static member make (ctx: Context) = 
-            {
-                Step      = Data<float32> (ctx / "Step",      Shape.scalar) 
-                Momentum  = Data<float32> (ctx / "Momentum",  Shape.scalar) 
-                Decay     = Data<float32> (ctx / "Decay",     Shape.scalar) 
-                DecayMom1 = Data<float32> (ctx / "DecayMom1", Shape.scalar)
-                DecayMom2 = Data<float32> (ctx / "DecayMom2", Shape.scalar) 
-                Offset    = Data<float32> (ctx / "Offset",    Shape.scalar) 
-            }
+        static member make (ctx: Context) = {
+            StepData      = Data<float32> (ctx / "Step",      Shape.scalar) 
+            MomentumData  = Data<float32> (ctx / "Momentum",  Shape.scalar) 
+            DecayData     = Data<float32> (ctx / "Decay",     Shape.scalar) 
+            DecayMom1Data = Data<float32> (ctx / "DecayMom1", Shape.scalar)
+            DecayMom2Data = Data<float32> (ctx / "DecayMom2", Shape.scalar) 
+            OffsetData    = Data<float32> (ctx / "Offset",    Shape.scalar) 
+        }
 
-        member this.StepVal
-            with get () = this.Step.InstValue.Value
-            and set value = this.Step.InstValue.Value <- value
+        member this.Step
+            with get () = this.StepData.InstValue.Value
+            and set value = this.StepData.InstValue.Value <- value
             
+        member this.Momentum
+            with get () = this.MomentumData.InstValue.Value
+            and set value = this.MomentumData.InstValue.Value <- value
+
+        member this.Decay
+            with get () = this.DecayData.InstValue.Value
+            and set value = this.DecayData.InstValue.Value <- value
+            
+        member this.DecayMom1
+            with get () = this.DecayMom1Data.InstValue.Value
+            and set value = this.DecayMom1Data.InstValue.Value <- value
+
+        member this.DecayMom2
+            with get () = this.DecayMom2Data.InstValue.Value
+            and set value = this.DecayMom2Data.InstValue.Value <- value
+
+        member this.Offset
+            with get () = this.OffsetData.InstValue.Value
+            and set value = this.OffsetData.InstValue.Value <- value
+
 
     type State<'T> = {
-        Iter:           Tensor<'T>  
-        LastStep:       Tensor<'T>
-        EstMom1:        Tensor<'T>
-        EstMom2:        Tensor<'T>
-        EstMom1B:       Tensor<'T>
-        EstMom2B:       Tensor<'T>
-    } 
+        Iter:           Data<'T>  
+        LastStep:       Data<'T>
+        EstMom1:        Data<'T>
+        EstMom2:        Data<'T>
+        EstMom1B:       Data<'T>
+        EstMom2B:       Data<'T>
+    } with
+        static member make (ctx: Context) () =
+            // how to handle multiple parameters and variables??
+            // need a list of parameters to optimize wrt to
+            // however, now this has become more difficult
+            // we could instantiate multiple optimizers, one for each parameter
+            // so only way would be to instantiate the optimizer for each parameter, correct?
+            // yes, probably
+            // also if the 
+            // not  having one big parameter vector might kill us
+            // substitution approch:
+            // replace parameters with slices in big parameter vector
+            // is not bad, but how will a model part access its numeric data if it wants to?
+            // So, perhaps we need to introduce something like a DataRef?
+            // It references a data value that can be freely allocated somewhere or
+            // even replaced by another expression.
+            // We can store such a marker in the graph, but how will the local reference be updated?
+            // It would need to contain a write reference that is updated accordingly.
+            // If we just could store the model building on the graph.
+            ()
 
-    type StateExpr<'T> = {
-        Iter:           Expr<'T>
-        LastStep:       Expr<'T>
-        EstMom1:        Expr<'T>
-        EstMom2:        Expr<'T>
-        EstMom1B:       Expr<'T>
-        EstMom2B:       Expr<'T>
-    }
+        
+
 
 open Adam
 

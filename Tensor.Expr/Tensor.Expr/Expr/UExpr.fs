@@ -51,8 +51,10 @@ type UExpr (baseExpr: BaseExpr) =
     new (baseVar: Var) = 
         UExpr {VarArg.Var=baseVar}
 
-    new (data: Data) =
-        UExpr {DataArg.Data=data}
+    /// Expression having the value of the specified tensor.
+    /// A reference to that tensor is stored.
+    new (tensor: Tensor.ITensor) =
+        UExpr {DataArg.Data=OrdRef tensor}
 
     member this.BaseExpr = baseExpr
     static member baseExpr (expr: UExpr) = expr.BaseExpr
@@ -89,12 +91,6 @@ type UExpr (baseExpr: BaseExpr) =
 
     member this.Vars = baseExpr.Vars
     static member vars (expr: UExpr) = expr.Vars
-
-    member this.DataMap = baseExpr.DataMap
-    static member dataMap (expr: UExpr) = expr.DataMap
-
-    member this.Data = baseExpr.Data
-    static member data (expr: UExpr) = expr.Data
 
     member this.CanEvalAllSymSizes = baseExpr.CanEvalAllSymSizes
     static member canEvalAllSymSizes (expr: UExpr) = expr.CanEvalAllSymSizes
@@ -800,21 +796,5 @@ type UExpr (baseExpr: BaseExpr) =
     static member eval (varEnv: VarEnv) (expr: UExpr) : Tensor.ITensor = 
         let evalEnv : EvalEnv = {VarEnv=varEnv; Tracer=NoTracer()}
         UExpr.evalWithEnv evalEnv expr
-
-    /// Instantiates all data contained in the expression.
-    static member instData (expr: UExpr) =
-        for data in expr.Data do
-            data |> Data.inst
-
-    /// Instantiates all data contained in the expression.
-    static member instDataOnce (expr: UExpr) =
-        for data in expr.Data do
-            data |> Data.instOnce        
-
-    /// Initializes all data contained in the expression.
-    static member initData (expr: UExpr) =
-        for data in expr.Data do
-            data |> Data.init    
-
 
 

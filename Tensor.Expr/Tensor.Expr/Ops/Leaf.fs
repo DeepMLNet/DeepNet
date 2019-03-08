@@ -123,35 +123,37 @@ type VarArg = { Var: Var } with
     interface IVarContainingOp with
         member this.Vars =
             Set [this.Var]
+        member this.SubstVars env =
+            match env |> Map.tryFind this.Var.Name with
+            | Some replVar -> {Var=replVar} :> _
+            | None -> this
+
 
     interface IOpFormat with
         member this.Text =
             sprintf "%A" this.Var
 
 
-/// A reference to data.
-type DataArg = { Data: Data } with
+/// A reference to a data tensor.
+type DataArg = { Data: OrdRef<ITensor> } with
     interface IOp with       
         member this.Check () = ()
         member this.Channels = Ch.onlyOne
         member this.Devs = 
-            this.Data.Dev |> Ch.only
+            this.Data.Value.Dev |> Ch.only
         member this.TypeNames = 
-            TypeName.ofTypeInst this.Data.DataType |> Ch.only
+            TypeName.ofTypeInst this.Data.Value.DataType |> Ch.only
         member this.Shapes = 
-            this.Data.Shape |> Ch.only
+            this.Data.Value.Shape |> List.map SizeSpec.fix |> Ch.only
         member this.Args = Map.empty
         member this.ReplaceArgs args = this :> _
-        member this.SubstSymSizes env = 
-            {Data = this.Data |> Data.substSymSizes env} :> _
-        member this.CanEvalAllSymSizes = 
-            this.Data |> Data.canEvalAllSymSizes
+        member this.SubstSymSizes env = this :> _
+        member this.CanEvalAllSymSizes = true
         member this.Eval env argVals =
-            this.Data.Check ()
-            this.Data.InstValue |> Ch.only       
+            this.Data.Value |> Ch.only       
 
     interface IOpFormat with
-        member this.Text =
+        member this.Text = 
             sprintf "%A" this.Data
 
 
