@@ -516,6 +516,13 @@ type Expr<'T> (baseExpr: BaseExpr) =
     static member eval (varEnv: VarEnv) (expr: Expr<'T>) : Tensor.Tensor<'T> = 
         UExpr.eval varEnv expr.Untyped :?> Tensor.Tensor<'T>
 
+    /// Substitutes the variables within the expression tree.
+    static member substVars (env: Map<VarName, UExpr>) (expr: Expr<'T>) =
+        let env = env |> Map.map (fun _ sExpr -> sExpr.BaseExpr)
+        expr.BaseExpr |> BaseExpr.substVars env |> Expr<'T>
+
+
+
 
 
 

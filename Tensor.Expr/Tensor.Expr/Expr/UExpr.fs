@@ -797,4 +797,8 @@ type UExpr (baseExpr: BaseExpr) =
         let evalEnv : EvalEnv = {VarEnv=varEnv; Tracer=NoTracer()}
         UExpr.evalWithEnv evalEnv expr
 
+    /// Substitutes the variables within the expression tree.
+    static member substVars (env: Map<VarName, UExpr>) (expr: UExpr) =
+        let env = env |> Map.map (fun _ sExpr -> sExpr.BaseExpr)
+        expr.BaseExpr |> BaseExpr.substVars env |> UExpr
 

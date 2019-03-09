@@ -153,12 +153,10 @@ module IOp =
             Operators.compare aType.FullName bType.FullName
 
 
-/// An op that contains variables.
-type IVarContainingOp =
-    /// Variables contained in this op.
-    abstract Vars: Set<Var>
-    /// Substitutes the variables contained in this op.
-    abstract SubstVars: Map<VarName, BaseExprCh> -> IOp
+/// An op that represents a variable.
+type IVarOp =
+    /// Variable represented by this op.
+    abstract Var: Var
 
 
 
@@ -212,7 +210,7 @@ type BaseExpr private (op: IOp) =
     let _varMap = 
         let getOp (op: IOp) =
             match op with
-            | :? IVarContainingOp as op -> Set.toSeq op.Vars
+            | :? IVarOp as op -> Seq.singleton op.Var
             | _ -> Seq.empty
         let getExpr (expr: BaseExpr) = expr.VarMap
         let getKey (var: Var) = var.Name
@@ -322,14 +320,18 @@ type BaseExpr private (op: IOp) =
                 |> BaseExpr.ofOp)
         mapStep expr
 
-    /// Substitutes the symbolic sizes within this expression and all its subexpressions.
+    /// Substitutes the symbolic sizes within the expression tree.
     static member substSymSizes (env: SymSizeEnv) (expr: BaseExpr) =
         expr |> BaseExpr.mapOpRec (fun op -> op.SubstSymSizes env)
 
-    static member substVars (env: Map<VarName, BaseExprCh>) (expr: BaseExpr) = 
+    /// Substitutes the variables within the expression tree.
+    static member substVars (env: Map<VarName, BaseExpr>) (expr: BaseExpr) = 
         expr |> BaseExpr.mapOpRec (fun op ->
             match op with
-            | :? IVarContainingOp as op -> op.SubstVars env
+            | :? IVarOp as varOp -> 
+                match env |> Map.tryFind varOp.Var.Name with
+                | Some replExpr -> replExpr.Op 
+                | None -> op
             | _ -> op)
  
     /// Access to specified channel of this expression.
@@ -462,6 +464,9 @@ type BaseExprCh = private {
 
     /// Pretty string.
     member this.Pretty = this.ToString 80
+
+
+
 
 [<AutoOpen>]
 module BaseExprChRecognizier =

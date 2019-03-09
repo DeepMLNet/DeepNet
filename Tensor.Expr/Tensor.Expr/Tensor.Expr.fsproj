@@ -55,7 +55,7 @@
     <Compile Include="Deriv\Loop.fs" />
     <Compile Include="TextTracer.fs" />
     <Compile Include="EvalUpdateBundle.fs" />
-    <Compile Include="ParameterGroup.fs" />
+    <Compile Include="ParSet.fs" />
     <None Include="Old\Expr.fs" />
     <None Include="Old\Hold.fs" />
     <None Include="Old\Optimizer.fs" />

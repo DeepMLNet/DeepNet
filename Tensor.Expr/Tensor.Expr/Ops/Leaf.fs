@@ -120,14 +120,8 @@ type VarArg = { Var: Var } with
         member this.Eval env argVals = 
             env.VarEnv.[this.Var.Name] |> Ch.only       
 
-    interface IVarContainingOp with
-        member this.Vars =
-            Set [this.Var]
-        member this.SubstVars env =
-            match env |> Map.tryFind this.Var.Name with
-            | Some replVar -> {Var=replVar} :> _
-            | None -> this
-
+    interface IVarOp with
+        member this.Var = this.Var
 
     interface IOpFormat with
         member this.Text =

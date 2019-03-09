@@ -94,4 +94,8 @@ type MultiChannelExpr (baseExpr: BaseExpr) =
         let evalEnv : EvalEnv = {VarEnv=varEnv; Tracer=NoTracer()}    
         BaseExprEval.eval evalEnv expr.BaseExpr
 
+    /// Substitutes the variables within the expression tree.
+    static member substVars (env: Map<VarName, UExpr>) (expr: MultiChannelExpr) =
+        let env = env |> Map.map (fun _ sExpr -> sExpr.BaseExpr)
+        expr.BaseExpr |> BaseExpr.substVars env |> MultiChannelExpr
 
