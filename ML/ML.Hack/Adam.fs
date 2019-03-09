@@ -1,146 +1,130 @@
-﻿namespace Optimizers
+﻿namespace Optimizers.Adam
 
 open DeepNet.Utils
 open Tensor
 open Tensor.Expr
+open Tensor.Backend
 
 
-module Adam =
 
-    //type VarTensorExpr<'T> = {
-    //    Var: Var<'T> option
-    //    mutable Tensor: Tensor<'T> option
-    //    Expr: Expr<'T>
-    //} with 
-    //    static member make (ctx, shp) =
-    //        let var = Var<'T> (ctx, shp)
-    //        {
-    //            Var = Some var
-    //            Tensor = None
-    //            Expr = Expr.var var
-    //        }
-
-    //    member this.Inst (symSizes: SymSizeEnv) =
-    //        match this.Var with
-    //        | Some var ->
-    //            let nShp = var.Shape |> ShapeSpec.substSymbols symSizes |> ShapeSpec.eval
-    //            this.Tensor <- Some (Tensor<'T>.zeros var.Dev nShp)
-    //        | None -> failwith "Can only instantiate when Var is present."    
-            
-
-    type Cfg = {
-        StepData:           Data<float32>
-        MomentumData:       Data<float32>
-        DecayData:          Data<float32>
-        DecayMom1Data:      Data<float32>
-        DecayMom2Data:      Data<float32>
-        OffsetData:         Data<float32>
-    } with 
-        static member make (ctx: Context) = {
-            StepData      = Data<float32> (ctx / "Step",      Shape.scalar) 
-            MomentumData  = Data<float32> (ctx / "Momentum",  Shape.scalar) 
-            DecayData     = Data<float32> (ctx / "Decay",     Shape.scalar) 
-            DecayMom1Data = Data<float32> (ctx / "DecayMom1", Shape.scalar)
-            DecayMom2Data = Data<float32> (ctx / "DecayMom2", Shape.scalar) 
-            OffsetData    = Data<float32> (ctx / "Offset",    Shape.scalar) 
-        }
-
-        member this.Step
-            with get () = this.StepData.InstValue.Value
-            and set value = this.StepData.InstValue.Value <- value
-            
-        member this.Momentum
-            with get () = this.MomentumData.InstValue.Value
-            and set value = this.MomentumData.InstValue.Value <- value
-
-        member this.Decay
-            with get () = this.DecayData.InstValue.Value
-            and set value = this.DecayData.InstValue.Value <- value
-            
-        member this.DecayMom1
-            with get () = this.DecayMom1Data.InstValue.Value
-            and set value = this.DecayMom1Data.InstValue.Value <- value
-
-        member this.DecayMom2
-            with get () = this.DecayMom2Data.InstValue.Value
-            and set value = this.DecayMom2Data.InstValue.Value <- value
-
-        member this.Offset
-            with get () = this.OffsetData.InstValue.Value
-            and set value = this.OffsetData.InstValue.Value <- value
-
-
-    type State<'T> = {
-        Iter:           Data<'T>  
-        LastStep:       Data<'T>
-        EstMom1:        Data<'T>
-        EstMom2:        Data<'T>
-        EstMom1B:       Data<'T>
-        EstMom2B:       Data<'T>
-    } with
-        static member make (ctx: Context) () =
-            // how to handle multiple parameters and variables??
-            // need a list of parameters to optimize wrt to
-            // however, now this has become more difficult
-            // we could instantiate multiple optimizers, one for each parameter
-            // so only way would be to instantiate the optimizer for each parameter, correct?
-            // yes, probably
-            // also if the 
-            // not  having one big parameter vector might kill us
-            // substitution approch:
-            // replace parameters with slices in big parameter vector
-            // is not bad, but how will a model part access its numeric data if it wants to?
-            // So, perhaps we need to introduce something like a DataRef?
-            // It references a data value that can be freely allocated somewhere or
-            // even replaced by another expression.
-            // We can store such a marker in the graph, but how will the local reference be updated?
-            // It would need to contain a write reference that is updated accordingly.
-            // If we just could store the model building on the graph.
-            ()
-
-        
-
-
-open Adam
-
-type Adam<'T when 'T: equality and 'T: comparison> 
-        (loss:  Expr, pars:  Expr,  cfg: CfgExpr,  state: StateExpr) =
-
-    do Util.checkProperType<'T> ()
-    do if loss.NDims <> 0 then failwith "loss must be a scalar"
-
-    let cfg = {
-        CfgExpr.Step        = Expr.var<'T> "Adam.Cfg.Step"          []
-        CfgExpr.Momentum    = Expr.var<'T> "Adam.Cfg.Momentum"      []
-        CfgExpr.Decay       = Expr.var<'T> "Adam.Cfg.Decay"         []
-        CfgExpr.DecayMom1   = Expr.var<'T> "Adam.Cfg.DecayMom1"     []
-        CfgExpr.DecayMom2   = Expr.var<'T> "Adam.Cfg.DecayMom2"     []
-        CfgExpr.Offset      = Expr.var<'T> "Adam.Cfg.Offset"        []
+type Cfg = {
+    Step:           float
+    Momentum:       float
+    Decay:          float
+    DecayMom1:      float
+    DecayMom2:      float
+    Offset:         float
+} with 
+    static member standard = {
+        Step        = 2e-4
+        Momentum    = 0.0
+        Decay       = (1.0 - 1e-8)
+        DecayMom1   = 1e-1
+        DecayMom2   = 1e-3
+        Offset      = 1e-8       
     }
 
-    let state = {
-        StateExpr.Iter      = Expr.var<'T> "Adam.State.Iter"        []
-        StateExpr.LastStep  = Expr.var<'T> "Adam.State.LastStep"    (Expr.shapeOf pars)
-        StateExpr.EstMom1   = Expr.var<'T> "Adam.State.EstMom1"     (Expr.shapeOf pars)
-        StateExpr.EstMom2   = Expr.var<'T> "Adam.State.EstMom2"     (Expr.shapeOf pars)
-        StateExpr.EstMom1B  = Expr.var<'T> "Adam.State.EstMom1B"    (Expr.shapeOf pars)
-        StateExpr.EstMom2B  = Expr.var<'T> "Adam.State.EstMom2B"    (Expr.shapeOf pars)            
+
+type State = {
+    Iter:           ITensor
+    LastStep:       ITensor
+    EstMom1:        ITensor
+    EstMom2:        ITensor
+    EstMom1B:       ITensor
+    EstMom2B:       ITensor
+} with
+    static member make dataType dev shape = {
+        Iter = ITensor.zeros dataType dev []
+        LastStep = ITensor.zeros dataType dev shape
+        EstMom1 = ITensor.zeros dataType dev shape
+        EstMom2 = ITensor.zeros dataType dev shape
+        EstMom1B = ITensor.zeros dataType dev shape
+        EstMom2B = ITensor.zeros dataType dev shape
     }
+            
 
-    let rpCfg = VarRecord<Cfg<'T>, CfgExpr> (cfg, dev)
-    let rpState = VarRecord<State<'T>, StateExpr> (state, dev)
+type AdamPart (grad: UExpr, value: UExpr) =
+    let typ = value.DataType
+    let dev = value.Dev
+    let shp = value.Shape
+    let symShp = ShapeSpec.fix shp
 
-    static member New loss pars dev =
-        Adam (loss, pars, dev) :> IOptimizer<'T, Cfg<'T>, State<'T>>
+    let one = UExpr.scalar dev (convTo typ 1.0)
+    let oneHalf = UExpr.scalar dev (convTo typ 1.5)
+    let two = UExpr.scalar dev (convTo typ 2.0)
 
-    static member DefaultCfg : Cfg<'T> = {
-        Step        = conv<'T> 2e-4
-        Momentum    = conv<'T> 0.0
-        Decay       = conv<'T> (1.0 - 1e-8)
-        DecayMom1   = conv<'T> 1e-1
-        DecayMom2   = conv<'T> 1e-3
-        Offset      = conv<'T> 1e-8       
-    }
+    let step = ITensor.zeros typ dev []
+    let momentum = ITensor.zeros typ dev []
+    let decay = ITensor.zeros typ dev []
+    let decayMom1 = ITensor.zeros typ dev []
+    let decayMom2 = ITensor.zeros typ dev []
+    let offset = ITensor.zeros typ dev []
+
+    let iter = ITensor.zeros typ dev []
+    let lastStep = ITensor.zeros typ dev symShp
+    let _estMom1 = ITensor.zeros typ dev symShp
+    let _estMom2 = ITensor.zeros typ dev symShp
+    let _estMom1B = ITensor.zeros typ dev symShp
+    let _estMom2B = ITensor.zeros typ dev symShp
+
+    member this.ApplyCfg (cfg: Cfg) =
+        step.Value <- convTo typ cfg.Step
+        momentum.Value <- convTo typ cfg.Momentum
+        decay.Value <- convTo typ cfg.Decay
+        decayMom1.Value <- convTo typ cfg.DecayMom1
+        decayMom2.Value <- convTo typ cfg.DecayMom2
+        offset.Value <- convTo typ cfg.Offset
+
+    member this.Step =
+        let gradient = grad |> UExpr.reshape value.Shape
+        //let gradient = gradient |> Expr.checkFinite "gradient"
+
+        let m, d, o = UExpr momentum, UExpr decay, UExpr offset
+        let dm1, dm2 = UExpr decayMom1, UExpr decayMom2
+        let t = UExpr iter + one
+
+        let coeff1 = one - (one - dm1) * d ** (t - one)
+        let estMom1B = coeff1 * gradient + (one - coeff1) * _estMom1B
+        let estMom2B = dm2 * gradient ** two + (one - dm2) * _estMom2B
+        let estMom1 = _estMom1B / (one - (one - dm1) ** t + o)
+        let estMom2 = _estMom2B / (one - (one - dm2) ** t + o)
+
+        let step1 = step * estMom1 / (estMom2 ** oneHalf + o)
+        let step2 = m * lastStep
+        let step = step1 + step2
+        let newValue = value - step
+
+        // so need another update bundle here to update state?
+        // or make this an imperative method?
+        // but then, how to eval something and update at the same time?
+
+           
+        Expr.discard [
+            Expr.storeToVar pars (pars - step)
+            Expr.storeToVar state.Iter (state.Iter + one)
+            Expr.storeToVar state.LastStep step
+            Expr.storeToVar state.EstMom1 estMom1
+            Expr.storeToVar state.EstMom2 estMom2
+            Expr.storeToVar state.EstMom1B estMom1B
+            Expr.storeToVar state.EstMom2B estMom2B
+        ]            
+
+
+type Adam (loss: UExpr, parSetInst: ParSetInst) =
+
+    do if loss.NDims <> 0 then 
+        failwithf "Loss must be a scalar, but it has shape %A." loss.Shape
+
+    let parts =
+        parSetInst.TypeDeviceValues
+        |> Map.toSeq
+        |> Seq.map (fun (_, value) -> State.make value.DataType value.Dev value.Shape)
+        |> List.ofSeq
+
+    let cfgs = 
+        parSetInst.Ty
+    member val Cfg = Cfg.make 
+
 
     member this.InitialState (cfg: Cfg<'T>) parVals : State<'T> =
         let shp = ITensor.shape parVals

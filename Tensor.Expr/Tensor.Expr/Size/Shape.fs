@@ -53,6 +53,9 @@ module ShapeSpec =
 
     let emptyVector : ShapeSpec = [SizeSpec.zero]
 
+    let fix (nShape: int64 list) : ShapeSpec =
+        nShape |> List.map SizeSpec.fix
+
     /// pads shape by inserting broadcast dimension on the left
     let padLeft (sa: ShapeSpec) : ShapeSpec =
         (SizeSpec.Broadcast)::sa

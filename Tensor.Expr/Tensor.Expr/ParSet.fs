@@ -17,6 +17,7 @@ type Par = {
     member this.Name = this.Placeholder.Name
 
 
+
 /// A parameter instance.
 /// This provides storage for the value of the parameter.
 type ParInst = {
@@ -27,6 +28,7 @@ type ParInst = {
     /// The value of this parameter.
     Data: ITensor
 }
+
     
 
 /// A set of parameters.
@@ -133,12 +135,13 @@ type ParSet = private {
 
         // build and initalize
         let pgi = {
-            ParSet = pg
-            Storages = pvGroupStorages
-            ParInsts = pvInsts
+            _ParSet = pg
+            _TypeDeviceGroups = pvGroupStorages
+            _ParInsts = pvInsts
         }
         ParSetInst.init pgi
         pgi
+
 
 
 /// An instantiated parameter set.
@@ -146,7 +149,7 @@ and ParSetInst = private {
     /// The parameter set this instance belongs to.
     _ParSet: ParSet
     /// Storages for each contained type/device combination.
-    _Storage: Map<TypeName * ITensorDevice, Var * ITensor>
+    _TypeDeviceGroups: Map<TypeName * ITensorDevice, Var * ITensor>
     /// Contained parameter instances.
     _ParInsts: Map<VarName, ParInst>
 } with 
@@ -158,7 +161,13 @@ and ParSetInst = private {
     member this.ParInsts = this._ParInsts
 
     /// Storages for each contained type/device combination.
-    member this.Storage = this._Storage
+    member this.TypeDeviceGroups = this._TypeDeviceGroups
+
+    /// Variable containing all parameters for a type/device combination.
+    member this.TypeDeviceVars = this.TypeDeviceGroups |> Map.map (fun _ (var, value) -> var)
+
+    /// Tensor containing all parameters for a type/device combination.
+    member this.TypeDeviceValues = this.TypeDeviceGroups |> Map.map (fun _ (var, value) -> value)
 
     /// Initializes all parameters.
     static member init (pgi: ParSetInst) =
@@ -171,7 +180,7 @@ and ParSetInst = private {
 
     /// Variable values to use this parameter group instance for evaluation of an expression.
     member this.VarEnv =
-        this.Storage
+        this.TypeDeviceGroups
         |> Map.toSeq
         |> Seq.map (fun (_, (var, data)) -> var.Name, data)
         |> Map.ofSeq
