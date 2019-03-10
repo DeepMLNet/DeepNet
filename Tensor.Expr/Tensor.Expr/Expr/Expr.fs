@@ -251,11 +251,11 @@ type Expr<'T> (baseExpr: BaseExpr) =
     static member (<<>>) (x: Expr<'T>, y: Expr<'T>) = (x.Untyped) <<>> (y.Untyped) |> Expr<bool>
 
     // element-wise binary logic with basetype
-    static member (&&&&) (x: Expr<bool>, y: bool) = (x.Untyped) &&&& y
-    static member (||||) (x: Expr<bool>, y: bool) = (x.Untyped) |||| y
+    static member (&&&&) (x: Expr<bool>, y: bool) = (x.Untyped) &&&& (UExpr.scalar x.Dev y)
+    static member (||||) (x: Expr<bool>, y: bool) = (x.Untyped) |||| (UExpr.scalar x.Dev y)
 
-    static member (&&&&) (x: bool, y: Expr<bool>) = x &&&& (y.Untyped)
-    static member (||||) (x: bool, y: Expr<bool>) = x |||| (y.Untyped)
+    static member (&&&&) (x: bool, y: Expr<bool>) = (UExpr.scalar y.Dev x) &&&& (y.Untyped)
+    static member (||||) (x: bool, y: Expr<bool>) = (UExpr.scalar y.Dev x) |||| (y.Untyped)
 
     // elementwise binary arithmetic with basetype
     static member (+) (x: Expr<'T>, y: 'T) = (x.Untyped) + (UExpr.scalar x.Dev y) |> Expr<'T>   

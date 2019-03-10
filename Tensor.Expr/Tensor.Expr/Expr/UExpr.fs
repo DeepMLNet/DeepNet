@@ -406,43 +406,43 @@ type UExpr (baseExpr: BaseExpr) =
     static member (<<>>) (x: UExpr, y: UExpr) = UExpr.constructElementwise (fun x y -> {NotEqual.X=x.BaseExprCh; Y=y.BaseExprCh} :> IOp) x y
 
     // element-wise binary logic with basetype
-    static member (&&&&) (x: UExpr, y: bool) = x &&&& (UExpr.scalar x.Dev y)
-    static member (||||) (x: UExpr, y: bool) = x |||| (UExpr.scalar x.Dev y)
+    //static member (&&&&) (x: UExpr, y: bool) = x &&&& (UExpr.scalar x.Dev y)
+    //static member (||||) (x: UExpr, y: bool) = x |||| (UExpr.scalar x.Dev y)
 
-    static member (&&&&) (x: bool, y: UExpr) = (UExpr.scalar y.Dev x) &&&& y
-    static member (||||) (x: bool, y: UExpr) = (UExpr.scalar y.Dev x) |||| y
+    //static member (&&&&) (x: bool, y: UExpr) = (UExpr.scalar y.Dev x) &&&& y
+    //static member (||||) (x: bool, y: UExpr) = (UExpr.scalar y.Dev x) |||| y
 
     // elementwise binary arithmetic with basetype
-    static member (+) (x: UExpr, y: obj) = x + (UExpr.scalar x.Dev y)
-    static member (-) (x: UExpr, y: obj) = x - (UExpr.scalar x.Dev y)
-    static member (*) (x: UExpr, y: obj) = x * (UExpr.scalar x.Dev y)
-    static member (/) (x: UExpr, y: obj) = x / (UExpr.scalar x.Dev y)
-    static member (%) (x: UExpr, y: obj) = x % (UExpr.scalar x.Dev y)
-    static member Pow (x: UExpr, y: obj) = x ** (UExpr.scalar x.Dev y)
-    static member ( *** ) (x: UExpr, y: obj) = x ** (UExpr.scalar x.Dev y)   
+    //static member (+) (x: UExpr, y: obj) = x + (UExpr.scalar x.Dev y)
+    //static member (-) (x: UExpr, y: obj) = x - (UExpr.scalar x.Dev y)
+    //static member (*) (x: UExpr, y: obj) = x * (UExpr.scalar x.Dev y)
+    //static member (/) (x: UExpr, y: obj) = x / (UExpr.scalar x.Dev y)
+    //static member (%) (x: UExpr, y: obj) = x % (UExpr.scalar x.Dev y)
+    //static member Pow (x: UExpr, y: obj) = x ** (UExpr.scalar x.Dev y)
+    //static member ( *** ) (x: UExpr, y: obj) = x ** (UExpr.scalar x.Dev y)   
 
-    static member (+) (x: obj, y: UExpr) = (UExpr.scalar y.Dev x) + y
-    static member (-) (x: obj, y: UExpr) = (UExpr.scalar y.Dev x) - y
-    static member (*) (x: obj, y: UExpr) = (UExpr.scalar y.Dev x) * y
-    static member (/) (x: obj, y: UExpr) = (UExpr.scalar y.Dev x) / y
-    static member (%) (x: obj, y: UExpr) = (UExpr.scalar y.Dev x) % y
-    static member Pow (x: obj, y: UExpr) = (UExpr.scalar y.Dev x) ** y
-    static member ( *** ) (x: obj, y: UExpr) = (UExpr.scalar y.Dev x) ** y
+    //static member (+) (x: obj, y: UExpr) = (UExpr.scalar y.Dev x) + y
+    //static member (-) (x: obj, y: UExpr) = (UExpr.scalar y.Dev x) - y
+    //static member (*) (x: obj, y: UExpr) = (UExpr.scalar y.Dev x) * y
+    //static member (/) (x: obj, y: UExpr) = (UExpr.scalar y.Dev x) / y
+    //static member (%) (x: obj, y: UExpr) = (UExpr.scalar y.Dev x) % y
+    //static member Pow (x: obj, y: UExpr) = (UExpr.scalar y.Dev x) ** y
+    //static member ( *** ) (x: obj, y: UExpr) = (UExpr.scalar y.Dev x) ** y
 
     // element-wise binary comparison with basetype
-    static member (====) (x: UExpr, y: obj) = x ==== (UExpr.scalar x.Dev y)
-    static member (<<<<) (x: UExpr, y: obj) = x <<<< (UExpr.scalar x.Dev y)
-    static member (<<==) (x: UExpr, y: obj) = x <<== (UExpr.scalar x.Dev y)
-    static member (>>>>) (x: UExpr, y: obj) = x >>>> (UExpr.scalar x.Dev y)
-    static member (>>==) (x: UExpr, y: obj) = x >>== (UExpr.scalar x.Dev y)
-    static member (<<>>) (x: UExpr, y: obj) = x <<>> (UExpr.scalar x.Dev y)
+    //static member (====) (x: UExpr, y: obj) = x ==== (UExpr.scalar x.Dev y)
+    //static member (<<<<) (x: UExpr, y: obj) = x <<<< (UExpr.scalar x.Dev y)
+    //static member (<<==) (x: UExpr, y: obj) = x <<== (UExpr.scalar x.Dev y)
+    //static member (>>>>) (x: UExpr, y: obj) = x >>>> (UExpr.scalar x.Dev y)
+    //static member (>>==) (x: UExpr, y: obj) = x >>== (UExpr.scalar x.Dev y)
+    //static member (<<>>) (x: UExpr, y: obj) = x <<>> (UExpr.scalar x.Dev y)
 
-    static member (====) (x: obj, y: UExpr) = (UExpr.scalar y.Dev x) ==== y
-    static member (<<<<) (x: obj, y: UExpr) = (UExpr.scalar y.Dev x) <<<< y
-    static member (<<==) (x: obj, y: UExpr) = (UExpr.scalar y.Dev x) <<== y
-    static member (>>>>) (x: obj, y: UExpr) = (UExpr.scalar y.Dev x) >>>> y
-    static member (>>==) (x: obj, y: UExpr) = (UExpr.scalar y.Dev x) >>== y
-    static member (<<>>) (x: obj, y: UExpr) = (UExpr.scalar y.Dev x) <<>> y
+    //static member (====) (x: obj, y: UExpr) = (UExpr.scalar y.Dev x) ==== y
+    //static member (<<<<) (x: obj, y: UExpr) = (UExpr.scalar y.Dev x) <<<< y
+    //static member (<<==) (x: obj, y: UExpr) = (UExpr.scalar y.Dev x) <<== y
+    //static member (>>>>) (x: obj, y: UExpr) = (UExpr.scalar y.Dev x) >>>> y
+    //static member (>>==) (x: obj, y: UExpr) = (UExpr.scalar y.Dev x) >>== y
+    //static member (<<>>) (x: obj, y: UExpr) = (UExpr.scalar y.Dev x) <<>> y
 
     /// Dot product.
     /// Behavior depends on the dimensionality of the arguments.
