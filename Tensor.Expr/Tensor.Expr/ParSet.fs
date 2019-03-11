@@ -60,7 +60,7 @@ type ParSet = private {
 
     /// Create a parameter set from all parameter within the given expression that are
     /// under the specified path.
-    static member fromExpr (path: ContextPath) (expr: UExpr)  =
+    static member fromUExpr (path: ContextPath) (expr: UExpr)  =
         expr.VarMap
         |> Map.toSeq
         |> Seq.choose (fun (_, var) ->
@@ -68,6 +68,11 @@ type ParSet = private {
             | Some par when var.Name.Path |> ContextPath.startsWith path -> Some var
             | _ -> None)
         |> Seq.fold (fun parSet var -> parSet |> ParSet.addUntyped var) ParSet.empty
+
+    /// Create a parameter set from all parameter within the given expression that are
+    /// under the specified path.
+    static member fromExpr (path: ContextPath) (expr: Expr<_>)  =
+        ParSet.fromUExpr path expr.Untyped
 
     /// Merges two parameter set.
     /// The variables contained in the sets must be disjoint.

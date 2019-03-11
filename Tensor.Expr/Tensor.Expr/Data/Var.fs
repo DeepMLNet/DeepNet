@@ -46,7 +46,10 @@ type Var = {
 
     /// pretty string representation
     member this.Pretty = 
-        sprintf "%A<%s@%A>%A" this.Name this.DataType.Name this.Dev this.Shape
+        let sep =
+            if this.Par.IsSome then "@@"
+            else "@"
+        sprintf "%A<%s%s%A>%A" this.Name this.DataType.Name sep this.Dev this.Shape
 
     /// Create variable using name, shape, data type and storage device.
     static member make (name, dataType, dev, shape) : Var = {

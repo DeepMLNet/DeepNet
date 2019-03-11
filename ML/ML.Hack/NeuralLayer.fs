@@ -108,9 +108,9 @@ module NeuralLayer =
     /// Neural layer parameters.
     type Pars<'T> = {
         /// expression for the weights
-        Weights:        Expr<'T>
+        Weights:        Var<'T>
         /// expression for the biases
-        Bias:           Expr<'T>
+        Bias:           Var<'T>
         /// hyper-parameters
         HyperPars:      HyperPars<'T>
     }
@@ -133,8 +133,8 @@ module NeuralLayer =
     /// r = 4 * sqrt (6 / (hp.NInput + hp.NOutput)).
     /// The biases are initialized to zero.
     let pars (ctx: Context) rng (hp: HyperPars<'T>) = {
-        Weights     = Expr (Data<'T> (ctx / "Weights", [hp.NOutput; hp.NInput], initWeights rng))
-        Bias        = Expr (Data<'T> (ctx / "Bias",    [hp.NOutput],            initBias rng))
+        Weights     = Var<'T> (ctx / "Weights", [hp.NOutput; hp.NInput]) |> Var<_>.toPar (initWeights rng)
+        Bias        = Var<'T> (ctx / "Bias",    [hp.NOutput])            |> Var<_>.toPar (initBias rng)
         HyperPars   = hp
     }
 
@@ -147,13 +147,13 @@ module NeuralLayer =
         // bias    [outUnit]
         // input   [smpl, inUnit]
         // pred    [smpl, outUnit]
-        let act = input .* pars.Weights.T + pars.Bias
+        let act = input .* (Expr pars.Weights).T + Expr pars.Bias
         ActFunc.apply pars.HyperPars.ActFunc act
 
     /// The regularization term for this layer.
     let regul (pars: Pars<'T>) =
-        let l1reg = Regul.lRegul pars.HyperPars.L1Regul 1.0 pars.Weights
-        let l2reg = Regul.lRegul pars.HyperPars.L2Regul 2.0 pars.Weights
+        let l1reg = Regul.lRegul pars.HyperPars.L1Regul 1.0 (Expr pars.Weights)
+        let l2reg = Regul.lRegul pars.HyperPars.L2Regul 2.0 (Expr pars.Weights)
         l1reg + l2reg
 
 
@@ -162,15 +162,34 @@ module User =
 
     let build() =
         let rng = System.Random 1
+        
+        // context
         let ctx = Context.root HostTensor.Dev
+        
+        // symbolic sizes
         let nSamples = SizeSpec.symbol "nSamples"
         let nFeatures = SizeSpec.symbol "nFeatures"
         let nOutputs = SizeSpec.symbol "nOutputs"
+
+        // model
         let inputVar = Var<float32> (ctx / "input", [nSamples; nFeatures])
         let input = Expr inputVar
         let hyperPars = NeuralLayer.HyperPars.standard nFeatures nOutputs
         let pars = NeuralLayer.pars ctx rng hyperPars
         let pred = NeuralLayer.pred pars input
+        printfn "%s" (pred.ToString())
+
+        // substitute symbol sizes
+        let sizeEnv = Map [
+            SizeSpec.extractSymbol nFeatures, SizeSpec.fix 10L
+            SizeSpec.extractSymbol nOutputs, SizeSpec.fix 1L
+        ]
+        //let pred = pred |> Expr.substSymSizes sizeEnv
+
+        // parameter set
+        let parSet = ParSet.fromExpr ContextPath.root pred
+        let parSetInst = ParSet.inst ContextPath.root parSet
+
         printfn "%s" (pred.ToString())
 
         // next step: calculate derivatives and get optimizer working.
