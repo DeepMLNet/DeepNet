@@ -9,16 +9,22 @@ open Tensor.Backend
 [<Struct; StructuredFormatDisplay("{Pretty}")>]
 type VarName = VarName of ContextPath with
 
-    /// Pretty string.
-    member this.Pretty =
+    /// The context path of this variable.
+    member this.Path =
         let (VarName cp) = this
-        cp.Pretty
+        cp
+
+    /// Pretty string.
+    member this.Pretty = this.Path.Pretty
 
     /// Unique variable path string.
-    member this.Str =
-        let (VarName cp) = this
-        cp.Str  
+    member this.Str = this.Path.Str
 
+
+
+type ParameterSpec = {
+    Init:   OrdRef<ITensor -> unit>
+}
 
 
 /// Variable specification (not generic over data type).
@@ -32,6 +38,8 @@ type Var = {
     Dev:       ITensorDevice
     /// symbolic shape
     Shape:     ShapeSpec
+    /// parameter
+    Par:       ParameterSpec option
 } with
     /// data type
     member this.DataType = TypeName.getType this.TypeName
@@ -40,17 +48,27 @@ type Var = {
     member this.Pretty = 
         sprintf "%A<%s@%A>%A" this.Name this.DataType.Name this.Dev this.Shape
 
-    /// Create variable using name, shape, data type name and storage device.
-    static member make (name, typeName, dev, shape) : Var =
-        {Name=name; TypeName=typeName; Shape=shape; Dev=dev}
-
     /// Create variable using name, shape, data type and storage device.
-    static member make (name, dataType, dev, shape) : Var =
-        {Name=name; TypeName=TypeName.ofTypeInst dataType; Shape=shape; Dev=dev}
+    static member make (name, dataType, dev, shape) : Var = {
+        Name = name
+        TypeName = TypeName.ofTypeInst dataType
+        Shape = shape
+        Dev = dev
+        Par = None
+    }
 
     /// Create variable using context, data type and shape.
-    static member make (ctx: Context, dataType, shape) : Var =
-        {Name=VarName ctx.Path; TypeName=TypeName.ofTypeInst dataType; Shape=shape; Dev=ctx.Dev}
+    static member make (ctx: Context, dataType, shape) : Var = {
+        Name = VarName ctx.Path
+        TypeName = TypeName.ofTypeInst dataType
+        Shape = shape
+        Dev = ctx.Dev
+        Par = None    
+    }
+
+    static member toPar (init: ITensor -> unit) (var: Var) = 
+        let parSpec = {Init = OrdRef init}
+        {var with Par = Some parSpec}
 
     /// name of variable
     static member name (vs: Var) = vs.Name
@@ -89,11 +107,15 @@ type Var<'T> (_var: Var) =
 
     /// Create variable using name, shape and storage device.
     new (name, dev, shape) =
-        Var<'T> ({Name=name; TypeName=TypeName.ofType<'T>; Dev=dev; Shape=shape})
+        Var<'T> (Var.make (name, typeof<'T>, dev, shape))
 
     /// Create variable using context and shape.
     new (ctx: Context, shape) =
-        Var<'T> ({Name=VarName ctx.Path; TypeName=TypeName.ofType<'T>; Dev=ctx.Dev; Shape=shape})
+        Var<'T> (Var.make (ctx, typeof<'T>, shape))
+
+    static member toPar (init: Tensor<'T> -> unit) (var: Var<'T>) =
+        let uInit (t: ITensor) = init (t :?> Tensor<'T>)
+        var.Untyped |> Var.toPar uInit |> Var<'T>
 
     interface System.IEquatable<Var<'T>> with
         member this.Equals other = this.Untyped = other.Untyped

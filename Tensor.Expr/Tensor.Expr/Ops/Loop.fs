@@ -347,7 +347,7 @@ type Loop = {
                     match vars |> Map.tryFindKey (fun vs _ -> vs.Name = name) with
                     | Some _ -> genName (i + 1)
                     | None -> name
-                let vs = Var.make (genName 0, expr.TypeName, expr.Dev, expr.Shape)
+                let vs = Var.make (genName 0, expr.DataType, expr.Dev, expr.Shape)
                 let lv = Loop.ConstArg (addArg expr)
                 vars <- vars |> Map.add vs lv
                 vs

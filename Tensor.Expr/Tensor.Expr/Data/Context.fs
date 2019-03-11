@@ -50,6 +50,13 @@ type ContextPath = ContextPath of string list with
     /// A resource in the root context of the specified name.
     static member from (name: string) = ContextPath.root / name
 
+    /// True if `path` begins with `start` and is therefore a sub-path of `start`.
+    static member startsWith (start: ContextPath) (path: ContextPath) =
+        if path.Parts.Length >= start.Parts.Length then
+            path.Parts.[0 .. start.Parts.Length-1] = start.Parts
+        else
+            false
+
 
 
 /// A context for named resource creation.

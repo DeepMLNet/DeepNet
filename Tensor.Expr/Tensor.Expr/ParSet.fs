@@ -6,23 +6,11 @@ open Tensor.Backend
 
 
 
-/// A parameter.
-type Par = {
-    /// Placeholder variable.
-    Placeholder: Var
-    /// Initialization function.
-    Init: ITensor -> unit
-} with
-    /// Name of placeholder variable.
-    member this.Name = this.Placeholder.Name
-
-
-
 /// A parameter instance.
 /// This provides storage for the value of the parameter.
 type ParInst = {
-    /// The parameter this parameter instance is representing.
-    Par: Par
+    /// The placeholder variable for this parameter.
+    Var: Var
     /// The expression used to access the parameter value.
     Expr: UExpr
     /// The value of this parameter.
@@ -33,66 +21,71 @@ type ParInst = {
 
 /// A set of parameters.
 type ParSet = private {
-    /// The context path to store the parameter set.
-    StoreBasePath: ContextPath
-    /// Parameters in this set.
-    Pars: Par list
-    /// Placeholder variables in this set.
-    Placeholders: Set<VarName>
+    /// Variables that are placeholders for parameters.
+    _Vars: Var list
+    /// Variables names of variables in this set.
+    _VarNames: Set<VarName>
 } with
 
+    /// Variables that are placeholders for parameters.
+    member this.Vars = this._Vars
+
     /// Create new parameter group using the specified storage path.
-    static member create (storePath: ContextPath): ParSet =
-        {
-            StoreBasePath = storePath
-            Pars = List.empty
-            Placeholders = Set.empty
-        }
-
-    /// No initialization.
-    static member noInit (_: #ITensor) = ()
+    static member empty : ParSet = {
+        _Vars = List.empty
+        _VarNames = Set.empty
+    }
 
     /// Add a placeholder variable to this parameter group.
-    static member addUntyped (var: Var) (init: ITensor -> unit) (pg: ParSet) =
-        if pg.Placeholders |> Set.contains var.Name then
-            failwithf "ParameterGroup %A already contains variable %A." pg.StoreBasePath var
-        let pv = {
-            Placeholder = var
-            Init = init
-        }
+    static member addUntyped (var: Var) (pg: ParSet) =
+        if var.Par.IsNone then
+            failwithf "Variable %A is not a parameter." var.Par
+        if pg._VarNames |> Set.contains var.Name then
+            failwithf "Parameter set already contains variable %A." var
         {pg with 
-            Pars = pv :: pg.Pars
-            Placeholders = pg.Placeholders |> Set.add var.Name
+            _Vars = var :: pg.Vars
+            _VarNames = pg._VarNames |> Set.add var.Name
         }
 
     /// Add a placeholder variable to this parameter group.
-    static member add (var: Var<'T>) (init: Tensor<'T> -> unit) (pg: ParSet) =
-        let initUntyped (t: ITensor) = init (t :?> Tensor<'T>)
-        ParSet.addUntyped var.Untyped initUntyped pg
+    static member add (var: Var<'T>) (pg: ParSet) =
+        ParSet.addUntyped var.Untyped pg
 
     /// Remove a placeholder variable from this parameter group.
     static member remove (varName: VarName) (pg: ParSet) =
         {pg with
-            Pars = pg.Pars |> List.filter (fun pv -> pv.Placeholder.Name <> varName)
-            Placeholders = pg.Placeholders |> Set.remove varName
+            _Vars = pg.Vars |> List.filter (fun pv -> pv.Name <> varName)
+            _VarNames = pg._VarNames |> Set.remove varName
         }
 
-    /// Instantiate this parameter set
-    static member inst (sizeEnv: SymSizeEnv) (pg: ParSet) =
-        // substitute symbolic sizes into all variables 
-        let pvs =
-            pg.Pars
-            |> List.map (fun pv -> {pv with Placeholder = pv.Placeholder |> Var.substSymSizes sizeEnv})
+    /// Create a parameter set from all parameter within the given expression that are
+    /// under the specified path.
+    static member fromExpr (path: ContextPath) (expr: UExpr)  =
+        expr.VarMap
+        |> Map.toSeq
+        |> Seq.choose (fun (_, var) ->
+            match var.Par with
+            | Some par when var.Name.Path |> ContextPath.startsWith path -> Some var
+            | _ -> None)
+        |> Seq.fold (fun parSet var -> parSet |> ParSet.addUntyped var) ParSet.empty
 
+    /// Merges two parameter set.
+    /// The variables contained in the sets must be disjoint.
+    static member merge (a: ParSet) (b: ParSet) =
+        (a, b.Vars)
+        ||> Seq.fold (fun a var -> a |> ParSet.addUntyped var)
+
+    /// Instantiate the parameter set using the specified path for storage.
+    static member inst (storePath: ContextPath) (pg: ParSet) =
         // check that shapes of all variables can be evaluated
-        for pv in pvs do
-            if not (ShapeSpec.canEval pv.Placeholder.Shape) then
-                failwithf "Cannot evaluate shape of variable %A." pv.Placeholder
+        for pv in pg.Vars do
+            if not (ShapeSpec.canEval pv.Shape) then
+                failwithf "Cannot evaluate shape of variable %A." pv
 
         // group variables by data type and storage device
         let pvGroups =
-            pg.Pars
-            |> List.groupBy (fun pv -> pv.Placeholder.TypeName, pv.Placeholder.Dev)
+            pg.Vars
+            |> List.groupBy (fun pv -> pv.TypeName, pv.Dev)
             |> Map.ofList
         
         // for each group perform instantiation
@@ -100,8 +93,8 @@ type ParSet = private {
             pvGroups
             |> Map.map (fun (typeName, dev) pvs ->
                 // create symbolic group storage variable
-                let groupSize = pvs |> List.sumBy (fun pv -> ShapeSpec.nElem pv.Placeholder.Shape)
-                let groupName = pg.StoreBasePath / sprintf "<%A@%A>" typeName dev
+                let groupSize = pvs |> List.sumBy (fun pv -> ShapeSpec.nElem pv.Shape)
+                let groupName = storePath / sprintf "<%A@%A>" typeName dev
                 let groupVar = Var.make (VarName groupName, typeName.Type, dev, [groupSize])
                 let groupExpr = UExpr groupVar
                 
@@ -112,12 +105,12 @@ type ParSet = private {
                 let pvInsts =
                     (SizeSpec.zero, pvs)
                     ||> List.mapFold (fun pos pv ->
-                        let size = ShapeSpec.nElem pv.Placeholder.Shape
-                        let varSlice = groupExpr.[pos .. pos + size - 1L] |> UExpr.reshape pv.Placeholder.Shape
+                        let size = ShapeSpec.nElem pv.Shape
+                        let varSlice = groupExpr.[pos .. pos + size - 1L] |> UExpr.reshape pv.Shape
                         let nPos, nSize = SizeSpec.eval pos, SizeSpec.eval size
-                        let nShape = ShapeSpec.eval pv.Placeholder.Shape
+                        let nShape = ShapeSpec.eval pv.Shape
                         let dataSlice = groupData.[nPos .. nPos + nSize - 1L] |> ITensor.reshape nShape
-                        (pv.Placeholder.Name, {Par=pv; Expr=varSlice; Data=dataSlice}), pos + size)
+                        (pv.Name, {Var=pv; Expr=varSlice; Data=dataSlice}), pos + size)
                     |> fst
                     |> Map.ofList
 
@@ -136,6 +129,7 @@ type ParSet = private {
         // build and initalize
         let pgi = {
             _ParSet = pg
+            _StorePath = storePath
             _TypeDeviceGroups = pvGroupStorages
             _ParInsts = pvInsts
         }
@@ -148,6 +142,8 @@ type ParSet = private {
 and ParSetInst = private {
     /// The parameter set this instance belongs to.
     _ParSet: ParSet
+    /// Base path of parameter storage.
+    _StorePath: ContextPath
     /// Storages for each contained type/device combination.
     _TypeDeviceGroups: Map<TypeName * ITensorDevice, Var * ITensor>
     /// Contained parameter instances.
@@ -156,6 +152,9 @@ and ParSetInst = private {
 
     /// The parameter set this instance belongs to.
     member this.ParSet = this._ParSet
+
+    /// Base path of parameter storage.
+    member this.StorePath = this._StorePath
 
     /// Contained parameter instances.
     member this.ParInsts = this._ParInsts
@@ -172,7 +171,7 @@ and ParSetInst = private {
     /// Initializes all parameters.
     static member init (pgi: ParSetInst) =
         for KeyValue (varName, pi) in pgi.ParInsts do
-            pi.Par.Init pi.Data
+            pi.Var.Par.Value.Init.Value pi.Data
 
     /// Placeholder substituions to use this parameter group instance in an expression.
     member this.VarSubsts =
