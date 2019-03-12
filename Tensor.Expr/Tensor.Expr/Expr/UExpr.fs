@@ -816,9 +816,20 @@ type UExpr (baseExpr: BaseExpr) =
     static member interpolate3D interpolator (x: UExpr) (y: UExpr) (z: UExpr) =
         UExpr.interpolate interpolator [x; y; z]
 
+    /// Substitutes the variables within the expression tree.
+    static member substVars (env: Map<VarName, UExpr>) (expr: UExpr) =
+        let env = env |> Map.map (fun _ sExpr -> sExpr.BaseExpr)
+        expr.BaseExpr |> BaseExpr.substVars env |> UExpr
+
     /// Evaluates the expression into a numeric value using the specified evaluation envirnoment.
-    static member evalWithEnv (evalEnv: EvalEnv) (expr: UExpr) : Tensor.ITensor = 
-        let chVals = BaseExprEval.eval evalEnv expr.BaseExpr
+    static member evalWithEnv (evalEnv: EvalEnv) (expr: UExpr) : Tensor.ITensor =
+        // Infer symbolic sizes from variable environment and substitute them into expression.
+        let varValMap = VarValMap.make evalEnv.VarEnv expr.VarMap
+        let symSizeEnv = varValMap |> VarValMap.inferSymSizes SymSizeEnv.empty
+        let substExpr = expr |> UExpr.substSymSizes symSizeEnv
+
+        // Evaluate.
+        let chVals = BaseExprEval.eval evalEnv substExpr.BaseExpr
         chVals.[Ch.Default]        
 
     /// Evaluates the expression into a numeric value.
@@ -826,8 +837,4 @@ type UExpr (baseExpr: BaseExpr) =
         let evalEnv : EvalEnv = {VarEnv=varEnv; Tracer=NoTracer()}
         UExpr.evalWithEnv evalEnv expr
 
-    /// Substitutes the variables within the expression tree.
-    static member substVars (env: Map<VarName, UExpr>) (expr: UExpr) =
-        let env = env |> Map.map (fun _ sExpr -> sExpr.BaseExpr)
-        expr.BaseExpr |> BaseExpr.substVars env |> UExpr
 

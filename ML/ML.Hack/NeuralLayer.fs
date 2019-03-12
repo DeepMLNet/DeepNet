@@ -205,6 +205,17 @@ module User =
     let build() =
         let rng = System.Random 1
         
+        // make training data
+        let x = HostTensor.linspace -2.0f 2.0f 100L
+        let y1 = 3.0f + 7.0f * x ** 2.0f
+        let y2 = 1.0f + 2.0f * x ** 3.0f + 4.0f * x ** 4.0f
+        let y = Tensor.concat 1 [y1.[*, NewAxis]; y2.[*, NewAxis]]
+        printfn "x: %A" x
+        printfn "y: %A" y
+        let exps = HostTensor.arange 0.0f 1.0f 10.0f
+        let f = x.[*, NewAxis] ** exps.[NewAxis, *]
+        printfn "f: %A" f.Shape
+
         // context
         let ctx = Context.root HostTensor.Dev
         
@@ -226,8 +237,8 @@ module User =
 
         // substitute symbol sizes
         let sizeEnv = Map [
-            SizeSpec.extractSymbol nFeatures, SizeSpec.fix 10L
-            SizeSpec.extractSymbol nOutputs, SizeSpec.fix 5L
+            SizeSpec.extractSymbol nFeatures, SizeSpec.fix f.Shape.[1]
+            SizeSpec.extractSymbol nOutputs, SizeSpec.fix y.Shape.[1]
         ]
         let loss = loss |> Expr.substSymSizes sizeEnv
         printfn "substituted: %s\n" (loss.ToString())
@@ -239,6 +250,25 @@ module User =
         printfn "with ParSet: %s\n" (loss.ToString())
 
         // use optimizer
+        let opt = Optimizers.Adam.Adam.make (loss, parSetInst)
+        let minStep = opt.Step
+        let minLossStep = minStep |> EvalUpdateBundle.addExpr loss
+        printfn "Minimiziation step: %A\n" minStep
 
+        // evaluate using training data
+        let varEnv = 
+            VarEnv.empty
+            |> VarEnv.add inputVar f
+            |> VarEnv.add targetVar y
+            |> parSetInst.Use
+        let lossVal = loss |> Expr.eval varEnv
+        printfn "loss value: %A" lossVal
+
+        // perform training step
+        printfn "training..."
+        for i in 1..10000 do
+            let results = minLossStep |> EvalUpdateBundle.exec varEnv
+            printf "step %d loss value: %f             \r" i (results.Get loss).Value
+        printfn ""
 
         ()

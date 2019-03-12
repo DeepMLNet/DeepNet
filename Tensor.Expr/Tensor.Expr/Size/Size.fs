@@ -283,8 +283,8 @@ type SizeSpec =
         match this with
         | SizeSpec.Base (BaseSize.Sym s)   -> Set [s]
         | SizeSpec.Base (BaseSize.Fixed _) -> Set.empty
-        | SizeSpec.Broadcast      -> Set.empty
-        | SizeSpec.Multinom m     -> m.ContainedSizeSymbols
+        | SizeSpec.Broadcast               -> Set.empty
+        | SizeSpec.Multinom m              -> m.ContainedSizeSymbols
             
     /// true if the specified SizeSymbol occurs in this SizeSpec
     member this.ContainsSymbol sym =

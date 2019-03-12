@@ -17,12 +17,13 @@
     <Compile Include="Size/Size.fs" />
     <Compile Include="Size/Shape.fs" />
     <Compile Include="Size/Range.fs" />
-    <Compile Include="Size/Env.fs" />
+    <Compile Include="Size\SymSizeEnv.fs" />
     <Compile Include="Data/TypeName.fs" />
     <Compile Include="Data/Const.fs" />
     <Compile Include="Data\Context.fs" />
     <Compile Include="Data/Var.fs" />
     <Compile Include="Data/VarEnv.fs" />
+    <Compile Include="Data\VarValMap.fs" />
     <Compile Include="Elem/Expr.fs" />
     <Compile Include="Elem/Unified.fs" />
     <Compile Include="Elem/Interpreter.fs" />

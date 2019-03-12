@@ -26,7 +26,7 @@ type Cfg = {
 
 
 
-type AdamPart (pars: Var, wrtParts: UExpr, cfg: Cfg) as this =
+type AdamPart (pars: Var, wrtParts: UExpr) =
     let typ = pars.DataType
     let dev = pars.Dev
     let shp = ShapeSpec.eval pars.Shape 
@@ -38,7 +38,6 @@ type AdamPart (pars: Var, wrtParts: UExpr, cfg: Cfg) as this =
     let decayMom1 = ITensor.zeros typ dev []
     let decayMom2 = ITensor.zeros typ dev []
     let offset = ITensor.zeros typ dev []
-    do this.ApplyCfg cfg
 
     // state
     let _iter = ITensor.zeros typ dev []
@@ -89,7 +88,7 @@ type AdamPart (pars: Var, wrtParts: UExpr, cfg: Cfg) as this =
         |> EvalUpdateBundle.addData _estMom2B estMom2B
 
 
-type Adam (loss: UExpr, parSetInst: ParSetInst) =
+type Adam private (loss: UExpr, parSetInst: ParSetInst) =
 
     do if loss.NDims <> 0 then 
         failwithf "Loss must be a scalar, but it has shape %A." loss.Shape
@@ -101,8 +100,17 @@ type Adam (loss: UExpr, parSetInst: ParSetInst) =
     let parts =
         parSetInst.TypeDeviceVars
         |> Map.toSeq
-        |> Seq.map (fun (_, parPartVar) -> AdamPart (parPartVar, deriv.Wrt parPartVar, cfg))
+        |> Seq.map (fun (_, parPartVar) -> 
+            let part = AdamPart (parPartVar, deriv.Wrt parPartVar)
+            part.ApplyCfg cfg
+            part)
         |> List.ofSeq
+
+    static member make (loss: UExpr, parSetInst: ParSetInst) =
+        Adam (loss, parSetInst)
+
+    static member make (loss: Expr<'T>, parSetInst: ParSetInst) =
+        Adam (loss.Untyped, parSetInst)
 
     member this.Cfg
         with get () = cfg

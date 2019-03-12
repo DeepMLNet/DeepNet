@@ -34,20 +34,13 @@ module SymSizeEnv =
                      | SimpleRangeSpec.DynStartSymSize (s, elems) ->
                          SimpleRangeSpec.DynStartSymSize (s, subst env elems))
 
-    /// adds inferred symbol value
+    /// Add symbol value.
     let add sym value env =
-        if subst env value = SizeSpec.Base (BaseSize.Sym sym) then
-            failwithf "inferrering %A = %A would introduce a loop" sym value
+        env |> Map.add sym value 
 
-        match Map.tryFind sym env with
-        | Some other ->
-            if other = value then env
-            else failwithf "%A must be %A, but was inferred to be %A previously" sym value other
-        | None -> 
-            env |> Map.add sym value 
-            
-    let tryGetInferred sym env = 
-        Map.tryFind sym env
+    /// Remove symbol value.
+    let remove sym env =
+        env |> Map.remove sym
 
     /// merges two environments
     let merge aEnv bEnv =

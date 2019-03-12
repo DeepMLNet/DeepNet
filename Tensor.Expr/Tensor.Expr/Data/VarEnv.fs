@@ -1,7 +1,6 @@
 ﻿namespace Tensor.Expr
 
 open Tensor
-open Tensor.Backend
 open DeepNet.Utils
 
 
@@ -19,7 +18,11 @@ type VarEnv = VarEnv of Map<VarName, ITensor> with
 
     /// Get variable value by name.
     member this.Item
-        with get(varName: VarName) : ITensor = this.Values.[varName] 
+        with get(varName: VarName) : ITensor = 
+            match this.Values |> Map.tryFind varName with
+            | Some value -> value
+            | None ->
+                failwithf "The variable %A does not exist in the variable environment." varName
 
     /// Creates a new, empty VarEnv.
     static member empty = VarEnv Map.empty
@@ -44,7 +47,7 @@ type VarEnv = VarEnv of Map<VarName, ITensor> with
         varEnv |> VarEnv.addVarName baseVar.Name value
 
     /// Add variable value to environment.
-    static member add (var: Var<'T>) (value: ITensor) (varEnv: VarEnv)  =
+    static member add (var: Var<'T>) (value: Tensor<'T>) (varEnv: VarEnv)  =
         varEnv |> VarEnv.addBaseVar var.Untyped value
 
     /// Remove variable by name from environment.
@@ -59,65 +62,8 @@ type VarEnv = VarEnv of Map<VarName, ITensor> with
     static member ofSeq (entries: (Var * ITensor) seq) =
         (VarEnv.empty, entries)
         ||> Seq.fold (fun ve (var, value) -> ve |> VarEnv.addBaseVar var value)
+    
 
-
-
-///// specification of variable storage locations
-//type VarLocs = Map<VarName, ITensorDevice>
-
-///// specification of variable strides
-//type VarStrides = Map<VarName, int64 list>
-
-    ///// infers symbol sizes from the variable environment
-    //static member inferSymSizes (symSizeEnv: SymSizeEnv) (varEnv: VarEnv) : SymSizeEnv =
-    //    (symSizeEnv, varEnv) ||> Map.fold 
-    //        (fun env vName (vSym, vVal) ->   
-    //            if Var.nDims vSym <> ITensor.nDims vVal then
-    //                failwithf "dimensionality mismatch: a value of shape %A was provided for variable %A"
-    //                    (ITensor.shape vVal) vSym
-
-    //            (Var.shape vSym, ITensor.shape vVal)
-    //            ||> List.zip
-    //            |> List.fold (fun env (svSym, svVal) ->
-    //                let failShape () =
-    //                    let vSymShp = vSym.Shape |> ShapeSpec.substSymbols env 
-    //                    failwithf "expected variable %A with (inferred) shape %A but got value with shape %A"
-    //                        vSym vSymShp vVal.Shape
-    //                match svSym |> SizeSpec.substSymbols env |> SizeSpec.simplify  with
-    //                | SizeSpec.Base (BaseSize.Sym sym) -> env |> SymSizeEnv.add sym (SizeSpec.fix svVal)
-    //                | SizeSpec.Base (BaseSize.Fixed f) -> 
-    //                    if f .= svVal then env
-    //                    else failShape ()
-    //                | SizeSpec.Broadcast ->
-    //                    if 1L = svVal then env
-    //                    else failShape ()
-    //                | SizeSpec.Multinom m -> failShape ()
-    //            ) env)
-
-
-    ///// substitues the given symbol sizes into the variable environment
-    //let substSymSizes symSizes (varEnv: VarEnv) : VarEnv =
-    //    varEnv 
-    //    |> Map.toSeq
-    //    |> Seq.map (fun (name, (vs, value)) -> name, (Var.substSymSizes symSizes vs, value))
-    //    |> Map.ofSeq
-
-    ///// checks that the values are valid in type and shape for the variables
-    //let check (varEnv: VarEnv) =
-    //    varEnv |> Map.iter (fun name (vs, value) ->
-    //        if TypeName.ofTypeInst value.DataType <> vs.TypeName then
-    //            failwithf "variable %A was expected to be of type %A but a \
-    //                       value with type %A was provided" vs.Name vs.TypeName.Type value.DataType
-
-    //        let ss = Var.shape vs
-    //        match ShapeSpec.tryEval ss with
-    //        | Some ns when ITensor.shape value <> ns ->
-    //            failwithf "variable %A was expected to be of shape %A (%A) but a \
-    //                       value with shape %A was provided" vs.Name ns ss (ITensor.shape value)
-    //        | None -> failwithf "variable %A contains size symbols that cannot be evaluated" vs
-    //        | _ -> ()
-    //    )
-        
     ///// gets the type names of the variable value arrays
     //let valueTypeNames (varEnv: VarEnv) =
     //    varEnv |> Map.map (fun _ (vs, vVal) -> vs.TypeName)
@@ -129,5 +75,13 @@ type VarEnv = VarEnv of Map<VarName, ITensor> with
     ///// gets the strides of the variable value arrays
     //let valueStrides (varEnv: VarEnv) : VarStrides =
     //    varEnv |> Map.map (fun _ (vs, vVal) -> vVal.Layout.Stride)
+
+
+    ///// specification of variable storage locations
+    //type VarLocs = Map<VarName, ITensorDevice>
+
+    ///// specification of variable strides
+    //type VarStrides = Map<VarName, int64 list>
+
 
 

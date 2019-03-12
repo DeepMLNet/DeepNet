@@ -99,7 +99,7 @@ type ParSet = private {
             |> Map.map (fun (typeName, dev) pvs ->
                 // create symbolic group storage variable
                 let groupSize = pvs |> List.sumBy (fun pv -> ShapeSpec.nElem pv.Shape)
-                let groupName = storePath / sprintf "<%A@%A>" typeName dev
+                let groupName = storePath / sprintf "ParSet<%A@%A>" typeName dev
                 let groupVar = Var.make (VarName groupName, typeName.Type, dev, [groupSize])
                 let groupExpr = UExpr groupVar
                 

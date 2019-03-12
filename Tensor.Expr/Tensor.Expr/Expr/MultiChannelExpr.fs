@@ -37,6 +37,9 @@ type MultiChannelExpr (baseExpr: BaseExpr) =
     member this.Vars = baseExpr.Vars
     static member vars (expr: MultiChannelExpr) = expr.Vars
 
+    member this.VarMap = baseExpr.VarMap
+    static member varMap (expr: MultiChannelExpr) = expr.VarMap
+
     member this.CanEvalAllSymSizes = baseExpr.CanEvalAllSymSizes
     static member canEvalAllSymSizes (expr: MultiChannelExpr) = expr.CanEvalAllSymSizes
     
@@ -89,10 +92,20 @@ type MultiChannelExpr (baseExpr: BaseExpr) =
         let xs = xs |> List.map UExpr.baseExprCh
         Ops.Loop.withLift length vars channels xs |> MultiChannelExpr
 
+    /// Evaluates all channels of the expression into numeric values using the specified evaluation envirnoment.
+    static member evalWithEnv (evalEnv: EvalEnv) (expr: MultiChannelExpr) = 
+        // Infer symbolic sizes from variable environment and substitute them into expression.
+        let varValMap = VarValMap.make evalEnv.VarEnv expr.VarMap
+        let symSizeEnv = varValMap |> VarValMap.inferSymSizes SymSizeEnv.empty
+        let substExpr = expr |> MultiChannelExpr.substSymSizes symSizeEnv
+
+        // Evaluate.
+        BaseExprEval.eval evalEnv substExpr.BaseExpr
+
     /// Evaluates all channels of the expression into numeric values.
     static member eval (varEnv: VarEnv) (expr: MultiChannelExpr) = 
         let evalEnv : EvalEnv = {VarEnv=varEnv; Tracer=NoTracer()}    
-        BaseExprEval.eval evalEnv expr.BaseExpr
+        MultiChannelExpr.evalWithEnv evalEnv expr
 
     /// Substitutes the variables within the expression tree.
     static member substVars (env: Map<VarName, UExpr>) (expr: MultiChannelExpr) =

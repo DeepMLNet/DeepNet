@@ -49,10 +49,9 @@ type MultiplyDeriv(op: Multiply) =
 type DivideDeriv(op: Divide) =
     interface IDerivableOp with      
         member this.Deriv dOp =
-            failwith "TODO: FIX"
             let env = DerivTools.Env.make op dOp 
-            let dX = env.DOp * (UExpr.padLeft env.Y)
-            let dY = env.DOp * (UExpr.padLeft env.X)
+            let dX = env.DOp * (UExpr.padLeft (env.Y ** (-env.One)))
+            let dY = env.DOp * (UExpr.padLeft (-env.X * env.Y ** (-env.Two)))
             DerivTools.binary dX dY
 
 
