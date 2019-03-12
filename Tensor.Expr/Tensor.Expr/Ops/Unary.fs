@@ -469,7 +469,9 @@ type Subtensor = {X: BaseExprCh; Range: SimpleRangesSpec} with
                 |> SimpleRangesSpecArgs.resolveDynElems dynVals 
                 |> SimpleRangesSpec.eval
             (ArgValue.unaryX argVals).[range] |> Ch.only
-
+    interface IOpFormat with
+        member this.Text =
+            sprintf "Subtensor%A" this.Range
 
 /// Reverses the tensor in the specified dimension.
 type ReverseAxis = {X: BaseExprCh; Axis: int} with
