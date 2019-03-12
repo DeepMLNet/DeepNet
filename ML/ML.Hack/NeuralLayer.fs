@@ -177,20 +177,22 @@ module User =
         let hyperPars = NeuralLayer.HyperPars.standard nFeatures nOutputs
         let pars = NeuralLayer.pars ctx rng hyperPars
         let pred = NeuralLayer.pred pars input
-        printfn "%s" (pred.ToString())
+        printfn "Original: %s\n" (pred.ToString())
 
         // substitute symbol sizes
         let sizeEnv = Map [
             SizeSpec.extractSymbol nFeatures, SizeSpec.fix 10L
             SizeSpec.extractSymbol nOutputs, SizeSpec.fix 1L
         ]
-        //let pred = pred |> Expr.substSymSizes sizeEnv
+        let pred = pred |> Expr.substSymSizes sizeEnv
+        printfn "substituted: %s\n" (pred.ToString())
 
         // parameter set
         let parSet = ParSet.fromExpr ContextPath.root pred
         let parSetInst = ParSet.inst ContextPath.root parSet
+        let pred = parSetInst.Use pred
 
-        printfn "%s" (pred.ToString())
+        printfn "with ParSet: %s\n" (pred.ToString())
 
         // next step: calculate derivatives and get optimizer working.
 

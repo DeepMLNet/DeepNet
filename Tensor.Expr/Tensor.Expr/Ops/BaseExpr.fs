@@ -315,7 +315,7 @@ type BaseExpr private (op: IOp) =
             replacement.GetOrAdd subExpr (fun _ ->
                 subExpr.Op.Args
                 |> Map.map (fun _ arg -> arg |> BaseExprCh.map mapStep)
-                |> expr.Op.ReplaceArgs 
+                |> subExpr.Op.ReplaceArgs 
                 |> fn
                 |> BaseExpr.ofOp)
         mapStep expr
