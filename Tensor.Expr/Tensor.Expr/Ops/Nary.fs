@@ -92,7 +92,7 @@ type BuildTensor = {Shape: ShapeSpec; Ranges: BaseRangesSpec list; Xs: BaseExprC
         member this.Args = Args.nary this.Xs
         member this.ReplaceArgs args = {this with Xs=Args.naryXs args} :> _
         member this.SubstSymSizes env = 
-            let sSize = Size.substSymbols env
+            let sSize = Size.substSyms env
             {this with Shape=ShapeSpec.substSymbols env this.Shape
                        Ranges=this.Ranges |> List.map (List.map (fun (f,l) -> sSize f, sSize l))} :> _
         member this.CanEvalAllSymSizes = 

@@ -196,16 +196,6 @@ type Size =
     /// Multinom of symbolic sizes.
     | Multinom of SizeMultinom       
 
-    /// simplify size specification
-    static member Simplify (ss: Size) =
-        match ss with
-        | Size.Multinom m -> 
-            match m.Products |> Map.toList with
-            | [SizeProduct.SingleSymbol s, Frac.One] -> Size.Atom (SizeAtom.Sym s)
-            | [SizeProduct.Empty, f] -> Size.Atom (SizeAtom.Fixed f)
-            | [] -> Size.Atom (SizeAtom.Fixed Frac.zero)
-            | _ -> ss
-        | _ -> ss
 
     static member (~-) (ssa: Size) =
         match ssa with
@@ -213,7 +203,7 @@ type Size =
         | Size.Atom b -> Size.Multinom (-SizeMultinom(b))
         | Size.Broadcast -> Size.Multinom (-SizeMultinom(SizeAtom.Fixed Frac.one))
         | Size.Multinom m -> Size.Multinom (-m)
-        |> Size.Simplify
+        |> Size.simplify
 
     static member (+) (ssa: Size, ssb: Size) =
         match ssa, ssb with
@@ -222,7 +212,7 @@ type Size =
         | Size.Multinom ma, Size.Multinom mb -> Size.Multinom (ma + mb)
         | Size.Multinom m, Size.Atom b | Size.Atom b, Size.Multinom m -> Size.Multinom (m + SizeMultinom(b))
         | Size.Atom ba, Size.Atom bb -> Size.Multinom (SizeMultinom(ba) + SizeMultinom(bb))
-        |> Size.Simplify
+        |> Size.simplify
 
     static member (-) (ssa: Size, ssb: Size) =
         ssa + (-ssb)
@@ -234,7 +224,7 @@ type Size =
         | Size.Multinom ma, Size.Multinom mb -> Size.Multinom (ma * mb)
         | Size.Multinom m, Size.Atom b | Size.Atom b, Size.Multinom m -> Size.Multinom (m * SizeMultinom(b))
         | Size.Atom ba, Size.Atom bb -> Size.Multinom (SizeMultinom(ba) * SizeMultinom(bb))
-        |> Size.Simplify
+        |> Size.simplify
 
     static member Pow (ssa: Size, pow: int64) =
         match pow with
@@ -250,7 +240,7 @@ type Size =
                 |> Seq.replicate (int32 pow)
                 |> Seq.reduce (*)
                 |> Size.Multinom
-        |> Size.Simplify
+        |> Size.simplify
 
     // operations with FracT
     static member (+) (ssa: Size, ssb: Frac) = ssa + (Size.Atom (SizeAtom.Fixed ssb))
@@ -268,31 +258,28 @@ type Size =
     static member (*) (ssa: Size, ssb: int64) = ssa * Frac ssb
     static member (*) (ssa: int64, ssb: Size) = Frac ssa * ssb
 
-    /// equal size with broadcastability
-    static member (%=) (ssa: Size, ssb: Size) = 
-        Size.Simplify ssa = Size.Simplify ssb 
+    /// True if both sizes have the same number of elements and 
+    /// are both broadcastable or non-broadcastable.
+    static member equalRespectingBc (ssa: Size) (ssb: Size) = 
+        Size.simplify ssa = Size.simplify ssb 
 
-    /// equal size ignoring broadcastability
-    static member (.=) (ssa: Size, ssb: Size) = 
-        match Size.Simplify ssa, Size.Simplify ssb with
-        | Size.Broadcast, Size.Atom (SizeAtom.Fixed Frac.One) | Size.Atom (SizeAtom.Fixed Frac.One), Size.Broadcast -> true
+    /// True if both sizes have the same number of elements.
+    /// Broadcastable and non-broadcastable are treated as equal.
+    static member equalIgnoringBc (ssa: Size) (ssb: Size) = 
+        match Size.simplify ssa, Size.simplify ssb with
+        | Size.Broadcast, Size.Atom (SizeAtom.Fixed Frac.One) 
+        | Size.Atom (SizeAtom.Fixed Frac.One), Size.Broadcast -> true
         | a, b -> a = b
 
-    /// unequal size ignoring broadcastability
-    static member (.<>) (ssa: Size, ssb: Size) = not (ssa .= ssb)
-
     /// the set of all contained SizeSymbols
-    member this.ContainedSizeSymbols =
+    member this.ContainedSyms =
         match this with
         | Size.Atom (SizeAtom.Sym s)   -> Set [s]
         | Size.Atom (SizeAtom.Fixed _) -> Set.empty
         | Size.Broadcast               -> Set.empty
         | Size.Multinom m              -> m.ContainedSizeSymbols
             
-    /// true if the specified SizeSymbol occurs in this SizeSpec
-    member this.ContainsSymbol sym =
-        this.ContainedSizeSymbols.Contains sym
-
+    /// Pretty string.
     member this.Pretty =
         match this with
         | Size.Atom b -> sprintf "%A" b
@@ -300,22 +287,24 @@ type Size =
         | Size.Multinom m -> sprintf "%A" m
 
     /// simplify size specification
-    static member simplify (ss: Size) = Size.Simplify ss
-
-    /// True if both sizes have the same number of elements and 
-    /// are both broadcastable or non-broadcastable.
-    static member equalWithBroadcastability (ssa: Size) (ssb: Size) = ssa %= ssb        
-
-    /// True if both sizes have the same number of elements.
-    /// Broadcastable and non-broadcastable are treated as equal.
-    static member equalWithoutBroadcastability (ssa: Size) (ssb: Size) = ssa .= ssb
+    static member simplify (ss: Size) = 
+        match ss with
+        | Size.Multinom m -> 
+            match m.Products |> Map.toList with
+            | [SizeProduct.SingleSymbol s, Frac.One] -> Size.Atom (SizeAtom.Sym s)
+            | [SizeProduct.Empty, f] -> Size.Atom (SizeAtom.Fixed f)
+            | [] -> Size.Atom (SizeAtom.Fixed Frac.zero)
+            | _ -> ss
+        | _ -> ss
 
     /// size zero
     static member zero = Size.Atom (SizeAtom.Fixed Frac.zero)
+    /// size zero
     static member Zero = Size.zero
 
     /// not-broadcastable size one
     static member one = Size.Atom (SizeAtom.Fixed Frac.one)
+    /// not-broadcastable size one
     static member One = Size.one
 
     /// fixed integer size
@@ -325,26 +314,17 @@ type Size =
     static member fixFrac nom dnm = Size.Atom (SizeAtom.Fixed (Frac (nom, dnm)))
 
     /// symbolic size
-    static member symbol s = Size.Atom (SizeAtom.Sym (SizeSym s))
-
-    /// symbolic size
     static member sym s = Size.Atom (SizeAtom.Sym s)
 
     /// broadcastable size one
     static member broadcastable = Size.Broadcast
 
-    /// extracts the size symbol
-    static member extractSymbol s =
-        match s with
-        | Size.Atom (SizeAtom.Sym sym) -> sym
-        | _ -> failwith "specified SizeSpec is not a symbol"
-
     /// substitute the symbols into the SizeSpec and simplifies it
-    static member substSymbols symVals ss =
+    static member substSyms symVals ss =
         match ss with
         | Size.Atom (SizeAtom.Sym sym) ->
             match Map.tryFind sym symVals with
-            | Some sv -> Size.substSymbols symVals sv
+            | Some sv -> Size.substSyms symVals sv
             | None -> ss
         | Size.Atom (SizeAtom.Fixed _) -> ss
         | Size.Broadcast -> ss
@@ -357,7 +337,7 @@ type Size =
                         (Size.one, prod.Symbols)
                         ||> Map.fold 
                             (fun substProd sBaseSym sPow ->
-                                let sBaseSubst = Size.substSymbols symVals (Size.Atom (SizeAtom.Sym sBaseSym))
+                                let sBaseSubst = Size.substSyms symVals (Size.Atom (SizeAtom.Sym sBaseSym))
                                 substProd * (sBaseSubst ** sPow))
                     substSum + fac * substProd)
         |> Size.simplify
@@ -382,8 +362,4 @@ type Size =
         | None -> failwithf "cannot evaluate %A to a numeric size since it contains symbols" ss
 
     /// returns the set of all contained SizeSymbols
-    static member containedSizeSymbols (ss: Size) = ss.ContainedSizeSymbols
-
-    /// true if the specified SizeSymbol occurs in the SizeSpec
-    static member containsSymbol sym (ss: Size) = ss.ContainsSymbol sym 
-         
+    static member containedSyms (ss: Size) = ss.ContainedSyms

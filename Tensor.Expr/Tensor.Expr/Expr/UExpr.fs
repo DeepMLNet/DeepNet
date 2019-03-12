@@ -577,7 +577,7 @@ type UExpr (baseExpr: BaseExpr) =
                 if t.NDims <> h.NDims then
                     failwithf "all arguments must have same number of dimensions but shapes %A were specifed" shps                        
                 for i, (sa, sb) in List.indexed (List.zip h.Shape t.Shape) do
-                    if i <> dim && sa .<> sb then
+                    if i <> dim && not (Size.equalIgnoringBc sa sb) then
                         failwithf "all arguments must have same shape expect in concatenation dimension %d but \
                                    shapes %A were specified" dim shps
                     

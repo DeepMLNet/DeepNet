@@ -19,7 +19,7 @@ module SymSizeEnv =
 
     /// substitutes all symbols into the size and simplifies it
     let subst env size =
-        Size.substSymbols env size
+        Size.substSyms env size
 
     /// substitutes all symbols into the shape and simplifies it
     let substShape env (shape: ShapeSpec) : ShapeSpec =

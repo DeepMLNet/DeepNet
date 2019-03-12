@@ -61,7 +61,7 @@ module Interpreter =
                 match op with
                 | LeafOp.Const v -> unbox v.Value
                 | SizeValue (ss, _) ->
-                    let sv = ss |> Size.substSymbols symVals |> Size.eval
+                    let sv = ss |> Size.substSyms symVals |> Size.eval
                     conv<'T> sv
                 | ArgElement ((Arg n, argIdxs), _) ->
                     let argIdxs = ShapeSpec.substSymbols symVals argIdxs
@@ -99,9 +99,9 @@ module Interpreter =
                             doEval (symVals |> Map.add sym (Size.fix symVal)) a
                         typedApply2 (unsp) (+) (+) (+) (+) sumSoFar sumElem) 
                 | KroneckerRng (s, first, last) ->
-                    let sVal = s |> Size.substSymbols symVals |> Size.eval
-                    let firstVal = first |> Size.substSymbols symVals |> Size.eval
-                    let lastVal = last |> Size.substSymbols symVals |> Size.eval
+                    let sVal = s |> Size.substSyms symVals |> Size.eval
+                    let firstVal = first |> Size.substSyms symVals |> Size.eval
+                    let lastVal = last |> Size.substSyms symVals |> Size.eval
                     if firstVal <= sVal && sVal <= lastVal then av ()
                     else conv<'T> 0
 
@@ -116,8 +116,8 @@ module Interpreter =
                 | Modulo ->     typedApply2 (unsp) (%) (%) (%) (%) (av()) (bv())
                 | Power ->      typedApply2 (unsp) ( ** ) ( ** ) (unsp) (unsp) (av()) (bv())
                 | IfThenElse (left, right) ->
-                    let leftVal = left |> Size.substSymbols symVals |> Size.eval
-                    let rightVal = right |> Size.substSymbols symVals |> Size.eval
+                    let leftVal = left |> Size.substSyms symVals |> Size.eval
+                    let rightVal = right |> Size.substSyms symVals |> Size.eval
                     if leftVal = rightVal then av () else bv ()
 
         let initialSymVals =

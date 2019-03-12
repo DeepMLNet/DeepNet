@@ -167,13 +167,13 @@ module ShapeSpec =
     /// are both broadcastable or non-broadcastable in each dimension.
     let equalWithBroadcastability (sa: ShapeSpec) (sb: ShapeSpec) =
         List.length sa = List.length sb &&
-            List.forall2 Size.equalWithBroadcastability sa sb
+            List.forall2 Size.equalRespectingBc sa sb
 
     /// True if both shapes have the same number of elements in each dimension.
     /// Broadcastable and non-broadcastable are treated as equal.            
     let equalWithoutBroadcastability (sa: ShapeSpec) (sb: ShapeSpec) =
          List.length sa = List.length sb &&
-            List.forall2 Size.equalWithoutBroadcastability sa sb
+            List.forall2 Size.equalIgnoringBc sa sb
 
     /// Permutes the axes as specified.
     let permuteAxes (permut: int list) (sa: ShapeSpec) : ShapeSpec =
@@ -199,7 +199,7 @@ module ShapeSpec =
 
     /// substitute the symbols into the ShapeSpec and simplifies it
     let substSymbols symVals (sa: ShapeSpec) : ShapeSpec =
-        List.map (Size.substSymbols symVals) sa
+        List.map (Size.substSyms symVals) sa
 
     type SolutionT = {
         LeftValues:     Map<SizeSym, Size>

@@ -302,11 +302,11 @@ type Dot = { X: BaseExprCh; Y: BaseExprCh } with
             let sa, sb = this.X.Shape, this.Y.Shape
             match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
             | 2, 2 -> 
-                if sa.[1] .<> sb.[0] then
+                if not (Size.equalIgnoringBc sa.[1] sb.[0]) then
                     failwithf "Incompatible shapes for dot product: %A and %A." sa sb
             | na, nb when na = nb -> 
-                if sa.[na-1] .<> sb.[nb-2] || 
-                    [0 .. na-3] |> List.exists (fun n -> sa.[n] .<> sb.[n]) then
+                if not (Size.equalIgnoringBc sa.[na-1] sb.[nb-2]) || 
+                    [0 .. na-3] |> List.exists (fun n -> not (Size.equalIgnoringBc sa.[n] sb.[n])) then
                         failwithf "Incompatible shapes for batched dot product: %A and %A." sa sb
             | _ -> failwithf "Cannot compute dot product between tensors of shapes %A and %A." sa sb  
         member this.Channels = Ch.onlyOne

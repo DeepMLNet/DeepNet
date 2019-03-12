@@ -49,7 +49,7 @@ module VarValMap =
                     failwithf "Variable %A with shape %A is not compatible with value of shape %A." 
                         vSym (vSym.Shape |> ShapeSpec.substSymbols env) vVal.Shape
 
-                match svSym |> Size.substSymbols env with
+                match svSym |> Size.substSyms env with
                 | Size.Atom (SizeAtom.Sym sym) -> 
                     env |> SymSizeEnv.add sym (Size.fix svVal)
                 | Size.Atom (SizeAtom.Fixed f) -> 

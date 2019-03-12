@@ -327,7 +327,7 @@ type Invert = { X: BaseExprCh } with
         member this.Check () = 
             if this.X.NDims < 2 then
                 failwithf "Need at least a matrix to invert but got shape %A" this.X.Shape
-            if this.X.Shape.[this.X.NDims-2] .<> this.X.Shape.[this.X.NDims-1] then
+            if not (Size.equalIgnoringBc this.X.Shape.[this.X.NDims-2] this.X.Shape.[this.X.NDims-1]) then
                 failwithf "Cannot invert non-square matrix %A along last two axes." this.X.Shape
         member this.Channels = Ch.onlyOne
         member this.TypeNames = this.X.TypeName |> Ch.only
@@ -359,7 +359,7 @@ type Not = { X: BaseExprCh } with
 type Reshape = { X: BaseExprCh; Shape: ShapeSpec } with
     interface IOp with      
         member this.Check () = 
-            if ShapeSpec.nElem this.X.Shape .<> ShapeSpec.nElem this.Shape then
+            if not (Size.equalIgnoringBc (ShapeSpec.nElem this.X.Shape) (ShapeSpec.nElem this.Shape)) then
                 failwithf "Cannot change number of elements while reshaping from %A to %A." 
                             this.X.Shape this.Shape
         member this.Channels = Ch.onlyOne
@@ -389,7 +389,7 @@ type DoBroadcast = { X: BaseExprCh; Shape: ShapeSpec } with
             for dim in 0 .. (ShapeSpec.nDim this.Shape) - 1 do
                 match this.X.Shape.[dim], this.Shape.[dim] with
                 | Size.Broadcast, _ -> ()
-                | ssa, ssb when ssa .<> ssb -> 
+                | ssa, ssb when not (Size.equalIgnoringBc ssa ssb) -> 
                     failwithf "Cannot broadcast from %A to %A because non-broadcast dimensions must not change." 
                                 this.X.Shape this.Shape
                 | _ -> ()
@@ -501,7 +501,7 @@ type Diag = {X: BaseExprCh; Axis1: int; Axis2: int} with
             Check.axis this.Axis2 this.X 
             if not (this.Axis1 < this.Axis2) then 
                 failwith "First axis for extracting diagonal must come before second axis."
-            if this.X.Shape.[this.Axis1] .<> this.X.Shape.[this.Axis2] then
+            if not (Size.equalIgnoringBc this.X.Shape.[this.Axis1] this.X.Shape.[this.Axis2]) then
                 failwithf "Cannot extract diagonal along axes %d and %d from non-square tensor with shape %A" 
                             this.Axis1 this.Axis2 this.X.Shape
         member this.Channels = Ch.onlyOne
