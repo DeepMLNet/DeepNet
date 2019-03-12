@@ -54,7 +54,7 @@ type LoopDeriv(op: Loop) =
 
             /// adds an argument with a value full of zeros for use with initial value of a PreviousChannel
             let addZeroInitialArg channelShp channelType channelDev sliceDim delay =
-                let shp = channelShp |> ShapeSpec.insertAxis sliceDim delay
+                let shp = channelShp |> Shape.insertAxis sliceDim delay
                 let zeroExpr = UExpr.zeros channelType channelDev shp
                 addArg zeroExpr
 
@@ -89,7 +89,7 @@ type LoopDeriv(op: Loop) =
                     let sliceDim = spec.Channels.[ch].SliceDim
                     let expShp = 
                         (funElems :: spec.Channels.[ch].Expr.Shape)
-                        |> ShapeSpec.insertAxis (sliceDim + 1) spec.Length
+                        |> Shape.insertAxis (sliceDim + 1) spec.Length
                     dCh 
                     |> UExpr.reshape expShp
                     |> UExpr.reverseAxis (sliceDim + 1))
@@ -116,8 +116,8 @@ type LoopDeriv(op: Loop) =
                 let liType = usingVar.DataType
                 let liDev = usingVar.Dev
                 let liShape = usingVar.Shape
-                let liElems = ShapeSpec.nElem usingVar.Shape
-                let liDims = ShapeSpec.nDim usingVar.Shape
+                let liElems = Shape.nElem usingVar.Shape
+                let liDims = Shape.nDim usingVar.Shape
 
                 match li with
                 | Loop.ConstArg argIdx ->
@@ -329,7 +329,7 @@ type LoopDeriv(op: Loop) =
                         |> Seq.reduce (+)
 
                     // collapse Jacobian
-                    let wrtElems = ShapeSpec.nElem dExprExpanded.Shape.[1..] 
+                    let wrtElems = Shape.nElem dExprExpanded.Shape.[1..] 
                     let dExpr = dExprExpanded |> UExpr.reshape [funElems; wrtElems]
                     dExpr)
 

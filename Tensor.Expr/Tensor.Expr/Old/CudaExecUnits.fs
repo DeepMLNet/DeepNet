@@ -18,7 +18,7 @@ open UExprTypes
 module CudaExecUnitTypes =
 
     type LoopChannelManikinInfoT = {
-        Shape:          NShapeSpec
+        Shape:          NShape
         SliceDim:       int
         TargetManikin:  TensorManikin
     }
@@ -297,7 +297,7 @@ module CudaExecUnit =
             match cudaEnv.VarStorLoc |> Map.find vs with
             | dev when dev=CudaTensor.Dev -> 
                 // request to store directly into external var
-                let shp = vs.Shape |> ShapeSpec.eval
+                let shp = vs.Shape |> Shape.eval
                 let stride = cudaEnv |> CudaCompileEnv.strideForVar vs
                 [dfltChReq (Some (TensorManikin.external (StorageManikin.External vs) shp stride))]
             | dev when dev=HostTensor.Dev -> dfltSrcWithNoViewReq ()

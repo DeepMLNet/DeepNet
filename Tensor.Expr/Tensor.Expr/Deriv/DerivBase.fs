@@ -141,9 +141,9 @@ type Deriv = private {
     /// Computes the derivative expression w.r.t. all variables occuring in it using the specified
     /// value for the derivative of the specified expression.
     static member computeWithRootDeriv (rootDeriv: UExpr) (rootExpr: UExpr) : Deriv =
-        let funElems = ShapeSpec.nElem rootExpr.Shape
+        let funElems = Shape.nElem rootExpr.Shape
         let rootDerivShp = funElems :: rootExpr.Shape
-        if not (ShapeSpec.equalWithoutBroadcastability rootDerivShp rootDeriv.Shape) then
+        if not (Shape.equalIgnoringBc rootDerivShp rootDeriv.Shape) then
             failwithf "Expecting shape %A for root derivative, but got shape %A."
                       rootDerivShp rootDeriv.Shape
         let rootDeriv = Map [Ch.Default, rootDeriv.BaseExprCh]
@@ -161,7 +161,7 @@ type Deriv = private {
 
     /// Computes the derivative expression w.r.t. all variables occuring in it.
     static member compute (rootExpr: UExpr) : Deriv =
-        let funElems = ShapeSpec.nElem rootExpr.Shape 
+        let funElems = Shape.nElem rootExpr.Shape 
         let rootJac = UExpr.identity rootExpr.DataType rootExpr.Dev funElems
         let rootDeriv = rootJac |> UExpr.reshape (funElems :: rootExpr.Shape)
         let deriv = Deriv.computeWithRootDeriv rootDeriv rootExpr
@@ -178,7 +178,7 @@ type Deriv = private {
         match this._WrtVar |> Map.tryFind var with
         | Some d -> d
         | None -> 
-            UExpr.zeros var.DataType var.Dev [this.FunElems; ShapeSpec.nElem var.Shape]
+            UExpr.zeros var.DataType var.Dev [this.FunElems; Shape.nElem var.Shape]
 
 
     /// Returns the derivatives of the specified typed variable.

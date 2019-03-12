@@ -118,7 +118,7 @@ type IOp =
     abstract SubstSymSizes: env: SymSizeEnv -> IOp
 
     /// Should be true, if all symbolic sizes can be evaluated to numeric sizes.
-    /// This is the case if the function ShapeSpec.canEval or Size.canEval respectively
+    /// This is the case if the function Shape.canEval or Size.canEval respectively
     /// return true on all sizes used in this op.
     abstract CanEvalAllSymSizes: bool
      
@@ -129,7 +129,7 @@ type IOp =
     abstract TypeNames: Map<Ch, TypeName>
 
     /// The shapes of the channels.
-    abstract Shapes: Map<Ch, ShapeSpec>      
+    abstract Shapes: Map<Ch, Shape>      
 
     /// The storage devices of the channels.
     abstract Devs: Map<Ch, ITensorDevice>

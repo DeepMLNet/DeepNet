@@ -83,8 +83,8 @@ module Deriv =
         | SummingDim of SizeSym * Size * Size * SizeSym
         | FixedDim of Size * SizeSym
 
-    let buildDerivElemExpr (expr: Expr) (exprShp: ShapeSpec) nArgs =
-        let nDims = ShapeSpec.nDim exprShp
+    let buildDerivElemExpr (expr: Expr) (exprShp: Shape) nArgs =
+        let nDims = Shape.nDim exprShp
         let allDerives = compute expr
         let egArgNo = nArgs
         let egElem = Expr.argElemWithType (Expr.typeName expr).Type egArgNo
@@ -104,7 +104,7 @@ module Deriv =
                         // solve for target indices given derivative indices
                         let nArgDims = argIdx.Length
                         let idxSyms = [for d=0 to nArgDims-1 do yield sprintf "D%d" d |> SizeSym]
-                        let sol = ShapeSpec.solve argIdx idxSyms
+                        let sol = Shape.solve argIdx idxSyms
 
                         // extract sum information
                         let egIdxDimInfo = [

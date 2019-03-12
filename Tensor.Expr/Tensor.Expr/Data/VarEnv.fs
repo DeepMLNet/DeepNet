@@ -39,7 +39,7 @@ type VarEnv = VarEnv of Map<VarName, ITensor> with
         if value.Dev <> baseVar.Dev then
             failwithf "Variable %A is stored on device %A but specified value is stored on device %A."
                       baseVar.Name baseVar.Dev value.Dev
-        match ShapeSpec.tryEval baseVar.Shape with
+        match Shape.tryEval baseVar.Shape with
         | Some varShp when varShp <> value.Shape ->
             failwithf "Variable %A has shape %A but specified value is of shape %A."
                       baseVar.Name varShp value.Shape

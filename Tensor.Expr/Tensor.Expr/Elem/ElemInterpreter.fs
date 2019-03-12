@@ -50,7 +50,7 @@ module Interpreter =
         conv<'T> (sign x)
 
     /// evaluates the specified element of an element expression
-    let evalElement (expr: Expr) (args: Tensor.Tensor<'T> list) (idxs: ShapeSpec) : 'T =
+    let evalElement (expr: Expr) (args: Tensor.Tensor<'T> list) (idxs: Shape) : 'T =
         if expr.Type <> typeof<'T> then
             failwithf "Elem.Expr of type %A does not match eval function of type %A."
                 expr.Type typeof<'T>                    
@@ -64,8 +64,8 @@ module Interpreter =
                     let sv = ss |> Size.substSyms symVals |> Size.eval
                     conv<'T> sv
                 | ArgElement ((Arg n, argIdxs), _) ->
-                    let argIdxs = ShapeSpec.substSymbols symVals argIdxs
-                    let argIdxsVal = ShapeSpec.eval argIdxs
+                    let argIdxs = Shape.substSymbols symVals argIdxs
+                    let argIdxsVal = Shape.eval argIdxs
                     args.[n].[argIdxsVal]
 
             | Unary (op, a) ->
@@ -126,7 +126,7 @@ module Interpreter =
         doEval initialSymVals expr
 
     /// Evaluates all elements of an element expression.
-    let eval (expr: Expr) (args: Tensor.Tensor<'T> list) (resShape: NShapeSpec) : Tensor.Tensor<'T> =
+    let eval (expr: Expr) (args: Tensor.Tensor<'T> list) (resShape: int64 list) : Tensor.Tensor<'T> =
         let res = Tensor.HostTensor.zeros<'T> resShape
         for idx in Tensor.Backend.TensorLayout.allIdxOfShape resShape do
             let symIdx = idx |> List.map Size.fix
@@ -136,7 +136,7 @@ module Interpreter =
 
 
 type internal IInterpreter = 
-    abstract Eval: Expr -> Tensor.ITensor list -> NShapeSpec -> Tensor.ITensor
+    abstract Eval: Expr -> Tensor.ITensor list -> int64 list -> Tensor.ITensor
 type internal TInterpreter<'T> () =
     interface IInterpreter with 
         member this.Eval expr args resShape =
@@ -145,6 +145,6 @@ type internal TInterpreter<'T> () =
 
 type Interpreter =
     /// Evaluates all elements of an element expression using untyped tensors.
-    static member evalUntyped (expr: Expr) (args: Tensor.ITensor list) (resShape: NShapeSpec) : Tensor.ITensor = 
+    static member evalUntyped (expr: Expr) (args: Tensor.ITensor list) (resShape: int64 list) : Tensor.ITensor = 
         (Generic<TInterpreter<_>, IInterpreter> [args.Head.DataType]).Eval expr args resShape
     

@@ -80,7 +80,7 @@ type EvalUpdateBundle = private {
         if data.Dev <> expr.Dev then
             failwithf "Tensor device %A does not match expression device %A."
                 data.Dev expr.Dev
-        match ShapeSpec.tryEval expr.Shape with
+        match Shape.tryEval expr.Shape with
         | Some exprShp when exprShp <> data.Shape ->
             failwithf "Tensor shape %A does not match expression shape %A."
                 data.Shape exprShp

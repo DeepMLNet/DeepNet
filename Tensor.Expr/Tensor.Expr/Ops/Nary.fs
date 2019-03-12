@@ -52,7 +52,7 @@ type Discard = {Xs: BaseExprCh list} with
         member this.Channels = Ch.onlyOne
         member this.TypeNames = TypeName.ofType<int32> |> Ch.only
         member this.Devs = HostTensor.Dev |> Ch.only
-        member this.Shapes = ShapeSpec.emptyVector |> Ch.only
+        member this.Shapes = Shape.emptyVector |> Ch.only
         member this.Args = Args.nary this.Xs
         member this.ReplaceArgs args = {this with Xs=Args.naryXs args} :> _
         member this.SubstSymSizes env = this :> _
@@ -63,7 +63,7 @@ type Discard = {Xs: BaseExprCh list} with
 
 
 /// Build tensor using numeric ranges.
-type BuildTensor = {Shape: ShapeSpec; Ranges: BaseRangesSpec list; Xs: BaseExprCh list} with
+type BuildTensor = {Shape: Shape; Ranges: BaseRangesSpec list; Xs: BaseExprCh list} with
     interface IOp with       
         member this.Check () = 
             Check.sameType this.Xs
@@ -71,7 +71,7 @@ type BuildTensor = {Shape: ShapeSpec; Ranges: BaseRangesSpec list; Xs: BaseExprC
             if this.Ranges.Length <> this.Xs.Length then
                 failwithf "BuildTensor ranges must match arguments, but got %d ranges and %d arguments."
                             this.Ranges.Length this.Xs.Length
-            match ShapeSpec.tryEval this.Shape with
+            match Shape.tryEval this.Shape with
             | Some shp ->
                 for rng, arg in List.zip this.Ranges this.Xs do
                     if rng.Length <> shp.Length then
@@ -93,14 +93,14 @@ type BuildTensor = {Shape: ShapeSpec; Ranges: BaseRangesSpec list; Xs: BaseExprC
         member this.ReplaceArgs args = {this with Xs=Args.naryXs args} :> _
         member this.SubstSymSizes env = 
             let sSize = Size.substSyms env
-            {this with Shape=ShapeSpec.substSymbols env this.Shape
+            {this with Shape=Shape.substSymbols env this.Shape
                        Ranges=this.Ranges |> List.map (List.map (fun (f,l) -> sSize f, sSize l))} :> _
         member this.CanEvalAllSymSizes = 
-            ShapeSpec.canEval this.Shape &&
+            Shape.canEval this.Shape &&
             List.forall BaseRangesSpec.canEval this.Ranges
         member this.Eval env argVals = 
             let vs = ArgValue.naryXs argVals
-            let trgt = vs.Head.ZerosOfSameType vs.Head.Dev (ShapeSpec.eval this.Shape)
+            let trgt = vs.Head.ZerosOfSameType vs.Head.Dev (Shape.eval this.Shape)
             for rng, e in List.zip this.Ranges vs do                            
                 let aryRng = rng |> List.map (fun (first, last) -> 
                     Rng.Rng (Some (Size.eval first), Some (Size.eval last)))
@@ -110,7 +110,7 @@ type BuildTensor = {Shape: ShapeSpec; Ranges: BaseRangesSpec list; Xs: BaseExprC
 
 
 /// Elementwise calculated tensor.
-type Elements = {Shape: ShapeSpec; ElemExpr: Elem.Expr; Xs: BaseExprCh list} with
+type Elements = {Shape: Shape; ElemExpr: Elem.Expr; Xs: BaseExprCh list} with
     // TODO: introduce multi-channel element-wise calculation op.
     interface IOp with       
         member this.Check () = 
@@ -126,14 +126,14 @@ type Elements = {Shape: ShapeSpec; ElemExpr: Elem.Expr; Xs: BaseExprCh list} wit
         member this.Args = Args.nary this.Xs
         member this.ReplaceArgs args = {this with Xs=Args.naryXs args} :> _
         member this.SubstSymSizes env = 
-            {this with Shape=ShapeSpec.substSymbols env this.Shape
+            {this with Shape=Shape.substSymbols env this.Shape
                        ElemExpr=Elem.Expr.substSymSizes env this.ElemExpr} :> _
         member this.CanEvalAllSymSizes = 
-            ShapeSpec.canEval this.Shape &&
+            Shape.canEval this.Shape &&
             Elem.Expr.canEvalAllSymSizes this.ElemExpr
         member this.Eval env argVals = 
             let esv = ArgValue.naryXs argVals
-            let nResShape = ShapeSpec.eval this.Shape
+            let nResShape = Shape.eval this.Shape
             Elem.Interpreter.evalUntyped this.ElemExpr esv nResShape 
             |> Ch.only
 
@@ -159,7 +159,7 @@ type Interpolate = {Interpolator: Interpolator; Xs: BaseExprCh list} with
             if this.Interpolator.Resolution |> List.exists ((>) 0.0) then
                 failwith "Resolution of interpolator must be positive."
             for x in this.Xs do 
-                if not (ShapeSpec.equalWithoutBroadcastability x.Shape this.Xs.Head.Shape) then
+                if not (Shape.equalIgnoringBc x.Shape this.Xs.Head.Shape) then
                     failwithf "All arguments to interpolator must have equal shape but got shapes %A and %A."
                                 this.Xs.Head.Shape x.Shape
         member this.Channels = Ch.onlyOne

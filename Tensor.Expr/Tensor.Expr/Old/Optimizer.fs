@@ -90,7 +90,7 @@ module Optimizer =
     let rec pullSumOutOfElements elements =
         match elements with
         | Nary (Elements (resShape, elemExpr), args) ->
-            let nDims = ShapeSpec.nDim resShape
+            let nDims = Shape.nDim resShape
             let mutable nArgs = args.Length 
             let newArg () =
                 let res = nArgs
@@ -155,7 +155,7 @@ module Optimizer =
                 //    insigAx resShape.[insigAx] elemExpr
 
                 // replace insignificant axis by axis with one broadcastable element
-                let sigResShape = resShape |> ShapeSpec.set insigAx Size.broadcastable
+                let sigResShape = resShape |> Shape.set insigAx Size.broadcastable
                 let sigElements = Expr.elements sigResShape elemExpr args
 
                 // broadcast result to original shape
@@ -379,11 +379,11 @@ module Optimizer =
                     optRec a
 
                 // remove unnecessary reshapes
-                | Unary (Reshape ss, a) when ShapeSpec.equalWithBroadcastability ss (Expr.shapeOf a) ->
+                | Unary (Reshape ss, a) when Shape.equalWithBroadcastability ss (Expr.shapeOf a) ->
                     optRec a            
 
                 // remove unnecessary broadcasts
-                | Unary (DoBroadcast ss, a) when ShapeSpec.equalWithBroadcastability ss (Expr.shapeOf a) ->
+                | Unary (DoBroadcast ss, a) when Shape.equalWithBroadcastability ss (Expr.shapeOf a) ->
                     optRec a
 
                 // combine subsequent axes permutations
@@ -407,7 +407,7 @@ module Optimizer =
 
                 // remove unnecessary broadcasts after reshape
                 | Unary (DoBroadcast bcShp, Unary (Reshape reShp, a)) when 
-                        ShapeSpec.equalWithoutBroadcastability bcShp reShp ->
+                        Shape.equalWithoutBroadcastability bcShp reShp ->
                     Unary (Reshape bcShp, a) |> optRec
 
                 // pull permute through broadcast

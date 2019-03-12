@@ -811,9 +811,9 @@ module CudaExprWorkspaceTypes =
 
             // check the shapes and strides of external variables match with recipe
             for KeyValue(vs, ev) in externalVar do              
-                if ev.Layout.Shape <> ShapeSpec.eval vs.Shape then
+                if ev.Layout.Shape <> Shape.eval vs.Shape then
                     failwithf "variable %A was expected to have shape %A but the specified value has shape %A" 
-                              vs (ShapeSpec.eval vs.Shape) ev.Layout.Shape
+                              vs (Shape.eval vs.Shape) ev.Layout.Shape
                 match recipe.VarStrides.TryFind vs with
                 | Some rcptStride when ev.Layout.Stride <> rcptStride ->
                     failwithf "variable %A was expected to have strides %A but the specified value has strides %A" 

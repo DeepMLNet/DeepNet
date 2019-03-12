@@ -170,31 +170,31 @@ type UExpr (baseExpr: BaseExpr) =
 
     /// Inserts a broadcast axis at the given dimension.
     static member insertBroadcastAxis dim (expr: UExpr) : UExpr =
-        expr |> UExpr.reshape (expr.Shape |> ShapeSpec.insertBroadcastAxis dim)
+        expr |> UExpr.reshape (expr.Shape |> Shape.insertBroadcastAxis dim)
 
     /// adds one broadcastable dimension to the left
     static member padLeft (a: UExpr) : UExpr =
-        a |> UExpr.reshape (ShapeSpec.padLeft a.Shape)
+        a |> UExpr.reshape (Shape.padLeft a.Shape)
 
     /// adds one broadcastable dimension to the right
     static member padRight (a: UExpr) : UExpr =
-        a |> UExpr.reshape (ShapeSpec.padRight a.Shape)
+        a |> UExpr.reshape (Shape.padRight a.Shape)
 
     /// Reshapes the expression so that a single dimension remains.
     static member flatten (expr: UExpr) =
-        expr |> UExpr.reshape (ShapeSpec.flatten expr.Shape)
+        expr |> UExpr.reshape (Shape.flatten expr.Shape)
 
     /// pads from the left and broadcasts the argument to the given shape if possible
     static member broadcastToShape shp (a: UExpr) =
-        let psa = a.Shape |> ShapeSpec.padTo (ShapeSpec.nDim shp)
-        let bsa = psa |> ShapeSpec.broadcastToShape shp
+        let psa = a.Shape |> Shape.padTo (Shape.nDim shp)
+        let bsa = psa |> Shape.broadcastToShape shp
         a |> UExpr.reshape psa |> UExpr.broadcast bsa        
 
     /// pads and broadcasts all arguments to same shape if possible
     static member broadcastToSameMany (es: UExpr list) =
         let ss = es |> List.map UExpr.shape
-        let ps = ShapeSpec.padToSameMany ss
-        let bs = ShapeSpec.broadcastToSameMany false ps
+        let ps = Shape.padToSameMany ss
+        let bs = Shape.broadcastToSameMany false ps
         List.zip3 es ps bs
         |> List.map (fun (e, p, b) -> e |> UExpr.reshape p |> UExpr.broadcast b)
 
@@ -206,11 +206,11 @@ type UExpr (baseExpr: BaseExpr) =
 
     /// enables broadcasting in the given dimension, it must be of size one
     static member enableBroadcast dim (a: UExpr) = 
-        a |> UExpr.reshape (a.Shape |> ShapeSpec.enableBroadcast dim)
+        a |> UExpr.reshape (a.Shape |> Shape.enableBc dim)
 
     /// disables broadcasting in the given dimension
     static member disableBroadcast dim (a: UExpr) =
-        a |> UExpr.reshape (a.Shape |> ShapeSpec.disableBroadcast dim)
+        a |> UExpr.reshape (a.Shape |> Shape.disableBc dim)
   
     /// scalar constant of given value
     static member scalar dev (value: obj) : UExpr = 
@@ -314,7 +314,7 @@ type UExpr (baseExpr: BaseExpr) =
             | _                               -> failwithf "Invalid item/slice specification: %A" allArgs
 
         /// converts a full range specification into a simple range specification
-        let rec splitFRS (rngs: RangesSpec) (shps: ShapeSpec) (simpleRs: SimpleRangesSpec) (newShape: ShapeSpec) =
+        let rec splitFRS (rngs: RangesSpec) (shps: Shape) (simpleRs: SimpleRangesSpec) (newShape: Shape) =
             match rngs, shps with
             | RangeSpec.SymElem e :: rngs, _::shps -> splitFRS rngs shps (SimpleRangeSpec.SymStartSymEnd (e, Some e)::simpleRs) newShape
             | RangeSpec.DynElem e :: rngs, _::shps -> splitFRS rngs shps (SimpleRangeSpec.DynStartSymSize (e, Size.one)::simpleRs) newShape
@@ -366,8 +366,8 @@ type UExpr (baseExpr: BaseExpr) =
 
     /// emits an elementwise binary operation with broadcasting of the inputs if necessary
     static member constructElementwise op (a: UExpr) (b: UExpr) =
-        let psa, psb = ShapeSpec.padToSame a.Shape b.Shape
-        let bsa, bsb = ShapeSpec.broadcastToSame false psa psb
+        let psa, psb = Shape.padToSame a.Shape b.Shape
+        let bsa, bsb = Shape.broadcastToSame false psa psb
         let ba = a |> UExpr.reshape psa |> UExpr.broadcast bsa
         let bb = b |> UExpr.reshape psb |> UExpr.broadcast bsb 
         let opInst: IOp = op ba bb
@@ -469,27 +469,27 @@ type UExpr (baseExpr: BaseExpr) =
     /// (n+1, n) with n>2 -> batched matrix-vector dot product resulting in a vector.
     static member ( .* ) (a: UExpr, b: UExpr) = 
         let sa, sb = a.Shape, b.Shape
-        match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
+        match Shape.nDim sa, Shape.nDim sb with
         | 1, 1 -> 
             // vector-vector dot product
             UExpr.sum (a * b)
         | 2, 1 -> 
             // matrix-vector dot product
-            let bm = b |> UExpr.reshape (ShapeSpec.padRight sb)
+            let bm = b |> UExpr.reshape (Shape.padRight sb)
             UExpr {Dot.X=a.BaseExprCh; Y=bm.BaseExprCh} |> UExpr.reshape [sa.[0]]
         | 2, 2 -> 
             // matrix-matrix dot product
             UExpr {Dot.X=a.BaseExprCh; Y=b.BaseExprCh} 
         | na, nb when na = nb -> 
             // batched matrix-matrix dot product
-            let bsa, bsb = ShapeSpec.broadcastToSameInDims [0 .. na-3] false sa sb
+            let bsa, bsb = Shape.broadcastToSameInDims [0 .. na-3] false sa sb
             let ba = a |> UExpr.broadcast bsa
             let bb = b |> UExpr.broadcast bsb    
             UExpr {Dot.X=ba.BaseExprCh; Y=bb.BaseExprCh} 
         | na, nb when na = nb + 1 ->
             // batched matrix-vector dot product
-            let psb = ShapeSpec.padRight sb
-            let bsa, bsb = ShapeSpec.broadcastToSameInDims [0 .. na-3] false sa psb
+            let psb = Shape.padRight sb
+            let bsa, bsb = Shape.broadcastToSameInDims [0 .. na-3] false sa psb
             let ba = a |> UExpr.broadcast bsa
             let bb = b |> UExpr.reshape psb |> UExpr.broadcast bsb    
             UExpr {Dot.X=ba.BaseExprCh; Y=bb.BaseExprCh} |> UExpr.reshape bsa.[0 .. na-2]
@@ -533,12 +533,12 @@ type UExpr (baseExpr: BaseExpr) =
         x
 
     /// Tensor of given shape filled with specified value.
-    static member filled (dev: ITensorDevice) (shp: ShapeSpec) (value: obj) =
+    static member filled (dev: ITensorDevice) (shp: Shape) (value: obj) =
         let bcShp = shp |> List.map (fun _ -> Size.broadcastable)
         UExpr.scalar dev value |> UExpr.reshape bcShp |> UExpr.broadcast shp
 
     /// Zero tensor of given type and shape.
-    static member zeros dataType dev (shp: ShapeSpec) =
+    static member zeros dataType dev (shp: Shape) =
         UExpr.filled dev shp (zeroOf dataType)
 
     /// zero tensor with same shape and type as given tensor
@@ -583,7 +583,7 @@ type UExpr (baseExpr: BaseExpr) =
                     
         // calculate shape of concatenation
         let totalElems = es |> Seq.sumBy (fun e -> e.Shape.[dim])
-        let shp = es.Head.Shape |> ShapeSpec.set dim totalElems
+        let shp = es.Head.Shape |> Shape.set dim totalElems
 
         // build concatenation using iterative subtensor replacement
         let concatenated, _ =
@@ -732,7 +732,7 @@ type UExpr (baseExpr: BaseExpr) =
         UExpr {Gather.Indices=bcIndices; X=x.BaseExprCh} 
 
     /// Disperses elements according to the specified index tensors.
-    static member scatter (indices: UExpr option list) (trgtShp: ShapeSpec) (x: UExpr) =
+    static member scatter (indices: UExpr option list) (trgtShp: Shape) (x: UExpr) =
         let indices = indices |> List.map (Option.map (UExpr.broadcastToShape x.Shape))
         let indices = indices |> List.map (Option.map UExpr.baseExprCh)
         UExpr {Scatter.Indices=indices; Shape=trgtShp; X=x.BaseExprCh} 
@@ -769,8 +769,8 @@ type UExpr (baseExpr: BaseExpr) =
    /// Elementwise uses elements from `ifTrue` if `cond` is true for that element, otherwise elements from `ifFalse`.
     static member ifThenElse (cond: UExpr) (ifTrue: UExpr) (ifFalse: UExpr) =
         let shps = [cond.Shape; ifTrue.Shape; ifFalse.Shape]
-        let pShps = ShapeSpec.padToSameMany shps
-        let bcShps = ShapeSpec.broadcastToSameMany false pShps           
+        let pShps = Shape.padToSameMany shps
+        let bcShps = Shape.broadcastToSameMany false pShps           
         match pShps, bcShps with
         | [condPShp; ifTruePShp; ifFalsePShp], [condBcShp; ifTrueBcShp; ifFalseBcShp] -> 
             let condBc = cond |> UExpr.reshape condPShp |> UExpr.broadcast condBcShp

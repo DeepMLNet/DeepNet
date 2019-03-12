@@ -17,7 +17,7 @@ type ExprTestCase = {
     Expr:       UExpr
     DataType:   System.Type
     Dev:        ITensorDevice
-    Shape:      ShapeSpec
+    Shape:      Shape
     Value:      ITensor
 }
 

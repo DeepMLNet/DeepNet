@@ -264,8 +264,8 @@ type SumAxisDeriv(op: SumAxis) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = DerivTools.Env.make op dOp 
-            let bcEgExp = env.DOp |> UExpr.reshape (env.DOp.Shape |> ShapeSpec.insertBroadcastAxis (op.Axis + 1))
-            bcEgExp |> UExpr.broadcast (bcEgExp.Shape |> ShapeSpec.set (op.Axis + 1) env.Only.Shape.[op.Axis]) |> DerivTools.unary 
+            let bcEgExp = env.DOp |> UExpr.reshape (env.DOp.Shape |> Shape.insertBroadcastAxis (op.Axis + 1))
+            bcEgExp |> UExpr.broadcast (bcEgExp.Shape |> Shape.set (op.Axis + 1) env.Only.Shape.[op.Axis]) |> DerivTools.unary 
 
 
 [<OpExtender>]
@@ -275,7 +275,7 @@ type ProductAxisDeriv(op: ProductAxis) =
             let env = DerivTools.Env.make op dOp 
             // TODO: This division method incorrectly returns NaN for zero elements.
             //       But currently I do not see any efficient alternative.
-            let aBc = env.Only |> UExpr.reshape (Size.broadcastable :: ShapeSpec.flatten env.Only.Shape)
+            let aBc = env.Only |> UExpr.reshape (Size.broadcastable :: Shape.flatten env.Only.Shape)
             let pBc = env.Expr |> UExpr.reshape [Size.broadcastable; Size.broadcastable]
             (env.DOpJac |> UExpr.enableBroadcast 1) * (pBc / aBc) |> DerivTools.unary
 
@@ -285,8 +285,8 @@ type MaxAxisDeriv(op: MaxAxis) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = DerivTools.Env.make op dOp 
-            let bcExpr = env.Expr |> UExpr.reshape (env.Expr.Shape |> ShapeSpec.insertBroadcastAxis op.Axis)
-            let bcEgExp = env.DOp |> UExpr.reshape (env.DOp.Shape |> ShapeSpec.insertBroadcastAxis (op.Axis + 1))
+            let bcExpr = env.Expr |> UExpr.reshape (env.Expr.Shape |> Shape.insertBroadcastAxis op.Axis)
+            let bcEgExp = env.DOp |> UExpr.reshape (env.DOp.Shape |> Shape.insertBroadcastAxis (op.Axis + 1))
             UExpr.ifThenElse (UExpr.padLeft (env.Only ==== bcExpr)) bcEgExp (UExpr.zerosLike bcEgExp) |> DerivTools.unary
 
 

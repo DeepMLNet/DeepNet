@@ -323,11 +323,11 @@ type Expr<'T> (baseExpr: BaseExpr) =
         UExpr.limit (x.Untyped, ?minVal=Option.map box minVal, ?maxVal=Option.map box maxVal) |> Expr<'T> 
 
     /// Tensor of given shape filled with specified value.
-    static member filled (dev: ITensorDevice) (shp: ShapeSpec) (value: 'T) =
+    static member filled (dev: ITensorDevice) (shp: Shape) (value: 'T) =
         UExpr.filled dev shp (box value) |> Expr<'T>
 
     /// Zero tensor of given shape.
-    static member zeros dev (shp: ShapeSpec) =
+    static member zeros dev (shp: Shape) =
         UExpr.zeros typeof<'T> dev shp |> Expr<'T>
 
     /// Identity matrix of given size.
@@ -464,7 +464,7 @@ type Expr<'T> (baseExpr: BaseExpr) =
         UExpr.gather indices x.Untyped |> Expr<'T>
 
     /// Disperses elements according to the specified index tensors.
-    static member scatter (indices: Expr<int64> option list) (trgtShp: ShapeSpec) (x: Expr<'T>) =
+    static member scatter (indices: Expr<int64> option list) (trgtShp: Shape) (x: Expr<'T>) =
         let indices = indices |> List.map (Option.map (fun expr -> expr.Untyped))
         UExpr.scatter indices trgtShp x.Untyped |> Expr<'T>
 

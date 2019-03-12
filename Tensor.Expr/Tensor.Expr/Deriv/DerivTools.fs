@@ -16,7 +16,7 @@ module internal DerivTools =
     /// Flattens all but the first dimension of the Jacobian into one dimension.
     let inline collapse (dOp: UExpr) =
         let funElems = dOp.Shape.[0]
-        let wrtElems = dOp.Shape.[1..] |> ShapeSpec.nElem
+        let wrtElems = dOp.Shape.[1..] |> Shape.nElem
         dOp |> UExpr.reshape [funElems; wrtElems]
 
     /// Returns a zero derivative for the specified argument.
@@ -57,7 +57,7 @@ module internal DerivTools =
         member inline this.Expr = UExpr this.Op
         member inline this.FunElems = this.DOp.Shape.[0]
         member inline this.DOpJac =
-            let wrtElems = this.DOp.Shape.[1..] |> ShapeSpec.nElem
+            let wrtElems = this.DOp.Shape.[1..] |> Shape.nElem
             this.DOp |> UExpr.reshape [this.FunElems; wrtElems]
         member inline this.Only = this.Op.Args |> Args.unaryX |> UExpr
         member inline this.X = this.Op.Args |> Args.binaryX |> UExpr

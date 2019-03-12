@@ -25,7 +25,7 @@ module VarValMap =
                 failwithf "Variable %A was given value of data type %A." vSym vVal.DataType
             if vVal.Dev <> vSym.Dev then
                 failwithf "Variable %A was given value stored on device %A." vSym vVal.Dev
-            match ShapeSpec.tryEval vSym.Shape with
+            match Shape.tryEval vSym.Shape with
             | Some shp when vVal.Shape <> shp ->
                 failwithf "Variable %A was given value with shape %A." vSym vVal.Shape
             | Some shp -> ()
@@ -47,7 +47,7 @@ module VarValMap =
 
                 let failShape () =
                     failwithf "Variable %A with shape %A is not compatible with value of shape %A." 
-                        vSym (vSym.Shape |> ShapeSpec.substSymbols env) vVal.Shape
+                        vSym (vSym.Shape |> Shape.substSymbols env) vVal.Shape
 
                 match svSym |> Size.substSyms env with
                 | Size.Atom (SizeAtom.Sym sym) -> 

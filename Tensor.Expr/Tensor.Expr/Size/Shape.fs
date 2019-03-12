@@ -3,65 +3,64 @@
 open DeepNet.Utils
 
 
-/// shape specifcation of a tensor
-type ShapeSpec = Size list
+/// Symbolic shape of an expression.
+type Shape = Size list
 
-/// evaluated shape specification of a tensor
-type NShapeSpec = int64 list
 
-/// shape specification of a tensor
-module ShapeSpec =
 
-    let insertAxis ax ss (sa: ShapeSpec) : ShapeSpec =
+/// Functions for working with symbolic expression shapes.
+module Shape =
+
+    let insertAxis ax ss (sa: Shape) : Shape =
         sa |> List.insert ax ss
 
-    let withoutAxis ax (sa: ShapeSpec) : ShapeSpec =
+    let withoutAxis ax (sa: Shape) : Shape =
         sa |> List.without ax
 
-    let insertBroadcastAxis ax (sa: ShapeSpec) : ShapeSpec =
+    let insertBroadcastAxis ax (sa: Shape) : Shape =
         sa |> insertAxis ax Size.Broadcast
 
-    let set ax size (sa: ShapeSpec) : ShapeSpec =
+    let set ax size (sa: Shape) : Shape =
         sa |> List.set ax size
 
-    let nDim (sa: ShapeSpec) =
+    let nDim (sa: Shape) =
         List.length sa
 
-    let nElem (sa: ShapeSpec) =
+    let nElem (sa: Shape) =
         if List.isEmpty sa then Size.one
         else List.reduce (*) sa
 
-    let flatten (sa: ShapeSpec) : ShapeSpec =
+    let flatten (sa: Shape) : Shape =
         [nElem sa]
 
-    let concat (sa: ShapeSpec) (sb: ShapeSpec) : ShapeSpec =
+    let concat (sa: Shape) (sb: Shape) : Shape =
         sa @ sb
 
-    let transpose (sa: ShapeSpec) : ShapeSpec =
+    let transpose (sa: Shape) : Shape =
         if nDim sa <> 2 then failwithf "need matrix to transpose but have shape %A" sa
         List.rev sa
 
-    let swap (ax1: int) (ax2: int) (sa: ShapeSpec) : ShapeSpec =
+    let swap (ax1: int) (ax2: int) (sa: Shape) : Shape =
         sa  |> List.set ax1 sa.[ax2]
             |> List.set ax2 sa.[ax1]
 
-    let scalar : ShapeSpec = []
+    let scalar : Shape = []
 
-    let vector (ss: Size) : ShapeSpec = [ss]
+    let vector (ss: Size) : Shape = [ss]
 
-    let matrix (sr: Size) (sc: Size) : ShapeSpec = [sr; sc]
+    let matrix (sr: Size) (sc: Size) : Shape = [sr; sc]
 
-    let emptyVector : ShapeSpec = [Size.zero]
+    let emptyVector : Shape = [Size.zero]
 
-    let fix (nShape: int64 list) : ShapeSpec =
+    let fix (nShape: int64 list) : Shape =
         nShape |> List.map Size.fix
 
     /// pads shape by inserting broadcast dimension on the left
-    let padLeft (sa: ShapeSpec) : ShapeSpec =
+    let padLeft (sa: Shape) : Shape =
         (Size.Broadcast)::sa
 
     /// pads shape by inserting broadcast dimension on the right
-    let padRight (sa: ShapeSpec) : ShapeSpec =
+    let padRight (sa: Shape) : Shape =
         sa @ [Size.Broadcast]
 
     /// pads shape from the left to specified number of dimensions
@@ -88,12 +87,12 @@ module ShapeSpec =
                 sa <- padLeft sa
             sa)
 
-    let broadcast (sa: ShapeSpec) dim size : ShapeSpec =
+    let broadcast (sa: Shape) dim size : Shape =
         match sa.[dim] with
         | Size.Broadcast -> List.set dim size sa
         | _ -> failwithf "dimension %d of shape %A is not broadcastable (must be SizeBroadcast)" dim sa
 
-    let broadcastToShape (trgtShp: ShapeSpec) (saIn: ShapeSpec) : ShapeSpec =
+    let broadcastToShape (trgtShp: Shape) (saIn: Shape) : Shape =
         let mutable sa = saIn
         if nDim sa <> nDim trgtShp then
             failwithf "cannot broadcast shape %A to shape %A" saIn trgtShp
@@ -150,39 +149,39 @@ module ShapeSpec =
                 failwithf "cannot broadcast shapes %A of different rank to same size" sas                
             broadcastToSameInDimsMany [0 .. (nDim sa - 1)] mustEqual sas
 
-    let enableBroadcast dim (sa: ShapeSpec) : ShapeSpec =
+    let enableBc dim (sa: Shape) : Shape =
         match sa.[dim] with
         | Size.Atom (SizeAtom.Fixed Frac.One) | Size.Broadcast -> List.set dim Size.Broadcast sa
         | _ -> failwithf "cannot enable broadcasting for dimension %d of shape %A" dim sa
 
-    let disableBroadcast dim (sa: ShapeSpec) : ShapeSpec =
+    let disableBc dim (sa: Shape) : Shape =
         match sa.[dim] with
         | Size.Atom (SizeAtom.Fixed Frac.One) | Size.Broadcast -> List.set dim (Size.Atom (SizeAtom.Fixed Frac.one)) sa
         | _ -> failwithf "cannot disable broadcasting for dimension %d of shape %A" dim sa
 
-    let disableAllBroadcasts sa : ShapeSpec =
+    let disableAllBc sa : Shape =
         List.map (fun ss -> if ss = Size.Broadcast then Size.Atom (SizeAtom.Fixed Frac.one) else ss) sa
         
     /// True if both shape have the same number of elements and 
     /// are both broadcastable or non-broadcastable in each dimension.
-    let equalWithBroadcastability (sa: ShapeSpec) (sb: ShapeSpec) =
+    let equalRespectingBc (sa: Shape) (sb: Shape) =
         List.length sa = List.length sb &&
             List.forall2 Size.equalRespectingBc sa sb
 
     /// True if both shapes have the same number of elements in each dimension.
     /// Broadcastable and non-broadcastable are treated as equal.            
-    let equalWithoutBroadcastability (sa: ShapeSpec) (sb: ShapeSpec) =
+    let equalIgnoringBc (sa: Shape) (sb: Shape) =
          List.length sa = List.length sb &&
             List.forall2 Size.equalIgnoringBc sa sb
 
     /// Permutes the axes as specified.
-    let permuteAxes (permut: int list) (sa: ShapeSpec) : ShapeSpec =
+    let permuteAxes (permut: int list) (sa: Shape) : Shape =
         if nDim sa <> List.length permut then
             failwithf "permutation %A must have same rank as shape %A" permut sa
         sa |> List.permute (fun i -> permut.[i])
 
     /// evaluates shape to numeric shape, if possible
-    let tryEval (sa: ShapeSpec) : NShapeSpec option =
+    let tryEval (sa: Shape) : int64 list option =
         let c = List.map (Size.tryEval) sa
         if List.exists (Option.isNone) c then None
         else Some (List.map Option.get c)          
@@ -194,11 +193,11 @@ module ShapeSpec =
         | None -> false
 
     /// evaluates shape to numeric shape
-    let eval (sa: ShapeSpec) : NShapeSpec =
+    let eval (sa: Shape) : int64 list =
         List.map (Size.eval) sa
 
-    /// substitute the symbols into the ShapeSpec and simplifies it
-    let substSymbols symVals (sa: ShapeSpec) : ShapeSpec =
+    /// substitute the symbols into the Shape and simplifies it
+    let substSymbols symVals (sa: Shape) : Shape =
         List.map (Size.substSyms symVals) sa
 
     type SolutionT = {
@@ -206,7 +205,7 @@ module ShapeSpec =
         RightValues:    Map<SizeSym, Size>
     }        
 
-    let solve (left: ShapeSpec) (right: SizeSym list) =
+    let solve (left: Shape) (right: SizeSym list) =
         if left.Length <> right.Length then failwith "dimension mismatch"
         if right |> Set.ofList |> Set.count <> right.Length then
             failwith "symbols on the right must be unique"

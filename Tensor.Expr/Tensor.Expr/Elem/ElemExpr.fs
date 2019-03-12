@@ -10,7 +10,7 @@ open DeepNet.Utils
 type Arg = Arg of pos:int
 
 /// element of an argument
-type ArgElementSpec = Arg * ShapeSpec
+type ArgElementSpec = Arg * Shape
     
 type LeafOp =
     | Const of Const
@@ -208,8 +208,8 @@ with
         | Binary (op, a, b) -> max (Expr.requiredNumberOfArgs a) (Expr.requiredNumberOfArgs b)
     
     /// checks if the arguments' shapes are compatible with the result shape and that the types match
-    static member checkCompatibility (expr: Expr) (argShapes: ShapeSpec list) (argTypes: TypeName list) 
-                                        (resShape: ShapeSpec) =
+    static member checkCompatibility (expr: Expr) (argShapes: Shape list) (argTypes: TypeName list) 
+                                        (resShape: Shape) =
 
         // check number of arguments
         let nArgs = List.length argShapes
@@ -227,8 +227,8 @@ with
                 if not (0 <= n && n < nArgs) then
                     failwithf "the argument with zero-based index %d used in the element \
                                 expression does not exist" n
-                let idxDim = ShapeSpec.nDim idx
-                let argDim = ShapeSpec.nDim argShapes.[n]
+                let idxDim = Shape.nDim idx
+                let argDim = Shape.nDim argShapes.[n]
                 if idxDim <> argDim then
                     failwithf 
                         "the argument with zero-based index %d has %d dimensions but was used  \
@@ -269,7 +269,7 @@ with
         let rec canEval expr =  
             match expr with
             | Leaf (SizeValue (sc, _)) -> Size.canEval sc
-            | Leaf (ArgElement ((arg, argIdxs), _)) -> ShapeSpec.canEval argIdxs
+            | Leaf (ArgElement ((arg, argIdxs), _)) -> Shape.canEval argIdxs
             | Leaf _ -> true
 
             | Unary (Sum (sym, first, last), a) -> 

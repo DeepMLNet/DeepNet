@@ -84,7 +84,7 @@ type ParSet = private {
     static member inst (storePath: ContextPath) (pg: ParSet) =
         // check that shapes of all variables can be evaluated
         for pv in pg.Vars do
-            if not (ShapeSpec.canEval pv.Shape) then
+            if not (Shape.canEval pv.Shape) then
                 failwithf "Cannot evaluate shape of variable %A." pv
 
         // group variables by data type and storage device
@@ -98,7 +98,7 @@ type ParSet = private {
             pvGroups
             |> Map.map (fun (typeName, dev) pvs ->
                 // create symbolic group storage variable
-                let groupSize = pvs |> List.sumBy (fun pv -> ShapeSpec.nElem pv.Shape)
+                let groupSize = pvs |> List.sumBy (fun pv -> Shape.nElem pv.Shape)
                 let groupName = storePath / sprintf "ParSet<%A@%A>" typeName dev
                 let groupVar = Var.make (VarName groupName, typeName.Type, dev, [groupSize])
                 let groupExpr = UExpr groupVar
@@ -110,10 +110,10 @@ type ParSet = private {
                 let pvInsts =
                     (Size.zero, pvs)
                     ||> List.mapFold (fun pos pv ->
-                        let size = ShapeSpec.nElem pv.Shape
+                        let size = Shape.nElem pv.Shape
                         let varSlice = groupExpr.[pos .. pos + size - 1L] |> UExpr.reshape pv.Shape
                         let nPos, nSize = Size.eval pos, Size.eval size
-                        let nShape = ShapeSpec.eval pv.Shape
+                        let nShape = Shape.eval pv.Shape
                         let dataSlice = groupData.[nPos .. nPos + nSize - 1L] |> ITensor.reshape nShape
                         (pv.Name, {Var=pv; Expr=varSlice; Data=dataSlice}), pos + size)
                     |> fst

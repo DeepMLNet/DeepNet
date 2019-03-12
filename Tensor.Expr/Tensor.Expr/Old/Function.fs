@@ -74,7 +74,7 @@ open UExprTypes
 //                ||> List.zip
 //                |> List.fold (fun env (svSym, svVal) ->
 //                    let failShape () =
-//                        let vSymShp = vSym.Shape |> ShapeSpec.substSymbols env 
+//                        let vSymShp = vSym.Shape |> Shape.substSymbols env 
 //                        failwithf "expected variable %A with (inferred) shape %A but got value with shape %A"
 //                            vSym vSymShp vVal.Shape
 //                    match svSym |> Size.substSymbols env |> Size.simplify  with
@@ -104,7 +104,7 @@ open UExprTypes
 //                           value with type %A was provided" vs.Name vs.TypeName.Type value.DataType
 
 //            let ss = Var.shape vs
-//            match ShapeSpec.tryEval ss with
+//            match Shape.tryEval ss with
 //            | Some ns when ITensor.shape value <> ns ->
 //                failwithf "variable %A was expected to be of shape %A (%A) but a \
 //                           value with shape %A waTensorded" vs.Name ns ss (ITensor.shape value)

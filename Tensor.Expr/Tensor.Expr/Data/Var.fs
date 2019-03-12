@@ -37,7 +37,7 @@ type Var = {
     /// storage device
     Dev:       ITensorDevice
     /// symbolic shape
-    Shape:     ShapeSpec
+    Shape:     Shape
     /// parameter
     Par:       ParameterSpec option
 } with
@@ -80,7 +80,7 @@ type Var = {
     static member shape (vs: Var) = vs.Shape
 
     /// number of dimensions of variable
-    static member nDims (vs: Var) = vs.Shape |> ShapeSpec.nDim
+    static member nDims (vs: Var) = vs.Shape |> Shape.nDim
 
     /// type of variable
     static member dataType (vs: Var) = vs.DataType 
@@ -163,7 +163,7 @@ type Var<'T> (_var: Var) =
     member this.Pretty = this.Untyped.Pretty 
 
     /// number of dimensions of variable
-    static member nDims vs = Var.shape vs |> ShapeSpec.nDim
+    static member nDims vs = Var.shape vs |> Shape.nDim
 
     /// substitutes the size symbol environment into the variable
     static member substSymSizes symSizes (vs: Var<'T>) = 

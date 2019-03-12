@@ -356,10 +356,10 @@ type Not = { X: BaseExprCh } with
 
 
 /// Reshape
-type Reshape = { X: BaseExprCh; Shape: ShapeSpec } with
+type Reshape = { X: BaseExprCh; Shape: Shape } with
     interface IOp with      
         member this.Check () = 
-            if not (Size.equalIgnoringBc (ShapeSpec.nElem this.X.Shape) (ShapeSpec.nElem this.Shape)) then
+            if not (Size.equalIgnoringBc (Shape.nElem this.X.Shape) (Shape.nElem this.Shape)) then
                 failwithf "Cannot change number of elements while reshaping from %A to %A." 
                             this.X.Shape this.Shape
         member this.Channels = Ch.onlyOne
@@ -371,22 +371,22 @@ type Reshape = { X: BaseExprCh; Shape: ShapeSpec } with
         member this.SubstSymSizes env = 
             { this with Shape = SymSizeEnv.substShape env this.Shape } :> _
         member this.CanEvalAllSymSizes = 
-            ShapeSpec.canEval this.Shape
+            Shape.canEval this.Shape
         member this.Eval env argVals =
-            (ArgValue.unaryX argVals) |> ITensor.reshape (ShapeSpec.eval this.Shape) |> Ch.only
+            (ArgValue.unaryX argVals) |> ITensor.reshape (Shape.eval this.Shape) |> Ch.only
     interface IOpFormat with
         member this.Text =
             sprintf "Reshape%A" this.Shape
 
 
 /// Broadcast.
-type DoBroadcast = { X: BaseExprCh; Shape: ShapeSpec } with
+type DoBroadcast = { X: BaseExprCh; Shape: Shape } with
     interface IOp with      
         member this.Check () = 
-            if ShapeSpec.nDim this.X.Shape <> ShapeSpec.nDim this.Shape then
+            if Shape.nDim this.X.Shape <> Shape.nDim this.Shape then
                 failwithf "Tensor of shape %A does not have same number of dimesions as broadcast shape %A."
                             this.X.Shape this.Shape
-            for dim in 0 .. (ShapeSpec.nDim this.Shape) - 1 do
+            for dim in 0 .. (Shape.nDim this.Shape) - 1 do
                 match this.X.Shape.[dim], this.Shape.[dim] with
                 | Size.Broadcast, _ -> ()
                 | ssa, ssb when not (Size.equalIgnoringBc ssa ssb) -> 
@@ -402,8 +402,8 @@ type DoBroadcast = { X: BaseExprCh; Shape: ShapeSpec } with
         member this.SubstSymSizes env = 
             { this with Shape = SymSizeEnv.substShape env this.Shape } :> _
         member this.CanEvalAllSymSizes = 
-            ShapeSpec.canEval this.Shape
-        member this.Eval env argVals = (ArgValue.unaryX argVals) |> ITensor.broadcastTo (ShapeSpec.eval this.Shape) |> Ch.only
+            Shape.canEval this.Shape
+        member this.Eval env argVals = (ArgValue.unaryX argVals) |> ITensor.broadcastTo (Shape.eval this.Shape) |> Ch.only
     interface IOpFormat with
         member this.Text =
             sprintf "DoBroadcast%A" this.Shape
@@ -413,15 +413,15 @@ type DoBroadcast = { X: BaseExprCh; Shape: ShapeSpec } with
 type PermuteAxes = {X: BaseExprCh; Permutation: int list} with
     interface IOp with      
         member this.Check () = 
-            if ShapeSpec.nDim this.X.Shape <> List.length this.Permutation then
+            if Shape.nDim this.X.Shape <> List.length this.Permutation then
                 failwithf "Permutation %A must have same rank as shape %A." this.Permutation this.X.Shape
             if not (Permutation.is this.Permutation) then
                 failwithf "%A is not a valid permutation of an %d-dimensional tensor." 
-                            this.Permutation (ShapeSpec.nDim this.X.Shape)
+                            this.Permutation (Shape.nDim this.X.Shape)
         member this.Channels = Ch.onlyOne
         member this.TypeNames = this.X.TypeName |> Ch.only
         member this.Devs = this.X.Dev |> Ch.only
-        member this.Shapes = this.X.Shape |> ShapeSpec.permuteAxes this.Permutation |> Ch.only
+        member this.Shapes = this.X.Shape |> Shape.permuteAxes this.Permutation |> Ch.only
         member this.Args = Args.unary this.X
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
@@ -507,7 +507,7 @@ type Diag = {X: BaseExprCh; Axis1: int; Axis2: int} with
         member this.Channels = Ch.onlyOne
         member this.TypeNames = this.X.TypeName |> Ch.only
         member this.Devs = this.X.Dev |> Ch.only
-        member this.Shapes = this.X.Shape |> ShapeSpec.withoutAxis this.Axis2 |> Ch.only
+        member this.Shapes = this.X.Shape |> Shape.withoutAxis this.Axis2 |> Ch.only
         member this.Args = Args.unary this.X
         member this.ReplaceArgs args = {this with X = Args.unaryX args} :> _
         member this.SubstSymSizes env = this :> _
@@ -543,7 +543,7 @@ type SumAxis = {X: BaseExprCh; Axis: int} with
         member this.Channels = Ch.onlyOne
         member this.TypeNames = this.X.TypeName |> Ch.only
         member this.Devs = this.X.Dev |> Ch.only
-        member this.Shapes = this.X.Shape |> ShapeSpec.withoutAxis this.Axis |> Ch.only
+        member this.Shapes = this.X.Shape |> Shape.withoutAxis this.Axis |> Ch.only
         member this.Args = Args.unary this.X
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
@@ -558,7 +558,7 @@ type ProductAxis = {X: BaseExprCh; Axis: int} with
         member this.Channels = Ch.onlyOne
         member this.TypeNames = this.X.TypeName |> Ch.only
         member this.Devs = this.X.Dev |> Ch.only
-        member this.Shapes = this.X.Shape |> ShapeSpec.withoutAxis this.Axis |> Ch.only
+        member this.Shapes = this.X.Shape |> Shape.withoutAxis this.Axis |> Ch.only
         member this.Args = Args.unary this.X
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
@@ -573,7 +573,7 @@ type MaxAxis = {X: BaseExprCh; Axis: int} with
         member this.Channels = Ch.onlyOne
         member this.TypeNames = this.X.TypeName |> Ch.only
         member this.Devs = this.X.Dev |> Ch.only
-        member this.Shapes = this.X.Shape |> ShapeSpec.withoutAxis this.Axis |> Ch.only
+        member this.Shapes = this.X.Shape |> Shape.withoutAxis this.Axis |> Ch.only
         member this.Args = Args.unary this.X
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
@@ -588,7 +588,7 @@ type MinAxis = {X: BaseExprCh; Axis: int} with
         member this.Channels = Ch.onlyOne
         member this.TypeNames = this.X.TypeName |> Ch.only
         member this.Devs = this.X.Dev |> Ch.only
-        member this.Shapes = this.X.Shape |> ShapeSpec.withoutAxis this.Axis |> Ch.only
+        member this.Shapes = this.X.Shape |> Shape.withoutAxis this.Axis |> Ch.only
         member this.Args = Args.unary this.X
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
@@ -603,7 +603,7 @@ type ArgMaxAxis = {X: BaseExprCh; Axis: int} with
         member this.Channels = Ch.onlyOne
         member this.TypeNames = TypeName.ofType<int64> |> Ch.only
         member this.Devs = this.X.Dev |> Ch.only
-        member this.Shapes = this.X.Shape |> ShapeSpec.withoutAxis this.Axis |> Ch.only
+        member this.Shapes = this.X.Shape |> Shape.withoutAxis this.Axis |> Ch.only
         member this.Args = Args.unary this.X
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
@@ -618,7 +618,7 @@ type ArgMinAxis = {X: BaseExprCh; Axis: int} with
         member this.Channels = Ch.onlyOne
         member this.TypeNames = TypeName.ofType<int64> |> Ch.only
         member this.Devs = this.X.Dev |> Ch.only
-        member this.Shapes = this.X.Shape |> ShapeSpec.withoutAxis this.Axis |> Ch.only
+        member this.Shapes = this.X.Shape |> Shape.withoutAxis this.Axis |> Ch.only
         member this.Args = Args.unary this.X
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
@@ -644,7 +644,7 @@ type Gather = {X: BaseExprCh; Indices: BaseExprCh option list} with
                 | Some idx when idx.Shape <> trgtShape ->
                     failwithf "All gather indices must have equal shape, but got shapes %A."
                                 (this.Indices |> List.map (Option.map (fun e -> e.Shape)))
-                | None when dim >= ShapeSpec.nDim trgtShape ->
+                | None when dim >= Shape.nDim trgtShape ->
                     failwithf "Gather index dimensions beyond the number of target dimensions \
                                 must not be None."
                 | _ -> ()
@@ -669,7 +669,7 @@ type Gather = {X: BaseExprCh; Indices: BaseExprCh option list} with
 
 
 /// Disperses elements according to the specified index tensors.
-type Scatter = {X: BaseExprCh; Indices: BaseExprCh option list; Shape: ShapeSpec} with
+type Scatter = {X: BaseExprCh; Indices: BaseExprCh option list; Shape: Shape} with
     interface IOp with      
         member this.Check () = 
             for dim, idx in List.indexed this.Indices do
@@ -700,7 +700,7 @@ type Scatter = {X: BaseExprCh; Indices: BaseExprCh option list; Shape: ShapeSpec
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = 
             let vIndices = argVals |> ArgValue.naryOptXs this.Indices.Length
-            (ArgValue.unaryX argVals).Scatter vIndices (ShapeSpec.eval this.Shape) |> Ch.only
+            (ArgValue.unaryX argVals).Scatter vIndices (Shape.eval this.Shape) |> Ch.only
 
 
 /// Store value to variable.
@@ -710,19 +710,19 @@ type Store = {X: BaseExprCh; Var: Var} with
             if this.X.TypeName <> this.Var.TypeName then
                 failwithf "Cannot store expression of type %A into variable of type %A."
                             this.X.TypeName this.Var.TypeName
-            if not (ShapeSpec.equalWithoutBroadcastability this.X.Shape this.Var.Shape) then
+            if not (Shape.equalIgnoringBc this.X.Shape this.Var.Shape) then
                 failwithf "Cannot store expression of shape %A into variable of shape %A." 
                             this.X.Shape this.Var.Shape   
         member this.Channels = Ch.onlyOne                            
         member this.TypeNames = this.X.TypeName |> Ch.only
         member this.Devs = this.X.Dev |> Ch.only
-        member this.Shapes = ShapeSpec.emptyVector |> Ch.only
+        member this.Shapes = Shape.emptyVector |> Ch.only
         member this.Args = Args.unary this.X
         member this.ReplaceArgs args = 
             {this with X=Args.unaryX args} :> _
         member this.SubstSymSizes env = 
             {this with Var={this.Var with Shape=SymSizeEnv.substShape env this.Var.Shape}} :> _
-        member this.CanEvalAllSymSizes = ShapeSpec.canEval this.Var.Shape
+        member this.CanEvalAllSymSizes = Shape.canEval this.Var.Shape
         member this.Eval env argVals = 
             let tv = env.VarEnv.[this.Var.Name]
             let v = ArgValue.unaryX argVals                

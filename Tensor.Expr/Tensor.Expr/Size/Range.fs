@@ -68,14 +68,14 @@ module BaseRangesSpec =
         testOvlp [] rngs
 
     /// True if the BaseRangesSpecTs cover a tensor of the specified shape completely without overlap.
-    /// All BaseRangesSpecT and the ShapeSpecT must be evaluatable to numeric ranges and a
+    /// All BaseRangesSpecT and the ShapeT must be evaluatable to numeric ranges and a
     /// numeric shape respectively.
-    let areCoveringWithoutOverlap (shp: ShapeSpec) (rngs: BaseRangesSpec list) =       
+    let areCoveringWithoutOverlap (shp: Shape) (rngs: BaseRangesSpec list) =       
         if areOverlapping rngs then false
         else
             let shpElems = 
                 shp 
-                |> ShapeSpec.eval 
+                |> Shape.eval 
                 |> List.fold (*) 1L
             let rngElems = 
                 rngs
@@ -188,6 +188,6 @@ module SimpleRangesSpec =
     let (|Dynamic|Static|) rs =
         if isDynamic rs then Dynamic else Static
 
-    let toBaseRangesSpec (shape: ShapeSpec) rs =
+    let toBaseRangesSpec (shape: Shape) rs =
         (shape, rs) ||> List.map2 SimpleRangeSpec.toBaseRangeSpec
 

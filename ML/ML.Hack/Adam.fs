@@ -29,7 +29,7 @@ type Cfg = {
 type AdamPart (pars: Var, wrtParts: UExpr) =
     let typ = pars.DataType
     let dev = pars.Dev
-    let shp = ShapeSpec.eval pars.Shape 
+    let shp = Shape.eval pars.Shape 
 
     // configuration
     let step = ITensor.zeros typ dev []

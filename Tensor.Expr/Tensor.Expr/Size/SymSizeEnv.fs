@@ -22,7 +22,7 @@ module SymSizeEnv =
         Size.substSyms env size
 
     /// substitutes all symbols into the shape and simplifies it
-    let substShape env (shape: ShapeSpec) : ShapeSpec =
+    let substShape env (shape: Shape) : Shape =
         List.map (subst env) shape
 
     /// substitutes all symbols into the simplified range specification

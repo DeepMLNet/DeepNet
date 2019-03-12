@@ -300,7 +300,7 @@ type Dot = { X: BaseExprCh; Y: BaseExprCh } with
             Check.sameType [this.X; this.Y]
             Check.sameDev [this.X; this.Y]
             let sa, sb = this.X.Shape, this.Y.Shape
-            match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
+            match Shape.nDim sa, Shape.nDim sb with
             | 2, 2 -> 
                 if not (Size.equalIgnoringBc sa.[1] sb.[0]) then
                     failwithf "Incompatible shapes for dot product: %A and %A." sa sb
@@ -314,8 +314,8 @@ type Dot = { X: BaseExprCh; Y: BaseExprCh } with
         member this.Devs = this.X.Dev |> Ch.only
         member this.Shapes =
             let sa, sb = this.X.Shape, this.Y.Shape
-            match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
-            | 2, 2 -> ShapeSpec.matrix sa.[0] sb.[1]
+            match Shape.nDim sa, Shape.nDim sb with
+            | 2, 2 -> Shape.matrix sa.[0] sb.[1]
             | na, nb when na=nb -> sa.[0 .. na-2] @ [sb.[nb-1]]
             | _ -> failwithf "Invalid dot product shapes: %A and %A." sa sb
             |> Ch.only
@@ -333,7 +333,7 @@ type TensorProduct = { X: BaseExprCh; Y: BaseExprCh } with
             Check.sameType [this.X; this.Y]
             Check.sameDev [this.X; this.Y]
             let sa, sb = this.X.Shape, this.Y.Shape
-            if ShapeSpec.nDim sa <> ShapeSpec.nDim sb then
+            if Shape.nDim sa <> Shape.nDim sb then
                 failwithf "Cannot compute tensor product between tensors of shapes %A and %A." sa sb
         member this.Channels = Ch.onlyOne
         member this.TypeNames = this.X.TypeName |> Ch.only

@@ -13,14 +13,14 @@ type internal ChannelStridesT = Map<Ch, int64 list>
 
 /// channel information for loop execution
 type internal LoopChannelInfoT = {
-    Shape:          NShapeSpec
+    Shape:          int64 list
     SliceDim:       int
     Target:         ITensor
 } 
 
 /// channel layout information for building loop strides
 type internal LoopChannelLayoutInfoT = {
-    Shape:          NShapeSpec
+    Shape:          int64 list
     SliceDim:       int
     TargetLayout:   TensorLayout
 } 
@@ -154,7 +154,7 @@ type Loop = {
                     | Loop.IterationsRemaining -> itersRemainingAry
 
                 // check type and shape
-                if ShapeSpec.eval vs.Shape <> value.Shape then
+                if Shape.eval vs.Shape <> value.Shape then
                     failwithf "loop variable %A got value with shape %A" vs value.Shape
                 if vs.DataType <> value.DataType then
                     failwithf "loop variable %A got value with data type %A" vs value.DataType
@@ -193,14 +193,14 @@ type Loop = {
                     checkArg idx
                     if this.Xs.[idx].TypeName <> vs.TypeName then
                         failwithf "Constant argument variable %A was given argument of type %A." vs this.Xs.[idx].DataType
-                    if not (ShapeSpec.equalWithoutBroadcastability vs.Shape this.Xs.[idx].Shape) then
+                    if not (Shape.equalIgnoringBc vs.Shape this.Xs.[idx].Shape) then
                         failwithf "Constant argument variable %A was given argument of shape %A." vs this.Xs.[idx].Shape
                 | Loop.SequenceArgSlice {ArgIdx=idx; SliceDim=dim} ->
                     checkArg idx
                     if this.Xs.[idx].TypeName <> vs.TypeName then
                         failwithf "Sequence argument variable %A was given argument of type %A." vs this.Xs.[idx].DataType
-                    let reqShp = vs.Shape |> ShapeSpec.insertAxis dim this.Length
-                    if not (ShapeSpec.equalWithoutBroadcastability reqShp this.Xs.[idx].Shape) then
+                    let reqShp = vs.Shape |> Shape.insertAxis dim this.Length
+                    if not (Shape.equalIgnoringBc reqShp this.Xs.[idx].Shape) then
                         failwithf "Sequence argument variable %A requires argument shape %A but was given %A." 
                                     vs reqShp this.Xs.[idx].Shape
                 | Loop.PreviousChannel {Channel=prvCh; Delay=delay; InitialArg=ivIdx} ->
@@ -209,7 +209,7 @@ type Loop = {
                     | Some chVal -> 
                         if vs.TypeName <> chVal.Expr.TypeName then
                             failwithf "Previous channel variable %A was given channel of type %A." vs chVal.Expr.DataType
-                        if not (ShapeSpec.equalWithoutBroadcastability chVal.Expr.Shape vs.Shape) then
+                        if not (Shape.equalIgnoringBc chVal.Expr.Shape vs.Shape) then
                             failwithf "Previous channel variable %A was given channel of shape %A." vs chVal.Expr.Shape                                
                     | None -> 
                         failwithf "Previous channel %A for variable %A does not exist." prvCh vs
@@ -220,15 +220,15 @@ type Loop = {
                         failwithf "Previous channel variable %A was given initial value of type %A" 
                                     vs this.Xs.[ivIdx].DataType
                     let sliceDim = this.Channels.[prvCh].SliceDim
-                    let reqShp = vs.Shape |> ShapeSpec.insertAxis sliceDim delay
-                    if not (ShapeSpec.equalWithoutBroadcastability reqShp this.Xs.[ivIdx].Shape) then
+                    let reqShp = vs.Shape |> Shape.insertAxis sliceDim delay
+                    if not (Shape.equalIgnoringBc reqShp this.Xs.[ivIdx].Shape) then
                         failwithf "Previous channel variable %A needs initial value of shape %A but was given %A." 
                                     vs reqShp this.Xs.[ivIdx].Shape
                 | Loop.IterationIndex 
                 | Loop.IterationsRemaining -> 
                     if vs.TypeName <> TypeName.ofType<int> then
                         failwithf "Iteration index variable %A must be of type int." vs
-                    if not (ShapeSpec.equalWithoutBroadcastability vs.Shape []) then
+                    if not (Shape.equalIgnoringBc vs.Shape []) then
                         failwithf "Iteration index variable %A must be scalar." vs
                     if vs.Dev <> this.IterIndexDev then
                         failwithf "Iteration index variable %A is inconsistent with another usage on device %A."
@@ -242,7 +242,7 @@ type Loop = {
             this.Channels |> Map.map (fun _ lv -> lv.Expr.Dev)
         member this.Shapes = 
             this.Channels |> Map.map (fun ch lv ->
-                lv.Expr.Shape |> ShapeSpec.insertAxis lv.SliceDim this.Length)
+                lv.Expr.Shape |> Shape.insertAxis lv.SliceDim this.Length)
 
         member this.Args = Args.nary this.Xs
         member this.ReplaceArgs args = {this with Xs=Args.naryXs args} :> _
@@ -253,7 +253,7 @@ type Loop = {
                 Vars = this.Vars
                         |> Map.toSeq
                         |> Seq.map (fun (vs, li) ->
-                            let vs = {vs with Shape = ShapeSpec.substSymbols env vs.Shape}
+                            let vs = {vs with Shape = Shape.substSymbols env vs.Shape}
                             let li = match li with
                                      | Loop.PreviousChannel pc -> 
                                         Loop.PreviousChannel {pc with Delay = Size.substSyms env pc.Delay}
@@ -267,7 +267,7 @@ type Loop = {
         member this.CanEvalAllSymSizes = 
             (Size.canEval this.Length) &&
             (this.Vars |> Map.toSeq |> Seq.forall (fun (vs, li) ->
-                ShapeSpec.canEval vs.Shape &&
+                Shape.canEval vs.Shape &&
                 match li with
                 | Loop.PreviousChannel pc -> Size.canEval pc.Delay
                 | _ -> true)) &&
@@ -286,7 +286,7 @@ type Loop = {
             let channelInfos =
                 this.Channels
                 |> Map.map (fun ch lv ->
-                    let sliceShp = lv.Expr.Shape |> ShapeSpec.eval
+                    let sliceShp = lv.Expr.Shape |> Shape.eval
                     let targetShp = sliceShp |> List.insert lv.SliceDim nIters
                     let target = Tensor.NewOfType (targetShp, lv.Expr.DataType, HostTensor.Dev, order=RowMajor)
                     {

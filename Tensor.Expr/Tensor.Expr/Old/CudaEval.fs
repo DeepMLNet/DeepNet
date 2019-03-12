@@ -49,7 +49,7 @@ module CudaEvalTypes =
 
     type private HelperT =
         static member Allocator<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
-                (shp: NShapeSpec) : Tensor<'T> =
+                (shp: NShape) : Tensor<'T> =
             Tensor<'T> (shp, CudaTensor.Dev)
 
         static member ToDev<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 

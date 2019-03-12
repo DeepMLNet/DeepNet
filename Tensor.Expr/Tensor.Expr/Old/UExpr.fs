@@ -29,7 +29,7 @@ module UExprTypes =
         /// the data type of the result channels
         ChannelType:   Map<Channel, TypeName>
         /// the numeric shape of the result channels
-        ChannelShape:  Map<Channel, NShapeSpec>
+        ChannelShape:  Map<Channel, NShape>
         /// the generating expression, if created from one
         Expr:          Expr option
     }
@@ -52,7 +52,7 @@ module UExprTypes =
     and UExtraOpT =
         | Subtensor of UExprRngsSpecT 
         | SetSubtensor of UExprRngsSpecT
-        | Elements of ShapeSpec * Elem.Unified.UFunc
+        | Elements of Shape * Elem.Unified.UFunc
         | IfThenElse
         | Loop of ULoopSpecT
         | Channel of Channel
@@ -159,8 +159,8 @@ module UExprRngsSpec =
         | _                               , _         -> failwith "invalid unified subtensor spec"
 
     /// checks that the static parts of the range specification are compatible with the given shape
-    let checkCompatibility (shp: ShapeSpec) (srs: UExprRngsSpecT) =
-        let shp = ShapeSpec.eval shp
+    let checkCompatibility (shp: Shape) (srs: UExprRngsSpecT) =
+        let shp = Shape.eval shp
         let failRng () =
             failwithf "Subtensor range specification %A is invalid for tensor of shape %A." srs shp
         if shp.Length <> srs.Length then failRng ()
@@ -207,7 +207,7 @@ module UExpr =
             let toUExprRec = toUExprRec caches
             let metadata = {
                 ChannelType     = Map [dfltChId, Expr.typename expr]
-                ChannelShape    = Map [dfltChId, Expr.shapeOf expr |> ShapeSpec.eval]
+                ChannelShape    = Map [dfltChId, Expr.shapeOf expr |> Shape.eval]
                 Expr            = Some expr
             }
             let extra uop se    = UExpr (UExtraOp uop, se |> List.map toUExprRec, metadata)
@@ -228,7 +228,7 @@ module UExpr =
                 | Expr.Binary (BinaryOp.IfThenElse cond, ifTrue, ifFalse) ->
                     extra IfThenElse [ifTrue; ifFalse; cond]
                 | Expr.Nary (NaryOp.Elements (resShape, elemExpr), se) ->
-                    let nDims = ShapeSpec.nDim resShape
+                    let nDims = Shape.nDim resShape
                     let nArgs = List.length se
                     extra (Elements (resShape, Elem.Unified.toUFunc elemExpr nDims nArgs)) se
                 | Expr.Nary (NaryOp.Channel (MultiChannelOp.Loop loopSpec, channel), se) ->
@@ -236,7 +236,7 @@ module UExpr =
                     let uLoopSpec = loopSpecToULoopSpec caches loopSpec
                     let uLoopMetadata = {
                         ChannelType  = Expr.loopOutputTypeNames loopSpec
-                        ChannelShape = Expr.loopOutputShapes loopSpec |> Map.map (fun ch shp -> ShapeSpec.eval shp)
+                        ChannelShape = Expr.loopOutputShapes loopSpec |> Map.map (fun ch shp -> Shape.eval shp)
                         Expr         = None
                     }
                     let uLoop = UExpr (UExtraOp (Loop uLoopSpec), se |> List.map toUExprRec, uLoopMetadata)
@@ -429,7 +429,7 @@ module UExpr =
                             chMap |> Map.map (fun ch lv -> 
                                 {lv with OutputFrom = lv.OutputFrom + getChFirst loopExpr loopSpec ch})
                         let trimChShapes chShps =
-                            chShps |> Map.map (fun ch (shp: NShapeSpec) ->
+                            chShps |> Map.map (fun ch (shp: NShape) ->
                                 let sliceDim = loopSpec.Channels.[ch].SliceDim
                                 let outputSize = shp.[sliceDim] - getChFirst loopExpr loopSpec ch
                                 let trimedShp = shp |> List.set sliceDim outputSize

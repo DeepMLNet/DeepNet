@@ -181,9 +181,9 @@ type DotDeriv(op: Dot) =
             /// Helper function that computes derivative of y = m .* x wrt x.
             let mxWrtX (m: UExpr) x y dy =
                 let xShp, yShp, dyShp = UExpr.shape x, UExpr.shape y, UExpr.shape dy
-                let nd = ShapeSpec.nDim xShp
+                let nd = Shape.nDim xShp
                 let batchShp = xShp.[0..nd-3]
-                let batchElems = ShapeSpec.nElem batchShp
+                let batchElems = Shape.nElem batchShp
                 let xSmplShp, ySmplShp = xShp.[nd-2..], yShp.[nd-2..]
                 let funElems = dyShp.[0]
                 let dyMat = 
@@ -202,7 +202,7 @@ type DotDeriv(op: Dot) =
 
             // Calculate Jacobian wrt X by transposing expression and resulting Jacobian.
             let xShp = UExpr.shape env.X
-            let nd = ShapeSpec.nDim xShp
+            let nd = Shape.nDim xShp
             let batchShp = xShp.[0..nd-3]
             let egT = env.DOp.T |> DerivTools.collapse
             let dXT = mxWrtX (env.Y.T) (env.X.T) (env.Expr.T) egT

@@ -28,7 +28,7 @@ module Check =
             failwithf "All arguments are expected to be of type bool, but types are: %A." types
 
     let axis (ax: int) (expr: BaseExprCh) =
-        if not (0 <= ax && ax < ShapeSpec.nDim expr.Shape) then
+        if not (0 <= ax && ax < Shape.nDim expr.Shape) then
             failwithf "Cannot apply reduction operation over non-existant axis %d of tensor with shape %A." 
                       ax expr.Shape
 

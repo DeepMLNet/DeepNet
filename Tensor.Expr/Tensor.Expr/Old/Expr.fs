@@ -9,7 +9,7 @@ module private Cache =
     /// cache for ExprT hashes by reference
     let hash = Dictionary<obj, int> (HashIdentity.Reference)
 
-    let shape = ConcurrentDictionary<Expr, ShapeSpec> (HashIdentity.Reference)
+    let shape = ConcurrentDictionary<Expr, Shape> (HashIdentity.Reference)
 
     /// expressions that were already checked for correctness
     let checkedExprs = HashSet<Expr> (HashIdentity.Reference)
@@ -36,11 +36,11 @@ type IOp =
     abstract TypeName: argTypes: TypeName list -> TypeName
 
     /// Should return the shape of the result, given the shape of the arguments.
-    abstract Shape: argShapes: ShapeSpec list -> ShapeSpec      
+    abstract Shape: argShapes: Shape list -> Shape      
         
     /// Should check if the shapes of the arguments are acceptable and,
     /// if not, raise an exception.
-    abstract CheckArgs: argShapes: ShapeSpec list -> unit      
+    abstract CheckArgs: argShapes: Shape list -> unit      
 
     /// Should return the op with all symbolic sizes substituted using the specified
     /// substitution table.
@@ -48,7 +48,7 @@ type IOp =
     abstract SubstSymSizes: symSizes: SymSizeEnv -> IOp
 
     /// Should be true, if all symbolic sizes can be evaluated to numeric sizes.
-    /// This is the case if the function ShapeSpec.canEval or Size.canEval respectively
+    /// This is the case if the function Shape.canEval or Size.canEval respectively
     /// return true on all sizes used in this op.
     abstract CanEvalAllSymSizes: bool
 
@@ -149,9 +149,9 @@ type UnaryOp =
 
     // ==== shape operations ====
     /// reshape tensor; element count does not change
-    | Reshape of ShapeSpec          // DONE
+    | Reshape of Shape          // DONE
     /// broadcast tensor; element count may change
-    | DoBroadcast of ShapeSpec      // DONE
+    | DoBroadcast of Shape      // DONE
     /// permutes the axes of the tensor
     | PermuteAxes of perm:int list  // DONE
     /// subtensor 
@@ -161,7 +161,7 @@ type UnaryOp =
     /// select elements according to the specified index arrays
     | Gather of indices:Expr option list  // DONE
     /// disperses elements according to the specified index arrays
-    | Scatter of indices:Expr option list * shp:ShapeSpec // DONE
+    | Scatter of indices:Expr option list * shp:Shape // DONE
 
     // ==== variable storage ====
     /// variable write
@@ -183,7 +183,7 @@ type UnaryOp =
     | Annotated of string           // DONE
     /// an op that will expand into an expression once symbolic sizes have
     /// been substituted
-    | Held of derivsShp:ShapeSpec list * op:UnaryHeldOp
+    | Held of derivsShp:Shape list * op:UnaryHeldOp
 
 /// an op that will expand into an expression once symbolic sizes have been substituted
 type UnaryHeldOp =
@@ -246,9 +246,9 @@ type NaryOp =
     /// evaluate all subexpressions but discard them
     | Discard                                                   // DONE
     /// build tensor using numeric ranges
-    | BuildTensor of shp:ShapeSpec * rngs:BaseRangesSpec list   // DONE
+    | BuildTensor of shp:Shape * rngs:BaseRangesSpec list   // DONE
     /// elementwise calculated tensor
-    | Elements of shape:ShapeSpec * elemExpr:Elem.Expr          // DONE
+    | Elements of shape:Shape * elemExpr:Elem.Expr          // DONE
     /// elementwise interpolation
     | Interpolate of Interpolator                               // DONE
     /// use specified channel of a multi-channel op
@@ -426,7 +426,7 @@ type Expr =
     member this.Shape = Expr.shapeOf this
 
     /// number of dimensions
-    member this.NDims = ShapeSpec.nDim this.Shape
+    member this.NDims = Shape.nDim this.Shape
 
     /// symbolic number of elements
     member this.NElems = Expr.nElems this
@@ -571,7 +571,7 @@ type Expr =
             | _                               -> failwithf "invalid item/slice specification: %A" allArgs
 
         /// converts a full range specification into a simple range specification
-        let rec splitFRS (rngs: FullExprRngsSpecT) (shps: ShapeSpec) (simpleRs: ExprRngsSpec) (newShape: ShapeSpec) =
+        let rec splitFRS (rngs: FullExprRngsSpecT) (shps: Shape) (simpleRs: ExprRngsSpec) (newShape: Shape) =
             match rngs, shps with
             | RangeSpec.SymElem e :: rngs, _::shps -> splitFRS rngs shps (SimpleRangeSpec.SymStartSymEnd (e, Some e)::simpleRs) newShape
             | RangeSpec.DynElem e :: rngs, _::shps -> splitFRS rngs shps (SimpleRangeSpec.DynStartSymSize (e, Size.one)::simpleRs) newShape
@@ -699,10 +699,10 @@ type Expr =
                 match expr with
 
                 // tensor creation
-                | Leaf(Identity (ss, _)) -> ShapeSpec.matrix ss ss
-                | Leaf(ScalarConst _) -> ShapeSpec.scalar
-                | Leaf(SizeValue _) -> ShapeSpec.scalar
-                | Leaf(Arange (size, _)) -> ShapeSpec.vector size
+                | Leaf(Identity (ss, _)) -> Shape.matrix ss ss
+                | Leaf(ScalarConst _) -> Shape.scalar
+                | Leaf(SizeValue _) -> Shape.scalar
+                | Leaf(Arange (size, _)) -> Shape.vector size
 
                 // variable access
                 | Leaf(Var vs) -> Var.shape vs
@@ -734,26 +734,26 @@ type Expr =
                     -> Expr.shapeOf a
 
                 // tensor operations
-                | Unary(Diag(ax1, ax2), a) -> Expr.shapeOf a |> ShapeSpec.withoutAxis ax2
+                | Unary(Diag(ax1, ax2), a) -> Expr.shapeOf a |> Shape.withoutAxis ax2
                 | Unary(DiagMat(ax1, ax2), a) ->  Expr.shapeOf a |> List.insert ax2 (Expr.shapeOf a).[ax1]
                 | Unary(Invert, a) -> Expr.shapeOf a
 
                 // reductions
-                | Unary(Sum, _) -> ShapeSpec.scalar
-                | Unary(Product, _) -> ShapeSpec.scalar
-                | Unary(SumAxis ax, a) -> Expr.shapeOf a |> ShapeSpec.withoutAxis ax
-                | Unary(ProductAxis ax, a) -> Expr.shapeOf a |> ShapeSpec.withoutAxis ax
-                | Unary(MaxAxis ax, a) -> Expr.shapeOf a |> ShapeSpec.withoutAxis ax
-                | Unary(MinAxis ax, a) -> Expr.shapeOf a |> ShapeSpec.withoutAxis ax
+                | Unary(Sum, _) -> Shape.scalar
+                | Unary(Product, _) -> Shape.scalar
+                | Unary(SumAxis ax, a) -> Expr.shapeOf a |> Shape.withoutAxis ax
+                | Unary(ProductAxis ax, a) -> Expr.shapeOf a |> Shape.withoutAxis ax
+                | Unary(MaxAxis ax, a) -> Expr.shapeOf a |> Shape.withoutAxis ax
+                | Unary(MinAxis ax, a) -> Expr.shapeOf a |> Shape.withoutAxis ax
 
                 // index reductions
-                | Unary(ArgMaxAxis ax, a) -> Expr.shapeOf a |> ShapeSpec.withoutAxis ax
-                | Unary(ArgMinAxis ax, a) -> Expr.shapeOf a |> ShapeSpec.withoutAxis ax
+                | Unary(ArgMaxAxis ax, a) -> Expr.shapeOf a |> Shape.withoutAxis ax
+                | Unary(ArgMinAxis ax, a) -> Expr.shapeOf a |> Shape.withoutAxis ax
 
                 // shape operations
                 | Unary(Reshape(ss), _) -> ss
                 | Unary(DoBroadcast(ss), _) -> ss
-                | Unary(PermuteAxes perm, a) -> Expr.shapeOf a |> ShapeSpec.permuteAxes perm
+                | Unary(PermuteAxes perm, a) -> Expr.shapeOf a |> Shape.permuteAxes perm
                 | Unary(Subtensor(srs), a) ->
                     (srs, Expr.shapeOf a)
                     ||> List.map2 (fun sr shp ->
@@ -761,17 +761,17 @@ type Expr =
                          | SimpleRangeSpec.SymStartSymEnd (s, fo)    -> (fo |? (shp - Size.one)) + 1L - s
                          | SimpleRangeSpec.DynStartSymSize (_, size) -> size)
                 | Unary(ReverseAxis _, a) -> Expr.shapeOf a
-                | Unary(Held ([], ReplicateTo (dim, s)), a) -> Expr.shapeOf a |> ShapeSpec.set dim s
+                | Unary(Held ([], ReplicateTo (dim, s)), a) -> Expr.shapeOf a |> Shape.set dim s
                 | Unary(Gather indices, a) -> indices |> List.pick id |> Expr.shapeOf
                 | Unary (Scatter (indices, shp), a) -> shp
 
                 // misc
-                | Unary(StoreToVar _, a) -> ShapeSpec.emptyVector
+                | Unary(StoreToVar _, a) -> Shape.emptyVector
                 | Unary(Print _, a) -> Expr.shapeOf a
                 | Unary(Dump _, a) -> Expr.shapeOf a
                 | Unary(CheckFinite _, a) -> Expr.shapeOf a
                 | Unary(Annotated(_), a) -> Expr.shapeOf a
-                | Unary(Held (derivShp :: _, heldOp), a) -> [(Expr.shapeOf a).[0]; ShapeSpec.nElem derivShp]
+                | Unary(Held (derivShp :: _, heldOp), a) -> [(Expr.shapeOf a).[0]; Shape.nElem derivShp]
 
                 // binary elementwise
                 | Binary (Add, a, _)                         
@@ -796,8 +796,8 @@ type Expr =
                 // matrix/tensor operations
                 | Binary (Dot, a, b) -> 
                     let sa, sb = Expr.shapeOf a, Expr.shapeOf b
-                    match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
-                    | 2, 2 -> ShapeSpec.matrix sa.[0] sb.[1]
+                    match Shape.nDim sa, Shape.nDim sb with
+                    | 2, 2 -> Shape.matrix sa.[0] sb.[1]
                     | na, nb when na=nb -> sa.[0 .. na-2] @ [sb.[nb-1]]
                     | _ -> failwithf "invalid dot product shapes: %A, %A" sa sb
                 | Binary (TensorProduct, a, b) -> 
@@ -809,7 +809,7 @@ type Expr =
                     Expr.shapeOf a
 
                 // misc
-                | Nary(Discard, _) -> ShapeSpec.emptyVector 
+                | Nary(Discard, _) -> Shape.emptyVector 
                 | Nary(BuildTensor (shp, _), _) -> shp
                 | Nary(Elements (resShape, elemExpr), _) -> resShape
                 | Nary(Interpolate _, es) -> Expr.shapeOf es.Head
@@ -823,15 +823,15 @@ type Expr =
     static member internal loopOutputShapes (spec: LoopSpec) =
         spec.Channels
         |> Map.map (fun ch lv ->
-            Expr.shapeOf lv.Expr |> ShapeSpec.insertAxis lv.SliceDim spec.Length)
+            Expr.shapeOf lv.Expr |> Shape.insertAxis lv.SliceDim spec.Length)
 
     /// number of elements of given expression
     static member nElems expr =
-        expr |> Expr.shapeOf |> ShapeSpec.nElem
+        expr |> Expr.shapeOf |> Shape.nElem
 
     /// number of dimensions of given expression
     static member nDims expr =
-        expr |> Expr.shapeOf |> ShapeSpec.nDim
+        expr |> Expr.shapeOf |> Shape.nDim
 
     /// Wraps the given op in a Reshape op if its shape does not match ss.
     static member reshapeIfNecessary ss expr =
@@ -883,7 +883,7 @@ type Expr =
             if Expr.typename expr = TypeName.ofType<obj> then
                 failwith "Expression type cannot be object."
 
-            let (..=) (sa: ShapeSpec) (sb: ShapeSpec) =
+            let (..=) (sa: Shape) (sb: Shape) =
                 if sa.Length = sb.Length then List.forall2 (.=) sa sb
                 else false
             let (..<>) sa sb = not (sa ..= sb)
@@ -898,7 +898,7 @@ type Expr =
             | Unary (op, a) ->
                 Expr.checkExpr a
                 let sa = Expr.shapeOf a
-                let nda = ShapeSpec.nDim sa
+                let nda = Shape.nDim sa
 
                 match op with
                 | Not -> reqBool op a
@@ -910,13 +910,13 @@ type Expr =
                 | ArgMinAxis(ax) when not (0 <= ax && ax < nda) ->
                     failwithf "cannot recude over non-existant axis %d of array with shape %A" ax sa
                 | Reshape(ss) ->
-                    if ShapeSpec.nElem sa .<> ShapeSpec.nElem ss then
+                    if Shape.nElem sa .<> Shape.nElem ss then
                         failwithf "reshape cannot change number of elements while reshaping from %A to %A" sa ss
                 | DoBroadcast(ss) -> 
-                    if ShapeSpec.nDim ss <> nda then
+                    if Shape.nDim ss <> nda then
                         failwithf "array of shape %A does not have same number of dimesions as broadcast shape %A"
                             sa ss
-                    for dim in 0 .. (ShapeSpec.nDim ss) - 1 do
+                    for dim in 0 .. (Shape.nDim ss) - 1 do
                         match sa.[dim], ss.[dim] with
                         | Size.Broadcast, _ -> ()
                         | ssa, ssb when ssa .<> ssb -> 
@@ -979,7 +979,7 @@ type Expr =
                         | Some idx when idx.Shape <> trgtShape ->
                             failwithf "all gather indices must have equal shape, but got %A"
                                 (indices |> List.map (Option.map Expr.shapeOf))
-                        | None when dim >= ShapeSpec.nDim trgtShape ->
+                        | None when dim >= Shape.nDim trgtShape ->
                             failwithf "gather index dimensions beyond the number of target dimensions \
                                        must not be None"
                         | _ -> ()
@@ -1001,7 +1001,7 @@ type Expr =
                 Expr.checkExpr a
                 Expr.checkExpr b
                 let sa, sb = Expr.shapeOf a, Expr.shapeOf b
-                let nda, ndb = ShapeSpec.nDim sa, ShapeSpec.nDim sb
+                let nda, ndb = Shape.nDim sa, Shape.nDim sb
 
                 let ta, tb = Expr.typename a, Expr.typename b
                 if ta <> tb then
@@ -1059,7 +1059,7 @@ type Expr =
                     if List.length rngs <> List.length es then
                         failwithf "BuildTensor ranges must match arguments, but got %d ranges and %d arguments"
                                   rngs.Length es.Length
-                    match ShapeSpec.tryEval shp with
+                    match Shape.tryEval shp with
                     | Some shp ->
                         for rng, arg in List.zip rngs es do
                             if rng.Length <> shp.Length then
@@ -1118,7 +1118,7 @@ type Expr =
                             checkArg idx
                             if es.[idx].TypeName <> vs.TypeName then
                                 failwithf "sequence argument variable %A was given argument of type %A" vs es.[idx].Type
-                            let reqShp = vs.Shape |> ShapeSpec.insertAxis dim spec.Length
+                            let reqShp = vs.Shape |> Shape.insertAxis dim spec.Length
                             if reqShp ..<> ss.[idx] then
                                 failwithf "sequence argument variable %A requires argument shape %A but was given %A" vs reqShp ss.[idx]
                         | PreviousChannel {Channel=prvCh; Delay=delay; InitialArg=ivIdx} ->
@@ -1137,7 +1137,7 @@ type Expr =
                             if es.[ivIdx].TypeName <> vs.TypeName then
                                 failwithf "previous channel variable %A was given initial value of type %A" vs es.[ivIdx].Type
                             let sliceDim = spec.Channels.[prvCh].SliceDim
-                            let reqShp = vs.Shape |> ShapeSpec.insertAxis sliceDim delay
+                            let reqShp = vs.Shape |> Shape.insertAxis sliceDim delay
                             if reqShp ..<> ss.[ivIdx] then
                                 failwithf "previous channel variable %A needs initial value of shape %A but was given %A" vs reqShp ss.[ivIdx]                                
                         | IterationIndex 
@@ -1225,7 +1225,7 @@ type Expr =
     static member private testEvalAllSymSizes (failIfNot: bool) (expr: Expr) =
         let subTest = Expr.testEvalAllSymSizes failIfNot
         let tSize = Size.canEval
-        let tShp = ShapeSpec.canEval
+        let tShp = Shape.canEval
         let tSrs = SimpleRangesSpec.canEvalSymbols
         let evalable =
             if Cache.exprsWithEvalableSymSizes.LockedContains expr then true
@@ -1421,15 +1421,15 @@ type Expr =
     /// Transpose matrix.
     /// If the input has more than two dimensions, the last two axes are transposed.
     static member transpose a =
-        let nd = Expr.shapeOf a |> ShapeSpec.nDim
+        let nd = Expr.shapeOf a |> Shape.nDim
         if nd < 2 then invalidArg "a" "need at least a matrix to transpose"
         Expr.swapDim (nd-2) (nd-1) a
 
     /// emits an elementwise binary operation with broadcasting of the inputs if necessary
     static member constructElementwise op a b =
         let sa, sb = Expr.shapeOf a, Expr.shapeOf b
-        let psa, psb = ShapeSpec.padToSame sa sb
-        let bsa, bsb = ShapeSpec.broadcastToSame false psa psb
+        let psa, psb = Shape.padToSame sa sb
+        let bsa, bsb = Shape.broadcastToSame false psa psb
         let ba = a |> Expr.reshapeIfNecessary psa |> Expr.broadcastIfNecessary bsa
         let bb = b |> Expr.reshapeIfNecessary psb |> Expr.broadcastIfNecessary bsb    
         Binary (op, ba, bb) |> Expr.check
@@ -1437,15 +1437,15 @@ type Expr =
     /// pads from the left and broadcasts the argument to the given shape if possible
     static member broadcastToShape shp a =
         let sa = Expr.shapeOf a
-        let psa = sa |> ShapeSpec.padTo (ShapeSpec.nDim shp)
-        let bsa = psa |> ShapeSpec.broadcastToShape shp
+        let psa = sa |> Shape.padTo (Shape.nDim shp)
+        let bsa = psa |> Shape.broadcastToShape shp
         a |> Expr.reshapeIfNecessary psa |> Expr.broadcastIfNecessary bsa        
 
     /// pads and broadcasts all arguments to same shape if possible
     static member broadcastToSameMany es =
         let ss = es |> List.map Expr.shapeOf
-        let ps = ShapeSpec.padToSameMany ss
-        let bs = ShapeSpec.broadcastToSameMany false ps
+        let ps = Shape.padToSameMany ss
+        let bs = Shape.broadcastToSameMany false ps
         List.zip3 es ps bs
         |> List.map (fun (e, p, b) -> e |> Expr.reshapeIfNecessary p |> Expr.broadcastIfNecessary b)
 
@@ -1489,8 +1489,8 @@ type Expr =
     /// otherwise elements from ifFalse
     static member ifThenElse cond ifTrue ifFalse =
         let shps = [Expr.shapeOf cond; Expr.shapeOf ifTrue; Expr.shapeOf ifFalse]
-        let pShps = ShapeSpec.padToSameMany shps
-        let bcShps = ShapeSpec.broadcastToSameMany false pShps           
+        let pShps = Shape.padToSameMany shps
+        let bcShps = Shape.broadcastToSameMany false pShps           
         match pShps, bcShps with
         | [condPShp; ifTruePShp; ifFalsePShp], [condBcShp; ifTrueBcShp; ifFalseBcShp] -> 
             let condBc = cond |> Expr.reshapeIfNecessary condPShp |> Expr.broadcastIfNecessary condBcShp
@@ -1527,15 +1527,15 @@ type Expr =
 
     /// enables broadcasting in the given dimension, it must be of size one // DONE
     static member enableBroadcast dim a = 
-        a |> Expr.reshape (Expr.shapeOf a |> ShapeSpec.enableBroadcast dim)
+        a |> Expr.reshape (Expr.shapeOf a |> Shape.enableBroadcast dim)
 
     /// disables broadcasting in the given dimension // DONE
     static member disableBroadcast dim a =
-        a |> Expr.reshape (Expr.shapeOf a |> ShapeSpec.disableBroadcast dim)
+        a |> Expr.reshape (Expr.shapeOf a |> Shape.disableBroadcast dim)
   
     /// inserts a broadcast axis at the given dimension // DONE
     static member insertBroadcastAxis dim a =
-        a |> Expr.reshape (Expr.shapeOf a |> ShapeSpec.insertBroadcastAxis dim)
+        a |> Expr.reshape (Expr.shapeOf a |> Shape.insertBroadcastAxis dim)
 
     /// Replicates the tensor the given number of repetitions along the given axis.
     static member replicate dim reps a =
@@ -1546,7 +1546,7 @@ type Expr =
         // 3. reshape to result shape
         a 
         |> Expr.insertBroadcastAxis dim
-        |> Expr.broadcast (a.Shape |> ShapeSpec.insertAxis dim reps)
+        |> Expr.broadcast (a.Shape |> Shape.insertAxis dim reps)
         |> Expr.reshape (a.Shape |> List.set dim (reps * a.Shape.[dim]))
 
     /// Replicates the tensor along the given axis, so that after replication it has
@@ -1625,7 +1625,7 @@ type Expr =
         Leaf(Identity(size, Expr.typename expr)) |> Expr.check
 
     /// tensor of given shape filled with specified value
-    static member filled (shp: ShapeSpec) value =
+    static member filled (shp: Shape) value =
         let bcShp = shp |> List.map (fun _ -> Size.broadcastable)
         Expr.scalar value
         |> Expr.reshape bcShp
@@ -1633,7 +1633,7 @@ type Expr =
 
     /// zero tensor of given shape
     [<RequiresExplicitTypeArguments>]
-    static member zeros<'T> (shp: ShapeSpec) =
+    static member zeros<'T> (shp: Shape) =
         Expr.filled shp (conv<'T> 0)
 
     /// zero tensor of given type and shape
@@ -1651,11 +1651,11 @@ type Expr =
 
     /// variable of given name and shape
     [<RequiresExplicitTypeArguments>]
-    static member var<'T> name (ss: ShapeSpec) = 
+    static member var<'T> name (ss: Shape) = 
         Leaf(Var({Name=name; Shape=ss; TypeName=TypeName.ofType<'T>})) |> Expr.check
 
     /// variable of given name, type and shape
-    static member varOfType name typ (ss: ShapeSpec) = 
+    static member varOfType name typ (ss: Shape) = 
         Leaf(Var({Name=name; Shape=ss; TypeName=TypeName.ofTypeInst typ})) |> Expr.check
 
     /// Vector counting from zero to given size minus one.
@@ -1674,12 +1674,12 @@ type Expr =
     /// adds one broadcastable dimension to the left
     static member padLeft a =
         let sa = Expr.shapeOf a
-        Expr.reshape (ShapeSpec.padLeft sa) a
+        Expr.reshape (Shape.padLeft sa) a
 
     /// adds one broadcastable dimension to the right
     static member padRight a =
         let sa = Expr.shapeOf a
-        Expr.reshape (ShapeSpec.padRight sa) a
+        Expr.reshape (Shape.padRight sa) a
 
     /// Dot product.
     /// Behavior depends on the dimensionality of the arguments.
@@ -1691,27 +1691,27 @@ type Expr =
     /// (n+1, n) with n>2 -> batched matrix-vector dot product resulting in a vector.
     static member dot (a: Expr) (b: Expr) =
         let sa, sb = Expr.shapeOf a, Expr.shapeOf b
-        match ShapeSpec.nDim sa, ShapeSpec.nDim sb with
+        match Shape.nDim sa, Shape.nDim sb with
             | 1, 1 -> 
                 // vector-vector dot product
                 Expr.sum (a * b)
             | 2, 1 -> 
                 // matrix-vector dot product
-                let bm = b |> Expr.reshape (ShapeSpec.padRight sb)
+                let bm = b |> Expr.reshape (Shape.padRight sb)
                 Binary(Dot, a, bm) |> Expr.reshape [sa.[0]]
             | 2, 2 -> 
                 // matrix-matrix dot product
                 Binary(Dot, a, b)
             | na, nb when na = nb -> 
                 // batched matrix-matrix dot product
-                let bsa, bsb = ShapeSpec.broadcastToSameInDims [0 .. na-3] false sa sb
+                let bsa, bsb = Shape.broadcastToSameInDims [0 .. na-3] false sa sb
                 let ba = a |> Expr.broadcastIfNecessary bsa
                 let bb = b |> Expr.broadcastIfNecessary bsb    
                 Binary(Dot, ba, bb)
             | na, nb when na = nb + 1 ->
                 // batched matrix-vector dot product
-                let psb = ShapeSpec.padRight sb
-                let bsa, bsb = ShapeSpec.broadcastToSameInDims [0 .. na-3] false sa psb
+                let psb = Shape.padRight sb
+                let bsa, bsb = Shape.broadcastToSameInDims [0 .. na-3] false sa psb
                 let ba = a |> Expr.broadcastIfNecessary bsa
                 let bb = b |> Expr.reshapeIfNecessary psb |> Expr.broadcastIfNecessary bsb    
                 Binary(Dot, ba, bb) |> Expr.reshape bsa.[0 .. na-2]
@@ -1721,7 +1721,7 @@ type Expr =
     /// tensor product
     static member tensorProduct (a: Expr) (b: Expr) =
         let sa, sb = Expr.shapeOf a, Expr.shapeOf b
-        let psa, psb = ShapeSpec.padToSame sa sb
+        let psa, psb = Shape.padToSame sa sb
         let a, b = Expr.reshapeIfNecessary psa a, Expr.reshapeIfNecessary psb b
         Binary(TensorProduct, a, b) |> Expr.check
 
@@ -1762,7 +1762,7 @@ type Expr =
     /// If the expression has more than two dimensions, the diagonals
     /// are extracted along the last two dimensions.
     static member diag a = 
-        let nd = Expr.shapeOf a |> ShapeSpec.nDim
+        let nd = Expr.shapeOf a |> Shape.nDim
         if nd < 2 then failwith "need at least a matrix to extract diagonal"
         Expr.diagAxis (nd-2) (nd-1) a
 
@@ -1776,7 +1776,7 @@ type Expr =
     /// If the input has more than one dimension, the operation is
     /// performed batch-wise on the last dimension.
     static member diagMat a =
-        let nd = Expr.shapeOf a |> ShapeSpec.nDim
+        let nd = Expr.shapeOf a |> Shape.nDim
         if nd < 1 then failwith "need at least a vector to create diagonal matrix"
         Expr.diagMatAxis (nd-1) nd a
 
@@ -1789,7 +1789,7 @@ type Expr =
     /// If the input has more than two dimensions, the traces
     /// along the last two dimensions are returned.
     static member trace a =
-        let nd = Expr.shapeOf a |> ShapeSpec.nDim
+        let nd = Expr.shapeOf a |> Shape.nDim
         if nd < 2 then
             failwith "need at least a two dimensional array for trace"      
         Expr.traceAxis (nd-2) (nd-1) a
@@ -1952,7 +1952,7 @@ type Expr =
                     
         // calculate shape of concatenation
         let totalElems = es |> Seq.sumBy (fun e -> e.Shape.[dim])
-        let shp = es.Head.Shape |> ShapeSpec.set dim totalElems
+        let shp = es.Head.Shape |> Shape.set dim totalElems
 
         // build concatenation using iterative subtensor replacement
         let concatenated, _ =
