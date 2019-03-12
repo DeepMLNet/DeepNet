@@ -22,7 +22,7 @@ module private Cache =
 
 /// start plus the specified number of (symbolic elements)
 type internal PlusElems (elems: SizeSpec) =
-    new (intElems: int64) = PlusElems (SizeSpec.fix intElems)
+    new (intElems: int64) = PlusElems (Size.fix intElems)
     member this.Elems = elems
 
 
@@ -48,7 +48,7 @@ type IOp =
     abstract SubstSymSizes: symSizes: SymSizeEnv -> IOp
 
     /// Should be true, if all symbolic sizes can be evaluated to numeric sizes.
-    /// This is the case if the function ShapeSpec.canEval or SizeSpec.canEval respectively
+    /// This is the case if the function ShapeSpec.canEval or Size.canEval respectively
     /// return true on all sizes used in this op.
     abstract CanEvalAllSymSizes: bool
 
@@ -533,10 +533,10 @@ type Expr =
         /// converts ints to SizeSpecTs
         let intToSizeSpec (arg: obj) =
             match arg with
-            | :? int64 as f -> SizeSpec.fix f :> obj
+            | :? int64 as f -> Size.fix f :> obj
             | :? (int64 option) as fo -> 
                 match fo with
-                | Some f -> Some (SizeSpec.fix f) :> obj
+                | Some f -> Some (Size.fix f) :> obj
                 | None -> None :> obj
             | _ -> arg
 
@@ -574,14 +574,14 @@ type Expr =
         let rec splitFRS (rngs: FullExprRngsSpecT) (shps: ShapeSpec) (simpleRs: ExprRngsSpec) (newShape: ShapeSpec) =
             match rngs, shps with
             | RangeSpec.SymElem e :: rngs, _::shps -> splitFRS rngs shps (SimpleRangeSpec.SymStartSymEnd (e, Some e)::simpleRs) newShape
-            | RangeSpec.DynElem e :: rngs, _::shps -> splitFRS rngs shps (SimpleRangeSpec.DynStartSymSize (e, SizeSpec.one)::simpleRs) newShape
+            | RangeSpec.DynElem e :: rngs, _::shps -> splitFRS rngs shps (SimpleRangeSpec.DynStartSymSize (e, Size.one)::simpleRs) newShape
             | RangeSpec.SymStartSymEnd (so, fo) :: rngs, size::shps -> 
-                let size = (fo |? (size-1L)) - (so |? SizeSpec.zero) + 1L
-                splitFRS rngs shps (SimpleRangeSpec.SymStartSymEnd (so |? SizeSpec.zero, fo)::simpleRs) (size::newShape)
+                let size = (fo |? (size-1L)) - (so |? Size.zero) + 1L
+                splitFRS rngs shps (SimpleRangeSpec.SymStartSymEnd (so |? Size.zero, fo)::simpleRs) (size::newShape)
             | RangeSpec.DynStartSymSize (s, size) :: rngs, _::shps ->
                 splitFRS rngs shps (SimpleRangeSpec.DynStartSymSize (s, size)::simpleRs) (size::newShape)
             | RangeSpec.NewAxis :: rngs, _ ->
-                splitFRS rngs shps simpleRs (SizeSpec.broadcastable::newShape)
+                splitFRS rngs shps simpleRs (Size.broadcastable::newShape)
             | RangeSpec.AllFill :: rrngs, _ ->
                 if List.length rngs <= List.length shps then splitFRS (RangeSpec.All::rngs) shps simpleRs newShape
                 else splitFRS rrngs shps simpleRs newShape
@@ -758,7 +758,7 @@ type Expr =
                     (srs, Expr.shapeOf a)
                     ||> List.map2 (fun sr shp ->
                          match sr with
-                         | SimpleRangeSpec.SymStartSymEnd (s, fo)    -> (fo |? (shp - SizeSpec.one)) + 1L - s
+                         | SimpleRangeSpec.SymStartSymEnd (s, fo)    -> (fo |? (shp - Size.one)) + 1L - s
                          | SimpleRangeSpec.DynStartSymSize (_, size) -> size)
                 | Unary(ReverseAxis _, a) -> Expr.shapeOf a
                 | Unary(Held ([], ReplicateTo (dim, s)), a) -> Expr.shapeOf a |> ShapeSpec.set dim s
@@ -918,7 +918,7 @@ type Expr =
                             sa ss
                     for dim in 0 .. (ShapeSpec.nDim ss) - 1 do
                         match sa.[dim], ss.[dim] with
-                        | SizeSpec.Broadcast, _ -> ()
+                        | Size.Broadcast, _ -> ()
                         | ssa, ssb when ssa .<> ssb -> 
                             failwithf "cannot broadcast from %A to %A because non-broadcast dimensions must not change" sa ss
                         | _ -> ()
@@ -1067,7 +1067,7 @@ type Expr =
                             for (start, stop), size, argSize in List.zip3 rng shp (Expr.shapeOf arg) do
                                 if argSize <> stop - start + 1L then
                                     failwithf "BuildTensor range %A is invalid for argument of shape %A" rng (Expr.shapeOf arg)
-                                match SizeSpec.tryEval start, SizeSpec.tryEval stop with
+                                match Size.tryEval start, Size.tryEval stop with
                                 | Some start, Some stop when not (0L <= start && start < size && 0L <= stop && 
                                                                   stop < size && start <= stop) ->
                                     failwithf "BuildTensor range %A is invalid for shape %A" rng shp
@@ -1224,7 +1224,7 @@ type Expr =
     /// tests if all symbolic sizes can be evaluated
     static member private testEvalAllSymSizes (failIfNot: bool) (expr: Expr) =
         let subTest = Expr.testEvalAllSymSizes failIfNot
-        let tSize = SizeSpec.canEval
+        let tSize = Size.canEval
         let tShp = ShapeSpec.canEval
         let tSrs = SimpleRangesSpec.canEvalSymbols
         let evalable =
@@ -1626,7 +1626,7 @@ type Expr =
 
     /// tensor of given shape filled with specified value
     static member filled (shp: ShapeSpec) value =
-        let bcShp = shp |> List.map (fun _ -> SizeSpec.broadcastable)
+        let bcShp = shp |> List.map (fun _ -> Size.broadcastable)
         Expr.scalar value
         |> Expr.reshape bcShp
         |> Expr.broadcast shp
@@ -1956,7 +1956,7 @@ type Expr =
 
         // build concatenation using iterative subtensor replacement
         let concatenated, _ =
-            ((Expr.zerosOfSameType es.Head shp, SizeSpec.zero), es)
+            ((Expr.zerosOfSameType es.Head shp, Size.zero), es)
             ||> List.fold (fun (concatSoFar, pos) e ->
                 let len = e.Shape.[dim]
                 let slice : FullExprRngsSpecT = 

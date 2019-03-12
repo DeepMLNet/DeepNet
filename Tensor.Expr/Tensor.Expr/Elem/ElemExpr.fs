@@ -14,7 +14,7 @@ type ArgElementSpec = Arg * ShapeSpec
     
 type LeafOp =
     | Const of Const
-    | SizeValue of value:SizeSpec * typ:TypeName
+    | SizeValue of value:Size * typ:TypeName
     | ArgElement of argElem:ArgElementSpec * typ:TypeName
 
 and UnaryOp = 
@@ -38,8 +38,8 @@ and UnaryOp =
     | Floor
     | Round
     | Truncate
-    | Sum of SizeSymbol * SizeSpec * SizeSpec
-    | KroneckerRng of SizeSpec * SizeSpec * SizeSpec
+    | Sum of SizeSym * Size * Size
+    | KroneckerRng of Size * Size * Size
 
 and BinaryOp = 
     | Add                           
@@ -48,7 +48,7 @@ and BinaryOp =
     | Divide                        
     | Modulo
     | Power        
-    | IfThenElse of SizeSpec * SizeSpec
+    | IfThenElse of Size * Size
         
 /// an element expression
 and [<StructuredFormatDisplay("{Pretty}")>] Expr =        
@@ -151,25 +151,25 @@ with
     /// index symbol for given dimension of the result
     static member idxSymbol dim =
         sprintf "R%d" dim
-        |> SizeSymbol.ofName
+        |> SizeSym
 
     /// index size of given dimension of the result
     static member idx dim =
-        SizeSpec.Base (BaseSize.Sym (Expr.idxSymbol dim)) 
+        Size.Atom (SizeAtom.Sym (Expr.idxSymbol dim)) 
 
     /// summation symbol of given name
     static member sumSymbol name =
         sprintf "SUM_%s" name 
-        |> SizeSymbol.ofName
+        |> SizeSym
 
     /// summation index size of given name
     static member sumIdx name =
-        SizeSpec.Base (BaseSize.Sym (Expr.sumSymbol name))
+        Size.Atom (SizeAtom.Sym (Expr.sumSymbol name))
 
     /// sum exprover given index (created by sumIdx) from first to last
     static member sum idx first last expr =
         match idx with
-        | SizeSpec.Base (BaseSize.Sym (sumSym)) ->
+        | Size.Atom (SizeAtom.Sym (sumSym)) ->
             Unary (Sum (sumSym, first, last), expr) |> Expr.check
         | _ -> invalidArg "idx" "idx must be summation index obtained by calling sumIdx"
 
@@ -268,31 +268,31 @@ with
     static member canEvalAllSymSizes expr =
         let rec canEval expr =  
             match expr with
-            | Leaf (SizeValue (sc, _)) -> SizeSpec.canEval sc
+            | Leaf (SizeValue (sc, _)) -> Size.canEval sc
             | Leaf (ArgElement ((arg, argIdxs), _)) -> ShapeSpec.canEval argIdxs
             | Leaf _ -> true
 
             | Unary (Sum (sym, first, last), a) -> 
                 // replace sum index by one before testing for evaluability
-                let sumSymVals = Map [sym, SizeSpec.one]
-                SizeSpec.canEval first && 
-                SizeSpec.canEval last && 
+                let sumSymVals = Map [sym, Size.one]
+                Size.canEval first && 
+                Size.canEval last && 
                 canEval (a |> Expr.substSymSizes sumSymVals)
             | Unary (KroneckerRng (sym, first, last), a) ->
-                SizeSpec.canEval sym && 
-                SizeSpec.canEval first && 
-                SizeSpec.canEval last &&
+                Size.canEval sym && 
+                Size.canEval first && 
+                Size.canEval last &&
                 canEval a
             | Unary (op, a) -> canEval a
             | Binary (IfThenElse (left, right), a, b) ->
-                SizeSpec.canEval left && 
-                SizeSpec.canEval right &&
+                Size.canEval left && 
+                Size.canEval right &&
                 canEval a && canEval b
             | Binary (op, a, b) -> canEval a && canEval b
 
         // replace output indices by ones before testing for evaluability
         let dummySymVals =
-            seq {for dim=0 to 20 do yield (Expr.idxSymbol dim, SizeSpec.one)}
+            seq {for dim=0 to 20 do yield (Expr.idxSymbol dim, Size.one)}
             |> Map.ofSeq
         expr |> Expr.substSymSizes dummySymVals |> canEval
 

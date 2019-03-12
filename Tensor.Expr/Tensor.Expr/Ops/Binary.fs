@@ -380,7 +380,7 @@ type SetSubtensor = {X: BaseExprCh; Y: BaseExprCh; Range: SimpleRangesSpec} with
                     match arg with
                     | Arg.N _ -> true
                     | _ -> false)
-                |> Map.map (fun _ v -> Tensor.value (v :?> Tensor<int64>) |> SizeSpec.fix)
+                |> Map.map (fun _ v -> Tensor.value (v :?> Tensor<int64>) |> Size.fix)
             let range = 
                 this.Range 
                 |> SimpleRangesSpecArgs.resolveDynElems dynVals 

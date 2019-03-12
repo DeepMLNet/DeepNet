@@ -135,8 +135,8 @@ type LoopDeriv(op: Loop) =
                     // source is accumulated Jacobian w.r.t. ConstArg argIdx in previous derivative loop iteration
                     let dpp: Loop.PreviousChannel = {
                         Channel    = dPort
-                        Delay      = SizeSpec.one
-                        InitialArg = addZeroInitialArg (funElems :: usingVar.Shape) usingVar.DataType usingVar.Dev (liDims+1) SizeSpec.one
+                        Delay      = Size.one
+                        InitialArg = addZeroInitialArg (funElems :: usingVar.Shape) usingVar.DataType usingVar.Dev (liDims+1) Size.one
                     }
                     varInputSpecs.Add (dAccumVar, Loop.PreviousChannel dpp)
 

@@ -61,7 +61,7 @@ module Interpreter =
                 match op with
                 | LeafOp.Const v -> unbox v.Value
                 | SizeValue (ss, _) ->
-                    let sv = ss |> SizeSpec.substSymbols symVals |> SizeSpec.eval
+                    let sv = ss |> Size.substSymbols symVals |> Size.eval
                     conv<'T> sv
                 | ArgElement ((Arg n, argIdxs), _) ->
                     let argIdxs = ShapeSpec.substSymbols symVals argIdxs
@@ -92,16 +92,16 @@ module Interpreter =
                 | Round ->    typedApply (unsp) round round (unsp) (unsp) (av ())
                 | Truncate -> typedApply (unsp) truncate truncate (unsp) (unsp) (av ())
                 | Sum (sym, first, last) ->
-                    let first, last = SizeSpec.eval first, SizeSpec.eval last
+                    let first, last = Size.eval first, Size.eval last
                     (conv<'T> 0, [first .. last])
                     ||> List.fold (fun sumSoFar symVal ->
                         let sumElem = 
-                            doEval (symVals |> Map.add sym (SizeSpec.fix symVal)) a
+                            doEval (symVals |> Map.add sym (Size.fix symVal)) a
                         typedApply2 (unsp) (+) (+) (+) (+) sumSoFar sumElem) 
                 | KroneckerRng (s, first, last) ->
-                    let sVal = s |> SizeSpec.substSymbols symVals |> SizeSpec.eval
-                    let firstVal = first |> SizeSpec.substSymbols symVals |> SizeSpec.eval
-                    let lastVal = last |> SizeSpec.substSymbols symVals |> SizeSpec.eval
+                    let sVal = s |> Size.substSymbols symVals |> Size.eval
+                    let firstVal = first |> Size.substSymbols symVals |> Size.eval
+                    let lastVal = last |> Size.substSymbols symVals |> Size.eval
                     if firstVal <= sVal && sVal <= lastVal then av ()
                     else conv<'T> 0
 
@@ -116,8 +116,8 @@ module Interpreter =
                 | Modulo ->     typedApply2 (unsp) (%) (%) (%) (%) (av()) (bv())
                 | Power ->      typedApply2 (unsp) ( ** ) ( ** ) (unsp) (unsp) (av()) (bv())
                 | IfThenElse (left, right) ->
-                    let leftVal = left |> SizeSpec.substSymbols symVals |> SizeSpec.eval
-                    let rightVal = right |> SizeSpec.substSymbols symVals |> SizeSpec.eval
+                    let leftVal = left |> Size.substSymbols symVals |> Size.eval
+                    let rightVal = right |> Size.substSymbols symVals |> Size.eval
                     if leftVal = rightVal then av () else bv ()
 
         let initialSymVals =
@@ -129,7 +129,7 @@ module Interpreter =
     let eval (expr: Expr) (args: Tensor.Tensor<'T> list) (resShape: NShapeSpec) : Tensor.Tensor<'T> =
         let res = Tensor.HostTensor.zeros<'T> resShape
         for idx in Tensor.Backend.TensorLayout.allIdxOfShape resShape do
-            let symIdx = idx |> List.map SizeSpec.fix
+            let symIdx = idx |> List.map Size.fix
             let ev = evalElement expr args symIdx 
             res.[idx] <- ev
         res

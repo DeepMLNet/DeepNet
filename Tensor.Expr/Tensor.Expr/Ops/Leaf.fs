@@ -27,7 +27,7 @@ type Scalar = { Value: Const; Dev: ITensorDevice } with
 
     
 /// Value of the specified size
-type SizeValue = { Value: SizeSpec; Dev: ITensorDevice } with
+type SizeValue = { Value: Size; Dev: ITensorDevice } with
     interface IOp with    
         member this.Check () = ()
         member this.Channels = Ch.onlyOne
@@ -37,9 +37,9 @@ type SizeValue = { Value: SizeSpec; Dev: ITensorDevice } with
         member this.Args = Map.empty
         member this.ReplaceArgs args = this :> _
         member this.SubstSymSizes env = {this with Value = SymSizeEnv.subst env this.Value} :> _
-        member this.CanEvalAllSymSizes = SizeSpec.canEval this.Value
+        member this.CanEvalAllSymSizes = Size.canEval this.Value
         member this.Eval env argVals = 
-            SizeSpec.eval this.Value |> Tensor.scalar this.Dev :> ITensor |> Ch.only     
+            Size.eval this.Value |> Tensor.scalar this.Dev :> ITensor |> Ch.only     
 
     interface IOpFormat with
         member this.Text =
@@ -47,7 +47,7 @@ type SizeValue = { Value: SizeSpec; Dev: ITensorDevice } with
 
 
 /// Identity matrix
-type Identity = { Size: SizeSpec; Type: TypeName; Dev: ITensorDevice } with     
+type Identity = { Size: Size; Type: TypeName; Dev: ITensorDevice } with     
     interface IOp with    
         member this.Check () = ()
         member this.Channels = Ch.onlyOne
@@ -57,7 +57,7 @@ type Identity = { Size: SizeSpec; Type: TypeName; Dev: ITensorDevice } with
         member this.Args = Map.empty
         member this.ReplaceArgs args = this :> _
         member this.SubstSymSizes env = {this with Size = SymSizeEnv.subst env this.Size} :> _
-        member this.CanEvalAllSymSizes = SizeSpec.canEval this.Size
+        member this.CanEvalAllSymSizes = Size.canEval this.Size
         member this.Eval env argVals = 
             (Generic<IdentityTyped<_>, IIdentityTyped> [this.Type.Type]).Eval this env
             |> Ch.only
@@ -72,11 +72,11 @@ and internal IIdentityTyped =
 and internal IdentityTyped<'T> () =     
     interface IIdentityTyped with
         member __.Eval this env =
-            Tensor<'T>.identity this.Dev (SizeSpec.eval this.Size) :> ITensor       
+            Tensor<'T>.identity this.Dev (Size.eval this.Size) :> ITensor       
 
 
 /// Counting vector of given size
-type Arange = { Size: SizeSpec; Type: TypeName; Dev: ITensorDevice } with
+type Arange = { Size: Size; Type: TypeName; Dev: ITensorDevice } with
     interface IOp with    
         member this.Check () = ()
         member this.Channels = Ch.onlyOne
@@ -86,7 +86,7 @@ type Arange = { Size: SizeSpec; Type: TypeName; Dev: ITensorDevice } with
         member this.Args = Map.empty
         member this.ReplaceArgs args = this :> _
         member this.SubstSymSizes env = {this with Size = SymSizeEnv.subst env this.Size} :> _
-        member this.CanEvalAllSymSizes = SizeSpec.canEval this.Size
+        member this.CanEvalAllSymSizes = Size.canEval this.Size
         member this.Eval env argVals = 
             (Generic<ArangeTyped<_>, IArangeTyped> [this.Type.Type]).Eval this env  
             |> Ch.only
@@ -101,7 +101,7 @@ and internal IArangeTyped =
 and internal ArangeTyped<'T> () =     
     interface IArangeTyped with
         member __.Eval this env =
-            Tensor.counting this.Dev (SizeSpec.eval this.Size) :> ITensor       
+            Tensor.counting this.Dev (Size.eval this.Size) :> ITensor       
 
 
 /// Argument (placeholder for a variable).
@@ -138,7 +138,7 @@ type DataArg = { Data: OrdRef<ITensor> } with
         member this.TypeNames = 
             TypeName.ofTypeInst this.Data.Value.DataType |> Ch.only
         member this.Shapes = 
-            this.Data.Value.Shape |> List.map SizeSpec.fix |> Ch.only
+            this.Data.Value.Shape |> List.map Size.fix |> Ch.only
         member this.Args = Map.empty
         member this.ReplaceArgs args = this :> _
         member this.SubstSymSizes env = this :> _

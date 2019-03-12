@@ -39,14 +39,14 @@ module CudaElemExpr =
 
 
     let generateSizeSpecCode (sizeSymVars: Map<SizeSymbol, VarNameT>) (ss: SizeSpec) =
-        match SizeSpec.tryEval ss with
+        match Size.tryEval ss with
         | Some v -> sprintf "%dLL" v
         | None ->
-            match SizeSpec.simplify ss with 
-            | SizeSpec.Base (BaseSize.Fixed c) -> sprintf "%dLL" c.IntValue
-            | SizeSpec.Base (BaseSize.Sym sym) -> sizeSymVars.[sym]
-            | SizeSpec.Broadcast -> "1LL"
-            | SizeSpec.Multinom m ->
+            match Size.simplify ss with 
+            | Size.Base (BaseSize.Fixed c) -> sprintf "%dLL" c.IntValue
+            | Size.Base (BaseSize.Sym sym) -> sizeSymVars.[sym]
+            | Size.Broadcast -> "1LL"
+            | Size.Multinom m ->
                 m.Products
                 |> Map.toSeq
                 |> Seq.map (fun (sp, fac) ->
@@ -248,7 +248,7 @@ module CudaElemExpr =
                     |> List.sumBy (fun (argDim, _) -> arg.Layout.Stride.[argDim])
                     |> fun strIncr -> if strIncr = 1L then 1L else 0L)
             | {Op=UUnaryOp (Sum (sumSym, first, last)); Args=[summand]} ->
-                let iters = SizeSpec.eval last - SizeSpec.eval first + 1L 
+                let iters = Size.eval last - Size.eval first + 1L 
                 srcStats summand |> List.map (fun oneStrs -> oneStrs * iters)
             | {Args=args} ->
                 args |> List.map srcStats |> List.sumElemwise

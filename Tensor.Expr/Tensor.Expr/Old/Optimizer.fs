@@ -32,7 +32,7 @@ module Optimizer =
         | Unary (DoBroadcast bc, a) ->
             List.zip bc (Expr.shapeOf a)
             |> List.map (fun (bcDim, aDim) -> 
-                if aDim = SizeSpec.broadcastable && bcDim <> aDim then Broadcasted bcDim
+                if aDim = Size.broadcastable && bcDim <> aDim then Broadcasted bcDim
                 else NotBroadcasted aDim)
         | _ ->
             Expr.shapeOf expr
@@ -147,7 +147,7 @@ module Optimizer =
             let insigAx = 
                 Seq.indexed axSigs 
                 |> Seq.tryFind (fun (ax, axSig) ->
-                    not axSig && resShape.[ax] .<> SizeSpec.broadcastable)
+                    not axSig && resShape.[ax] .<> Size.broadcastable)
 
             match insigAx with
             | Some (insigAx, _) ->
@@ -155,7 +155,7 @@ module Optimizer =
                 //    insigAx resShape.[insigAx] elemExpr
 
                 // replace insignificant axis by axis with one broadcastable element
-                let sigResShape = resShape |> ShapeSpec.set insigAx SizeSpec.broadcastable
+                let sigResShape = resShape |> ShapeSpec.set insigAx Size.broadcastable
                 let sigElements = Expr.elements sigResShape elemExpr args
 
                 // broadcast result to original shape
@@ -262,7 +262,7 @@ module Optimizer =
                     let rplSym d = sprintf "__RPL%d__" d |> SizeSymbol.ofName
                     let insSubst1 =
                         dimRng
-                        |> List.map (fun d -> Elem.Expr.idxSymbol d, SizeSpec.Base (BaseSize.Sym (rplSym d)))
+                        |> List.map (fun d -> Elem.Expr.idxSymbol d, Size.Base (BaseSize.Sym (rplSym d)))
                         |> Map.ofList
                     let insSubst2 =
                         dimRng
@@ -283,23 +283,23 @@ module Optimizer =
                     Expr.shapeOf a
                     |> List.indexed
                     |> List.collect (fun (d, ss) ->
-                        if ss = SizeSpec.broadcastable then [Elem.Expr.idxSymbol d, SizeSpec.zero]
+                        if ss = Size.broadcastable then [Elem.Expr.idxSymbol d, Size.zero]
                         else [])
                     |> Map.ofSeq
                 let bcElemExpr, bcArgs = getArgElemExpr a
                 bcElemExpr |> Elem.Expr.substSymSizes bcSubst, bcArgs
             | Unary (Reshape rsShp, src) when combinable() &&
-                    (rsShp |> List.withoutValue SizeSpec.broadcastable) = src.Shape ->
+                    (rsShp |> List.withoutValue Size.broadcastable) = src.Shape ->
                 // replace insertion of broadcast axes using Reshape op by insertion of
                 // axes into element expression
                 let rsElemExpr, rsArgs = getArgElemExpr src
-                insertBcAxes SizeSpec.broadcastable 0 src.Shape rsShp rsElemExpr, rsArgs
+                insertBcAxes Size.broadcastable 0 src.Shape rsShp rsElemExpr, rsArgs
             | Unary (Reshape rsShp, src) when combinable() && 
-                    (rsShp |> List.withoutValue SizeSpec.one) = src.Shape ->
+                    (rsShp |> List.withoutValue Size.one) = src.Shape ->
                 // replace insertion of singleton axes using Reshape op by insertion of
                 // axes into element expression
                 let rsElemExpr, rsArgs = getArgElemExpr src
-                insertBcAxes SizeSpec.one 0 src.Shape rsShp rsElemExpr, rsArgs
+                insertBcAxes Size.one 0 src.Shape rsShp rsElemExpr, rsArgs
             | combArgExpr -> 
                 let idxs = [0 .. combArgExpr.NDims-1] |> List.map Elem.Expr.idx
                 Elem.Expr.argElemWithType combArgExpr.Type 0 idxs, [combArgExpr]  
@@ -393,8 +393,8 @@ module Optimizer =
 
                 // remove unneccessary permutation of size-one axes before reshape
                 | Unary (Reshape ss, Unary (PermuteAxes (Permutation.Swap (ax1, ax2)), a)) when
-                        (a.Shape.[ax1] .= SizeSpec.one || a.Shape.[ax2] .= SizeSpec.one) &&
-                        a.Shape.[ax1+1 .. ax2-1] |> List.forall (fun ss -> ss .= SizeSpec.one) ->
+                        (a.Shape.[ax1] .= Size.one || a.Shape.[ax2] .= Size.one) &&
+                        a.Shape.[ax1+1 .. ax2-1] |> List.forall (fun ss -> ss .= Size.one) ->
                     Unary (Reshape ss, a) |> optRec
 
                 // combine subsequent reshapes
@@ -428,7 +428,7 @@ module Optimizer =
                     let aOptBc =
                         List.indexed (axesBroadcasted ba)   
                         |> List.map (function | d, bc when d = ax1 || d = ax2 -> bc.Size
-                                              | _, Broadcasted _ -> SizeSpec.broadcastable
+                                              | _, Broadcasted _ -> Size.broadcastable
                                               | _, NotBroadcasted s -> s)
                     let baOpt = Unary (DoBroadcast aOptBc, a) |> optRec
                     Unary (DoBroadcast (Expr.shapeOf expr), Unary (op, baOpt)) |> optRec
@@ -440,7 +440,7 @@ module Optimizer =
                     let aOptBc =
                         List.indexed (axesBroadcasted ba)   
                         |> List.map (function | d, bc when d = ax1 -> bc.Size
-                                              | _, Broadcasted _ -> SizeSpec.broadcastable
+                                              | _, Broadcasted _ -> Size.broadcastable
                                               | _, NotBroadcasted s -> s)
                     let baOpt = Unary (DoBroadcast aOptBc, a) |> optRec
                     Unary (DoBroadcast (Expr.shapeOf expr), Unary (op, baOpt)) |> optRec
@@ -465,7 +465,7 @@ module Optimizer =
                         List.zip (axesBroadcasted ba) (axesBroadcasted bb)
                         |> List.indexed
                         |> List.map (function | d, (aBc, bBc) when d >= ba.NDims-2 -> aBc.Size, bBc.Size
-                                              | _, (Broadcasted _, Broadcasted _) -> SizeSpec.broadcastable, SizeSpec.broadcastable
+                                              | _, (Broadcasted _, Broadcasted _) -> Size.broadcastable, Size.broadcastable
                                               | _, (aBc, bBc) -> aBc.Size, bBc.Size)
                         |> List.unzip
                     let baOpt = Unary (DoBroadcast aOptBc, a) |> optRec

@@ -128,9 +128,9 @@ module NeuralLayer =
     /// Neural layer hyper-parameters.
     type HyperPars<'T> = {
         /// number of inputs
-        NInput:             SizeSpec
+        NInput:             Size
         /// number of outputs
-        NOutput:            SizeSpec
+        NOutput:            Size
         /// transfer (activation) function
         ActFunc:            ActFunc
         /// l1 regularization weight
@@ -220,16 +220,16 @@ module User =
         let ctx = Context.root HostTensor.Dev
         
         // symbolic sizes
-        let nSamples = SizeSpec.symbol "nSamples"
-        let nFeatures = SizeSpec.symbol "nFeatures"
-        let nOutputs = SizeSpec.symbol "nOutputs"
+        let nSamples = SizeSym "nSamples"
+        let nFeatures = SizeSym "nFeatures"
+        let nOutputs = SizeSym "nOutputs"
 
         // model
-        let inputVar = Var<float32> (ctx / "input", [nSamples; nFeatures])
-        let targetVar = Var<float32> (ctx / "target", [nSamples; nOutputs])
+        let inputVar = Var<float32> (ctx / "input", [Size.sym nSamples; Size.sym nFeatures])
+        let targetVar = Var<float32> (ctx / "target", [Size.sym nSamples; Size.sym nOutputs])
         let input = Expr inputVar
         let target = Expr targetVar
-        let hyperPars = NeuralLayer.HyperPars.standard nFeatures nOutputs
+        let hyperPars = NeuralLayer.HyperPars.standard (Size.sym nFeatures) (Size.sym nOutputs)
         let pars = NeuralLayer.pars ctx rng hyperPars
         let pred = NeuralLayer.pred pars input
         let loss = LossLayer.loss LossLayer.MSE pred target
@@ -237,8 +237,8 @@ module User =
 
         // substitute symbol sizes
         let sizeEnv = Map [
-            SizeSpec.extractSymbol nFeatures, SizeSpec.fix f.Shape.[1]
-            SizeSpec.extractSymbol nOutputs, SizeSpec.fix y.Shape.[1]
+            nFeatures, Size.fix f.Shape.[1]
+            nOutputs, Size.fix y.Shape.[1]
         ]
         let loss = loss |> Expr.substSymSizes sizeEnv
         printfn "substituted: %s\n" (loss.ToString())
@@ -266,7 +266,7 @@ module User =
 
         // perform training step
         printfn "training..."
-        for i in 1..10000 do
+        for i in 1..200 do
             let results = minLossStep |> EvalUpdateBundle.exec varEnv
             printf "step %d loss value: %f             \r" i (results.Get loss).Value
         printfn ""

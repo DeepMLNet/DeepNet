@@ -71,8 +71,8 @@ let dumpExpr (output: ITestOutputHelper) (expr: UExpr) =
 //        let name = sprintf "v%d" idx
 //        let sshp = 
 //            shp 
-//            |> List.map (function | -1L -> SizeSpec.broadcastable
-//                                  | s -> SizeSpec.fix s)
+//            |> List.map (function | -1L -> Size.broadcastable
+//                                  | s -> Size.fix s)
 //        yield Expr.var<'T> name sshp]
 
 //[<RequiresExplicitTypeArguments>]

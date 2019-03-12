@@ -104,15 +104,15 @@ type ParSet = private {
                 let groupExpr = UExpr groupVar
                 
                 // create group storage tensor
-                let groupData = ITensor.zeros typeName.Type dev [SizeSpec.eval groupSize]
+                let groupData = ITensor.zeros typeName.Type dev [Size.eval groupSize]
 
                 // slice group storage variable/tensor to obtain expressions/subtensors for each parameter
                 let pvInsts =
-                    (SizeSpec.zero, pvs)
+                    (Size.zero, pvs)
                     ||> List.mapFold (fun pos pv ->
                         let size = ShapeSpec.nElem pv.Shape
                         let varSlice = groupExpr.[pos .. pos + size - 1L] |> UExpr.reshape pv.Shape
-                        let nPos, nSize = SizeSpec.eval pos, SizeSpec.eval size
+                        let nPos, nSize = Size.eval pos, Size.eval size
                         let nShape = ShapeSpec.eval pv.Shape
                         let dataSlice = groupData.[nPos .. nPos + nSize - 1L] |> ITensor.reshape nShape
                         (pv.Name, {Var=pv; Expr=varSlice; Data=dataSlice}), pos + size)

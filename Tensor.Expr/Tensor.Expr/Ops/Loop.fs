@@ -29,7 +29,7 @@ type internal LoopChannelLayoutInfoT = {
 /// Elementwise interpolation using a value table.
 type Loop = {
     /// number of loop iterations
-    Length:     SizeSpec
+    Length:     Size
     /// specifies the values of the variables used in the channel value expressions,
     /// i.e. LoopValueT.Expr
     Vars:       Map<Var, Loop.Input>   
@@ -139,7 +139,7 @@ type Loop = {
                         let slice = rngAllBut args.[idx] dim (Rng.Elem iter)
                         args.[idx].[slice] 
                     | Loop.PreviousChannel {Channel=ch; Delay=delay; InitialArg=ivIdx} ->
-                        let delay = SizeSpec.eval delay
+                        let delay = Size.eval delay
                         let dim = channels.[ch].SliceDim
                         if channels.[ch].Target.Shape.[dim] < delay then
                             failwithf "target for channel %A has insufficient size %d for delay %d"
@@ -249,14 +249,14 @@ type Loop = {
 
         member this.SubstSymSizes env = 
             {this with
-                Length = SizeSpec.substSymbols env this.Length
+                Length = Size.substSymbols env this.Length
                 Vars = this.Vars
                         |> Map.toSeq
                         |> Seq.map (fun (vs, li) ->
                             let vs = {vs with Shape = ShapeSpec.substSymbols env vs.Shape}
                             let li = match li with
                                      | Loop.PreviousChannel pc -> 
-                                        Loop.PreviousChannel {pc with Delay = SizeSpec.substSymbols env pc.Delay}
+                                        Loop.PreviousChannel {pc with Delay = Size.substSymbols env pc.Delay}
                                      | _ -> li
                             vs, li)
                         |> Map.ofSeq
@@ -265,11 +265,11 @@ type Loop = {
             } :> _
 
         member this.CanEvalAllSymSizes = 
-            (SizeSpec.canEval this.Length) &&
+            (Size.canEval this.Length) &&
             (this.Vars |> Map.toSeq |> Seq.forall (fun (vs, li) ->
                 ShapeSpec.canEval vs.Shape &&
                 match li with
-                | Loop.PreviousChannel pc -> SizeSpec.canEval pc.Delay
+                | Loop.PreviousChannel pc -> Size.canEval pc.Delay
                 | _ -> true)) &&
             (this.Channels |> Map.toSeq |> Seq.forall (fun (ch, lv) -> lv.Expr.Expr.CanEvalAllSymSizes))   
             
@@ -278,7 +278,7 @@ type Loop = {
             let thisExpr = BaseExpr.ofOp this
 
             // iteration index variables
-            let nIters = SizeSpec.eval this.Length
+            let nIters = Size.eval this.Length
             let iterAry = Tensor<int64>.zeros this.IterIndexDev []
             let itersRemAry = Tensor<int64>.zeros this.IterIndexDev []
 
@@ -318,7 +318,7 @@ type Loop = {
     static member internal noLift length vars channels xs =
         BaseExpr.ofOp {Loop.Length=length; Vars=vars; Channels=channels; Xs=xs} 
 
-    static member internal withLift (length: SizeSpec) (vars: Map<Var, Loop.Input>) 
+    static member internal withLift (length: Size) (vars: Map<Var, Loop.Input>) 
                                     (channels: Map<Ch, Loop.Value>) (xs: BaseExprCh list) =       
         let mutable args = xs
         let mutable vars = vars

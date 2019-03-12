@@ -24,10 +24,10 @@
     <Compile Include="Data/Var.fs" />
     <Compile Include="Data/VarEnv.fs" />
     <Compile Include="Data\VarValMap.fs" />
-    <Compile Include="Elem/Expr.fs" />
-    <Compile Include="Elem/Unified.fs" />
-    <Compile Include="Elem/Interpreter.fs" />
-    <Compile Include="Elem/Deriv.fs" />
+    <Compile Include="Elem\ElemExpr.fs" />
+    <Compile Include="Elem\ElemUnified.fs" />
+    <Compile Include="Elem\ElemInterpreter.fs" />
+    <Compile Include="Elem\ElemDeriv.fs" />
     <Compile Include="Interpolator.fs" />
     <Compile Include="Dump.fs" />
     <Compile Include="Ops\BaseExpr.fs" />

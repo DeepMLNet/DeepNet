@@ -345,7 +345,7 @@ module CudaExecUnit =
                     BaseRangesSpec.areCoveringWithoutOverlap shp rngs -> 
                 rngs |> List.map (fun rng ->
                     let aryRng = rng |> List.map (fun (first, last) -> 
-                        Rng.Rng (Some (SizeSpec.eval first), Some (SizeSpec.eval last)))
+                        Rng.Rng (Some (Size.eval first), Some (Size.eval last)))
                     dfltChReq (Some (req |> TensorManikin.range aryRng)))
             | _ -> dfltSrcWithNoViewReq ()            
 
@@ -1110,7 +1110,7 @@ module CudaExecUnit =
         | ULeafOp (Identity _) -> execItemsForElemwise (dfltChTrgt()) (NoArgEOpArgTmpl("DiagonalOneIEOp_t", true)) []
         | ULeafOp (ScalarConst cs) -> execItemsForElemwise (dfltChTrgt()) (ConstEOpArgTmpl cs) [] 
         | ULeafOp (SizeValue (sv, _)) -> 
-            let value = Convert.ChangeType(SizeSpec.eval sv, TypeName.getType (trgtDfltChType()))
+            let value = Convert.ChangeType(Size.eval sv, TypeName.getType (trgtDfltChType()))
             let cs = Const.ofValue value
             execItemsForElemwise (dfltChTrgt()) (ConstEOpArgTmpl cs) [] 
         | ULeafOp (Arange _) ->
@@ -1322,7 +1322,7 @@ module CudaExecUnit =
                     execItemsForElemwise (dfltChTrgt()) (ConstEOpArgTmpl cs) [] 
             let parts = rngs |> List.map (fun rng ->
                 let aryRng = rng |> List.map (fun (first, last) -> 
-                    Rng.Rng (Some (SizeSpec.eval first), Some (SizeSpec.eval last)))
+                    Rng.Rng (Some (Size.eval first), Some (Size.eval last)))
                 dfltChTrgt() |> TensorManikin.range aryRng)            
             let copyItems = 
                 List.zip (srcsDfltCh()) parts 

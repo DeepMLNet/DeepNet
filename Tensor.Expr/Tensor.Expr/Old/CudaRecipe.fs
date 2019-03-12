@@ -451,7 +451,7 @@ module CudaRecipe =
                     let resVarName = sprintf "__%s__" channel
                     let resVar = {
                         Var.Name = resVarName
-                        Shape         = nshp |> List.map SizeSpec.fix
+                        Shape         = nshp |> List.map Size.fix
                         TypeName      = tn
                     }
 

@@ -23,7 +23,7 @@ type IDerivableOp =
 /// Derivatives for each variable occuring in an expression.
 type Deriv = private {
     /// The number of elements of the function the derivative is taken of.
-    _FunElems:   SizeSpec
+    _FunElems:   Size
     /// The derivatives w.r.t. the variables occuring in the expression.
     /// They are of the shape _FunElems x (shape of variable).
     _WrtVar:     Map<Var, UExpr>

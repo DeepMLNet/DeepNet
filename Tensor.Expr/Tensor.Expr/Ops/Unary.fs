@@ -388,7 +388,7 @@ type DoBroadcast = { X: BaseExprCh; Shape: ShapeSpec } with
                             this.X.Shape this.Shape
             for dim in 0 .. (ShapeSpec.nDim this.Shape) - 1 do
                 match this.X.Shape.[dim], this.Shape.[dim] with
-                | SizeSpec.Broadcast, _ -> ()
+                | Size.Broadcast, _ -> ()
                 | ssa, ssb when ssa .<> ssb -> 
                     failwithf "Cannot broadcast from %A to %A because non-broadcast dimensions must not change." 
                                 this.X.Shape this.Shape
@@ -444,7 +444,7 @@ type Subtensor = {X: BaseExprCh; Range: SimpleRangesSpec} with
             (this.Range, this.X.Shape)
             ||> List.map2 (fun sr shp ->
                 match sr with
-                | SimpleRangeSpec.SymStartSymEnd (s, fo)    -> (fo |? (shp - SizeSpec.one)) + 1L - s
+                | SimpleRangeSpec.SymStartSymEnd (s, fo)    -> (fo |? (shp - Size.one)) + 1L - s
                 | SimpleRangeSpec.DynStartSymSize (_, size) -> size)            
             |> Ch.only
         member this.Args = 
@@ -467,7 +467,7 @@ type Subtensor = {X: BaseExprCh; Range: SimpleRangesSpec} with
                     match arg with
                     | Arg.N _ -> true
                     | _ -> false)
-                |> Map.map (fun _ v -> Tensor.value (v :?> Tensor<int64>) |> SizeSpec.fix)
+                |> Map.map (fun _ v -> Tensor.value (v :?> Tensor<int64>) |> Size.fix)
             let range = 
                 this.Range 
                 |> SimpleRangesSpecArgs.resolveDynElems dynVals 

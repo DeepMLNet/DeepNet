@@ -52,7 +52,7 @@ module Deriv =
             | Floor -> Map.empty
             | Round -> Map.empty
             | Truncate -> Map.empty
-            | Sum (sym, first, last) -> eg |> Expr.kroneckerRng (SizeSpec.Base (BaseSize.Sym sym)) first last |> rds a
+            | Sum (sym, first, last) -> eg |> Expr.kroneckerRng (Size.Atom (SizeAtom.Sym sym)) first last |> rds a
             | KroneckerRng (sym, first, last) -> eg |> Expr.kroneckerRng sym first last |> rds a                
 
         | Binary (op, a, b) ->
@@ -80,8 +80,8 @@ module Deriv =
         | None -> zero
 
     type private DerivDim =
-        | SummingDim of SizeSymbol * SizeSpec * SizeSpec * SizeSymbol
-        | FixedDim of SizeSpec * SizeSymbol
+        | SummingDim of SizeSym * Size * Size * SizeSym
+        | FixedDim of Size * SizeSym
 
     let buildDerivElemExpr (expr: Expr) (exprShp: ShapeSpec) nArgs =
         let nDims = ShapeSpec.nDim exprShp
@@ -103,7 +103,7 @@ module Deriv =
                     for KeyValue ((_, argIdx), deriv) in argDerivs do
                         // solve for target indices given derivative indices
                         let nArgDims = argIdx.Length
-                        let idxSyms = [for d=0 to nArgDims-1 do yield sprintf "D%d" d |> SizeSymbol.ofName]
+                        let idxSyms = [for d=0 to nArgDims-1 do yield sprintf "D%d" d |> SizeSym]
                         let sol = ShapeSpec.solve argIdx idxSyms
 
                         // extract sum information
@@ -113,17 +113,17 @@ module Deriv =
                                 match sol.LeftValues |> Map.tryFind exprDimSym with
                                 | Some ss -> yield FixedDim (ss, exprDimSym)
                                 | None -> yield SummingDim (newSumSymbol(),
-                                                            SizeSpec.zero, exprShp.[exprDim]-1L,
+                                                            Size.zero, exprShp.[exprDim]-1L,
                                                             exprDimSym)
                         ]              
                         // build indices for eg
                         let egIdxSyms = 
                             egIdxDimInfo 
                             |> List.map (function
-                                         | SummingDim (sym, _, _, _) -> SizeSpec.Base (BaseSize.Sym sym)
+                                         | SummingDim (sym, _, _, _) -> Size.Atom (SizeAtom.Sym sym)
                                          | FixedDim (ss, _) -> ss)
-                        let funcDimSym = SizeSymbol.ofName "F"
-                        let egIdxSyms = (SizeSpec.Base (BaseSize.Sym funcDimSym)) :: egIdxSyms
+                        let funcDimSym = SizeSym "F"
+                        let egIdxSyms = (Size.Atom (SizeAtom.Sym funcDimSym)) :: egIdxSyms
 
                         // sum over dimensions for which it is necessary
                         let argExprSumed = 
@@ -133,7 +133,7 @@ module Deriv =
                                 | SummingDim (sym, first, last, oldSym) ->
                                     let substSum = 
                                         derivSumSoFar 
-                                        |> Expr.substSymSizes (Map [oldSym, SizeSpec.Base (BaseSize.Sym sym)]) 
+                                        |> Expr.substSymSizes (Map [oldSym, Size.Atom (SizeAtom.Sym sym)]) 
                                     Unary (Sum (sym, first, last), substSum) 
                                 | FixedDim (ss, oldSym) -> 
                                     derivSumSoFar
@@ -143,7 +143,7 @@ module Deriv =
                         let argExpr =
                             (argExprSumed, sol.RightValues)
                             ||> Map.fold (fun kroneckersSoFar idxSym reqVal ->
-                                Expr.ifThenElse (SizeSpec.Base (BaseSize.Sym idxSym)) reqVal kroneckersSoFar zero)
+                                Expr.ifThenElse (Size.Atom (SizeAtom.Sym idxSym)) reqVal kroneckersSoFar zero)
 
                         // substitute index symbols "Dnnn" with result index symbols "R(nnn+1)"
                         let resSyms = [for d=1 to nArgDims do yield Expr.idx d]

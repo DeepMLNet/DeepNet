@@ -173,7 +173,7 @@ type Expr<'T> (baseExpr: BaseExpr) =
         UExpr.transfer dev expr.Untyped |> Expr<'T>
 
     /// Scalar with value of given size and type int64.
-    static member size dev (size: SizeSpec) = 
+    static member size dev (size: Size) = 
         UExpr.size dev size |> Expr<int64>
 
     /// Permutes the axes as specified.

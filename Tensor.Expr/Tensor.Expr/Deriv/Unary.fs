@@ -205,8 +205,8 @@ type DoBroadcastDeriv(op: DoBroadcast) =
             let mutable dOpUnBc = env.DOp
             for ax, (bSize, xSize) in List.indexed (List.zip env.Expr.Shape env.Only.Shape) do
                 match bSize, xSize with
-                | SizeSpec.Broadcast, SizeSpec.Broadcast -> ()
-                | _, SizeSpec.Broadcast ->
+                | Size.Broadcast, Size.Broadcast -> ()
+                | _, Size.Broadcast ->
                     dOpUnBc <- dOpUnBc |> UExpr.sumKeepingAxis (ax + 1)
                 | _ -> ()
             dOpUnBc |> DerivTools.unary                 
@@ -275,8 +275,8 @@ type ProductAxisDeriv(op: ProductAxis) =
             let env = DerivTools.Env.make op dOp 
             // TODO: This division method incorrectly returns NaN for zero elements.
             //       But currently I do not see any efficient alternative.
-            let aBc = env.Only |> UExpr.reshape (SizeSpec.broadcastable :: ShapeSpec.flatten env.Only.Shape)
-            let pBc = env.Expr |> UExpr.reshape [SizeSpec.broadcastable; SizeSpec.broadcastable]
+            let aBc = env.Only |> UExpr.reshape (Size.broadcastable :: ShapeSpec.flatten env.Only.Shape)
+            let pBc = env.Expr |> UExpr.reshape [Size.broadcastable; Size.broadcastable]
             (env.DOpJac |> UExpr.enableBroadcast 1) * (pBc / aBc) |> DerivTools.unary
 
 
@@ -358,7 +358,7 @@ type AssumeDerivDeriv(op: AssumeDeriv) =
             let deriv = UExpr op.Deriv 
             match env.FunElems, deriv.Shape.[0] with
             | fl, jl when fl = jl -> deriv
-            | fl, jl when jl = SizeSpec.broadcastable -> 
+            | fl, jl when jl = Size.broadcastable -> 
                 deriv |> UExpr.broadcast [fl; deriv.Shape.[1]]
             | _ -> failwithf "Cannot broadcast specified Jacobian of shape %A to required 
                               Jacobian shape %A" deriv.Shape env.DOp.Shape

@@ -9,8 +9,8 @@ open Tensor.Backend
 
 
 /// start plus the specified number of (symbolic elements)
-type internal PlusElems (elems: SizeSpec) =
-    new (intElems: int64) = PlusElems (SizeSpec.fix intElems)
+type internal PlusElems (elems: Size) =
+    new (intElems: int64) = PlusElems (Size.fix intElems)
     member this.Elems = elems
 
 
@@ -237,7 +237,7 @@ type UExpr (baseExpr: BaseExpr) =
             expr
 
     /// Scalar with value of given size and type int64.
-    static member size dev (size: SizeSpec) = 
+    static member size dev (size: Size) = 
         UExpr {SizeValue.Value=size; Dev=dev} 
 
     /// Permutes the axes as specified.
@@ -276,10 +276,10 @@ type UExpr (baseExpr: BaseExpr) =
         /// converts ints to SizeSpecTs
         let intToSizeSpec (arg: obj) =
             match arg with
-            | :? int64 as f -> SizeSpec.fix f :> obj
+            | :? int64 as f -> Size.fix f :> obj
             | :? (int64 option) as fo -> 
                 match fo with
-                | Some f -> Some (SizeSpec.fix f) :> obj
+                | Some f -> Some (Size.fix f) :> obj
                 | None -> None :> obj
             | _ -> arg
 
@@ -290,11 +290,11 @@ type UExpr (baseExpr: BaseExpr) =
             | [:? RangesSpec as rngs] -> rngs
 
             // slices
-            | (:? (SizeSpec option) as so)  :: (:? (SizeSpec option) as fo)    :: rest ->
+            | (:? (Size option) as so)  :: (:? (Size option) as fo)    :: rest ->
                 RangeSpec.SymStartSymEnd (so, fo) :: parseArgs rest
-            | (:? (SizeSpec option) as so)  :: null                            :: rest ->
+            | (:? (Size option) as so)  :: null                            :: rest ->
                 RangeSpec.SymStartSymEnd (so, None) :: parseArgs rest
-            | null                          :: (:? (SizeSpec option) as fo)    :: rest ->
+            | null                          :: (:? (Size option) as fo)    :: rest ->
                 RangeSpec.SymStartSymEnd (None, fo) :: parseArgs rest
             | (:? (UExpr option) as so)      :: (:? (PlusElems option) as fo)   :: rest ->
                 if so.Value.TypeName <> TypeName.ofType<int64> then
@@ -304,7 +304,7 @@ type UExpr (baseExpr: BaseExpr) =
                 RangeSpec.SymStartSymEnd (None, None) :: parseArgs rest
 
             // items
-            | (:? SizeSpec as s)     :: rest -> RangeSpec.SymElem s :: parseArgs rest
+            | (:? Size as s)     :: rest -> RangeSpec.SymElem s :: parseArgs rest
             | (:? int64 as s)        :: rest when s = Tensor.TensorVal.NewAxis -> RangeSpec.NewAxis :: parseArgs rest
             | (:? int64 as s)        :: rest when s = Tensor.TensorVal.Fill    -> RangeSpec.AllFill :: parseArgs rest
             | (:? UExpr as e)        :: rest  -> if e.TypeName <> TypeName.ofType<int64> then
@@ -317,14 +317,14 @@ type UExpr (baseExpr: BaseExpr) =
         let rec splitFRS (rngs: RangesSpec) (shps: ShapeSpec) (simpleRs: SimpleRangesSpec) (newShape: ShapeSpec) =
             match rngs, shps with
             | RangeSpec.SymElem e :: rngs, _::shps -> splitFRS rngs shps (SimpleRangeSpec.SymStartSymEnd (e, Some e)::simpleRs) newShape
-            | RangeSpec.DynElem e :: rngs, _::shps -> splitFRS rngs shps (SimpleRangeSpec.DynStartSymSize (e, SizeSpec.one)::simpleRs) newShape
+            | RangeSpec.DynElem e :: rngs, _::shps -> splitFRS rngs shps (SimpleRangeSpec.DynStartSymSize (e, Size.one)::simpleRs) newShape
             | RangeSpec.SymStartSymEnd (so, fo) :: rngs, size::shps -> 
-                let size = (fo |? (size-1L)) - (so |? SizeSpec.zero) + 1L
-                splitFRS rngs shps (SimpleRangeSpec.SymStartSymEnd (so |? SizeSpec.zero, fo)::simpleRs) (size::newShape)
+                let size = (fo |? (size-1L)) - (so |? Size.zero) + 1L
+                splitFRS rngs shps (SimpleRangeSpec.SymStartSymEnd (so |? Size.zero, fo)::simpleRs) (size::newShape)
             | RangeSpec.DynStartSymSize (s, size) :: rngs, _::shps ->
                 splitFRS rngs shps (SimpleRangeSpec.DynStartSymSize (s, size)::simpleRs) (size::newShape)
             | RangeSpec.NewAxis :: rngs, _ ->
-                splitFRS rngs shps simpleRs (SizeSpec.broadcastable::newShape)
+                splitFRS rngs shps simpleRs (Size.broadcastable::newShape)
             | RangeSpec.AllFill :: rrngs, _ ->
                 if List.length rngs <= List.length shps then splitFRS (RangeSpec.All::rngs) shps simpleRs newShape
                 else splitFRS rrngs shps simpleRs newShape
@@ -534,7 +534,7 @@ type UExpr (baseExpr: BaseExpr) =
 
     /// Tensor of given shape filled with specified value.
     static member filled (dev: ITensorDevice) (shp: ShapeSpec) (value: obj) =
-        let bcShp = shp |> List.map (fun _ -> SizeSpec.broadcastable)
+        let bcShp = shp |> List.map (fun _ -> Size.broadcastable)
         UExpr.scalar dev value |> UExpr.reshape bcShp |> UExpr.broadcast shp
 
     /// Zero tensor of given type and shape.
@@ -587,7 +587,7 @@ type UExpr (baseExpr: BaseExpr) =
 
         // build concatenation using iterative subtensor replacement
         let concatenated, _ =
-            ((UExpr.zeros es.Head.DataType es.Head.Dev shp, SizeSpec.zero), es)
+            ((UExpr.zeros es.Head.DataType es.Head.Dev shp, Size.zero), es)
             ||> List.fold (fun (concatSoFar, pos) e ->
                 let len = e.Shape.[dim]
                 let slice: RangesSpec = 

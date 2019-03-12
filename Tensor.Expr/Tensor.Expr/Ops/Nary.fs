@@ -79,7 +79,7 @@ type BuildTensor = {Shape: ShapeSpec; Ranges: BaseRangesSpec list; Xs: BaseExprC
                     for (start, stop), size, argSize in List.zip3 rng shp arg.Shape do
                         if argSize <> stop - start + 1L then
                             failwithf "BuildTensor range %A is invalid for argument of shape %A." rng arg.Shape
-                        match SizeSpec.tryEval start, SizeSpec.tryEval stop with
+                        match Size.tryEval start, Size.tryEval stop with
                         | Some start, Some stop when not (0L <= start && start < size && 0L <= stop && 
                                                             stop < size && start <= stop) ->
                             failwithf "BuildTensor range %A is invalid for shape %A." rng shp
@@ -92,7 +92,7 @@ type BuildTensor = {Shape: ShapeSpec; Ranges: BaseRangesSpec list; Xs: BaseExprC
         member this.Args = Args.nary this.Xs
         member this.ReplaceArgs args = {this with Xs=Args.naryXs args} :> _
         member this.SubstSymSizes env = 
-            let sSize = SizeSpec.substSymbols env
+            let sSize = Size.substSymbols env
             {this with Shape=ShapeSpec.substSymbols env this.Shape
                        Ranges=this.Ranges |> List.map (List.map (fun (f,l) -> sSize f, sSize l))} :> _
         member this.CanEvalAllSymSizes = 
@@ -103,7 +103,7 @@ type BuildTensor = {Shape: ShapeSpec; Ranges: BaseRangesSpec list; Xs: BaseExprC
             let trgt = vs.Head.ZerosOfSameType vs.Head.Dev (ShapeSpec.eval this.Shape)
             for rng, e in List.zip this.Ranges vs do                            
                 let aryRng = rng |> List.map (fun (first, last) -> 
-                    Rng.Rng (Some (SizeSpec.eval first), Some (SizeSpec.eval last)))
+                    Rng.Rng (Some (Size.eval first), Some (Size.eval last)))
                 trgt.[aryRng] <- e 
             trgt |> Ch.only
 

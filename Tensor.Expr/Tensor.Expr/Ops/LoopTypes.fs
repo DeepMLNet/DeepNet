@@ -19,7 +19,7 @@ type PreviousChannel = {
     /// the channel to use
     Channel:       Ch
     /// the delay, must be at least one
-    Delay:         SizeSpec
+    Delay:         Size
     /// the index of the argument specifying the initial values
     InitialArg:    int
 }

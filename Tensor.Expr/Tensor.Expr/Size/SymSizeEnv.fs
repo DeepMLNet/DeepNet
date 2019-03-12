@@ -4,7 +4,7 @@ open DeepNet.Utils
 
 
 /// Environment for resolving symbolic sizes.
-type SymSizeEnv = Map<SizeSymbol, SizeSpec>
+type SymSizeEnv = Map<SizeSym, Size>
 
 /// Functions for working with SymSizeEnv.
 module SymSizeEnv =
@@ -15,11 +15,11 @@ module SymSizeEnv =
     /// prints the size symbol environment
     let dump env =
         for KeyValue(sym, value) in env do
-            printfn "%-30s = %A" (SizeSymbol.name sym) value
+            printfn "%-30s = %A" (SizeSym.name sym) value
 
     /// substitutes all symbols into the size and simplifies it
     let subst env size =
-        SizeSpec.substSymbols env size
+        Size.substSymbols env size
 
     /// substitutes all symbols into the shape and simplifies it
     let substShape env (shape: ShapeSpec) : ShapeSpec =

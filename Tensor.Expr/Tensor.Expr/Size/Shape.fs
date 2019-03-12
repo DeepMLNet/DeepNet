@@ -4,7 +4,7 @@ open DeepNet.Utils
 
 
 /// shape specifcation of a tensor
-type ShapeSpec = SizeSpec list
+type ShapeSpec = Size list
 
 /// evaluated shape specification of a tensor
 type NShapeSpec = int64 list
@@ -19,7 +19,7 @@ module ShapeSpec =
         sa |> List.without ax
 
     let insertBroadcastAxis ax (sa: ShapeSpec) : ShapeSpec =
-        sa |> insertAxis ax SizeSpec.Broadcast
+        sa |> insertAxis ax Size.Broadcast
 
     let set ax size (sa: ShapeSpec) : ShapeSpec =
         sa |> List.set ax size
@@ -28,7 +28,7 @@ module ShapeSpec =
         List.length sa
 
     let nElem (sa: ShapeSpec) =
-        if List.isEmpty sa then SizeSpec.one
+        if List.isEmpty sa then Size.one
         else List.reduce (*) sa
 
     let flatten (sa: ShapeSpec) : ShapeSpec =
@@ -47,22 +47,22 @@ module ShapeSpec =
 
     let scalar : ShapeSpec = []
 
-    let vector (ss: SizeSpec) : ShapeSpec = [ss]
+    let vector (ss: Size) : ShapeSpec = [ss]
 
-    let matrix (sr: SizeSpec) (sc: SizeSpec) : ShapeSpec = [sr; sc]
+    let matrix (sr: Size) (sc: Size) : ShapeSpec = [sr; sc]
 
-    let emptyVector : ShapeSpec = [SizeSpec.zero]
+    let emptyVector : ShapeSpec = [Size.zero]
 
     let fix (nShape: int64 list) : ShapeSpec =
-        nShape |> List.map SizeSpec.fix
+        nShape |> List.map Size.fix
 
     /// pads shape by inserting broadcast dimension on the left
     let padLeft (sa: ShapeSpec) : ShapeSpec =
-        (SizeSpec.Broadcast)::sa
+        (Size.Broadcast)::sa
 
     /// pads shape by inserting broadcast dimension on the right
     let padRight (sa: ShapeSpec) : ShapeSpec =
-        sa @ [SizeSpec.Broadcast]
+        sa @ [Size.Broadcast]
 
     /// pads shape from the left to specified number of dimensions
     let padTo dims saIn =
@@ -90,7 +90,7 @@ module ShapeSpec =
 
     let broadcast (sa: ShapeSpec) dim size : ShapeSpec =
         match sa.[dim] with
-        | SizeSpec.Broadcast -> List.set dim size sa
+        | Size.Broadcast -> List.set dim size sa
         | _ -> failwithf "dimension %d of shape %A is not broadcastable (must be SizeBroadcast)" dim sa
 
     let broadcastToShape (trgtShp: ShapeSpec) (saIn: ShapeSpec) : ShapeSpec =
@@ -99,7 +99,7 @@ module ShapeSpec =
             failwithf "cannot broadcast shape %A to shape %A" saIn trgtShp
         for d=0 to nDim trgtShp - 1 do
             match sa.[d], trgtShp.[d] with
-            | al, bl when al = SizeSpec.Broadcast -> sa <- broadcast sa d bl
+            | al, bl when al = Size.Broadcast -> sa <- broadcast sa d bl
             | al, bl when al = bl -> ()
             | _ -> failwithf "cannot broadcast shape %A to %A in dimension %d" sa trgtShp d
         sa
@@ -110,8 +110,8 @@ module ShapeSpec =
             if not (d < nDim sa && d < nDim sb) then
                 failwithf "cannot broadcast shapes %A and %A to same size in non-existant dimension %d" sa sb d
             match sa.[d], sb.[d] with
-            | al, bl when al = SizeSpec.Broadcast -> sa <- broadcast sa d bl
-            | al, bl when bl = SizeSpec.Broadcast -> sb <- broadcast sb d al
+            | al, bl when al = Size.Broadcast -> sa <- broadcast sa d bl
+            | al, bl when bl = Size.Broadcast -> sb <- broadcast sb d al
             | al, bl when (if mustEqual then al = bl else true) -> ()        
             | _ -> failwithf "cannot broadcast shapes %A and %A to same size in dimension %d" sa sb d
         sa, sb
@@ -122,8 +122,8 @@ module ShapeSpec =
             if not (sas |> List.forall (fun sa -> d < nDim sa)) then
                 failwithf "cannot broadcast shapes %A to same size in non-existant dimension %d" sas d
             let ls = sas |> List.map (fun sa -> sa.[d])
-            if ls |> List.exists ((=) SizeSpec.Broadcast) then
-                let nonBc = ls |> List.filter (fun l -> l <> SizeSpec.Broadcast)
+            if ls |> List.exists ((=) Size.Broadcast) then
+                let nonBc = ls |> List.filter (fun l -> l <> Size.Broadcast)
                 match Set nonBc |> Set.count with
                 | 0 -> ()
                 | 1 ->
@@ -152,28 +152,28 @@ module ShapeSpec =
 
     let enableBroadcast dim (sa: ShapeSpec) : ShapeSpec =
         match sa.[dim] with
-        | SizeSpec.Base (BaseSize.Fixed Frac.One) | SizeSpec.Broadcast -> List.set dim SizeSpec.Broadcast sa
+        | Size.Atom (SizeAtom.Fixed Frac.One) | Size.Broadcast -> List.set dim Size.Broadcast sa
         | _ -> failwithf "cannot enable broadcasting for dimension %d of shape %A" dim sa
 
     let disableBroadcast dim (sa: ShapeSpec) : ShapeSpec =
         match sa.[dim] with
-        | SizeSpec.Base (BaseSize.Fixed Frac.One) | SizeSpec.Broadcast -> List.set dim (SizeSpec.Base (BaseSize.Fixed Frac.one)) sa
+        | Size.Atom (SizeAtom.Fixed Frac.One) | Size.Broadcast -> List.set dim (Size.Atom (SizeAtom.Fixed Frac.one)) sa
         | _ -> failwithf "cannot disable broadcasting for dimension %d of shape %A" dim sa
 
     let disableAllBroadcasts sa : ShapeSpec =
-        List.map (fun ss -> if ss = SizeSpec.Broadcast then SizeSpec.Base (BaseSize.Fixed Frac.one) else ss) sa
+        List.map (fun ss -> if ss = Size.Broadcast then Size.Atom (SizeAtom.Fixed Frac.one) else ss) sa
         
     /// True if both shape have the same number of elements and 
     /// are both broadcastable or non-broadcastable in each dimension.
     let equalWithBroadcastability (sa: ShapeSpec) (sb: ShapeSpec) =
         List.length sa = List.length sb &&
-            List.forall2 SizeSpec.equalWithBroadcastability sa sb
+            List.forall2 Size.equalWithBroadcastability sa sb
 
     /// True if both shapes have the same number of elements in each dimension.
     /// Broadcastable and non-broadcastable are treated as equal.            
     let equalWithoutBroadcastability (sa: ShapeSpec) (sb: ShapeSpec) =
          List.length sa = List.length sb &&
-            List.forall2 SizeSpec.equalWithoutBroadcastability sa sb
+            List.forall2 Size.equalWithoutBroadcastability sa sb
 
     /// Permutes the axes as specified.
     let permuteAxes (permut: int list) (sa: ShapeSpec) : ShapeSpec =
@@ -183,7 +183,7 @@ module ShapeSpec =
 
     /// evaluates shape to numeric shape, if possible
     let tryEval (sa: ShapeSpec) : NShapeSpec option =
-        let c = List.map (SizeSpec.tryEval) sa
+        let c = List.map (Size.tryEval) sa
         if List.exists (Option.isNone) c then None
         else Some (List.map Option.get c)          
 
@@ -195,37 +195,37 @@ module ShapeSpec =
 
     /// evaluates shape to numeric shape
     let eval (sa: ShapeSpec) : NShapeSpec =
-        List.map (SizeSpec.eval) sa
+        List.map (Size.eval) sa
 
     /// substitute the symbols into the ShapeSpec and simplifies it
     let substSymbols symVals (sa: ShapeSpec) : ShapeSpec =
-        List.map (SizeSpec.substSymbols symVals) sa
+        List.map (Size.substSymbols symVals) sa
 
     type SolutionT = {
-        LeftValues:     Map<SizeSymbol, SizeSpec>
-        RightValues:    Map<SizeSymbol, SizeSpec>
+        LeftValues:     Map<SizeSym, Size>
+        RightValues:    Map<SizeSym, Size>
     }        
 
-    let solve (left: ShapeSpec) (right: SizeSymbol list) =
+    let solve (left: ShapeSpec) (right: SizeSym list) =
         if left.Length <> right.Length then failwith "dimension mismatch"
         if right |> Set.ofList |> Set.count <> right.Length then
             failwith "symbols on the right must be unique"
         
-        let leftValues = Dictionary<SizeSymbol, SizeSpec>()
-        let rightValues = Dictionary<SizeSymbol, SizeSpec>()
+        let leftValues = Dictionary<SizeSym, Size>()
+        let rightValues = Dictionary<SizeSym, Size>()
 
         for l, r in List.zip left right do
             match l with
-            | SizeSpec.Base (BaseSize.Fixed _)
-            | SizeSpec.Broadcast -> 
+            | Size.Atom (SizeAtom.Fixed _)
+            | Size.Broadcast -> 
                 rightValues.Add (r, l)
-            | SizeSpec.Base (BaseSize.Sym s) ->
+            | Size.Atom (SizeAtom.Sym s) ->
                 if leftValues.ContainsKey s then
                     let pv = leftValues.[s]
                     rightValues.Add (r, pv)
                 else
-                    leftValues.Add (s, SizeSpec.Base (BaseSize.Sym r))
-            | SizeSpec.Multinom _ -> failwith "cannot solve with multinoms"
+                    leftValues.Add (s, Size.Atom (SizeAtom.Sym r))
+            | Size.Multinom _ -> failwith "cannot solve with multinoms"
                 
         {
             LeftValues = leftValues |> Map.ofDictionary

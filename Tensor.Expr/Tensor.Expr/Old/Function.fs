@@ -77,15 +77,15 @@ open UExprTypes
 //                        let vSymShp = vSym.Shape |> ShapeSpec.substSymbols env 
 //                        failwithf "expected variable %A with (inferred) shape %A but got value with shape %A"
 //                            vSym vSymShp vVal.Shape
-//                    match svSym |> SizeSpec.substSymbols env |> SizeSpec.simplify  with
-//                    | SizeSpec.Base (BaseSize.Sym sym) -> env |> SymSizeEnv.add sym (SizeSpec.fix svVal)
-//                    | SizeSpec.Base (BaseSize.Fixed f) -> 
+//                    match svSym |> Size.substSymbols env |> Size.simplify  with
+//                    | Size.Base (BaseSize.Sym sym) -> env |> SymSizeEnv.add sym (Size.fix svVal)
+//                    | Size.Base (BaseSize.Fixed f) -> 
 //                        if f .= svVal then env
 //                        else failShape ()
-//                    | SizeSpec.Broadcast ->
+//                    | Size.Broadcast ->
 //                        if 1L = svVal then env
 //                        else failShape ()
-//                    | SizeSpec.Multinom m -> failShape ()
+//                    | Size.Multinom m -> failShape ()
 //                ) env)
 
 

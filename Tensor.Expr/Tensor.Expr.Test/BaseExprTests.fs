@@ -15,10 +15,10 @@ type BaseExprTests (output: ITestOutputHelper) =
     [<Fact>]
     let ``Expr equality`` () =
         let ctx = Context.root HostTensor.Dev
-        let a1 = Var<float32> (ctx / "a", [SizeSpec.fix 10L; SizeSpec.fix 20L])
-        let b1 = Var<float32> (ctx / "b", [SizeSpec.fix 10L; SizeSpec.fix 20L])
-        let a2 = Var<float32> (ctx / "a", [SizeSpec.fix 10L; SizeSpec.fix 20L])
-        let b2 = Var<float32> (ctx / "b", [SizeSpec.fix 10L; SizeSpec.fix 20L])
+        let a1 = Var<float32> (ctx / "a", [Size.fix 10L; Size.fix 20L])
+        let b1 = Var<float32> (ctx / "b", [Size.fix 10L; Size.fix 20L])
+        let a2 = Var<float32> (ctx / "a", [Size.fix 10L; Size.fix 20L])
+        let b2 = Var<float32> (ctx / "b", [Size.fix 10L; Size.fix 20L])
 
         let expr1 = sin (Expr a1) - cos (Expr b1)
         let expr2 = sin (Expr a2) - cos (Expr b2)

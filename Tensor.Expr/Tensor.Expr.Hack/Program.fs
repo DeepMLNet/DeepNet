@@ -15,8 +15,8 @@ let dumpExpr (expr: UExpr) =
 
 module Vars =
     let ctx = Context.root HostTensor.Dev
-    let a = Var<float32> (ctx / "a", [SizeSpec.fix 10L; SizeSpec.fix 20L])
-    let b = Var<float32> (ctx / "b", [SizeSpec.fix 10L; SizeSpec.fix 20L])
+    let a = Var<float32> (ctx / "a", [Size.fix 10L; Size.fix 20L])
+    let b = Var<float32> (ctx / "b", [Size.fix 10L; Size.fix 20L])
 
 
 let ``Deriv: a + b`` () =

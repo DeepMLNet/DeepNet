@@ -118,7 +118,7 @@ type IOp =
     abstract SubstSymSizes: env: SymSizeEnv -> IOp
 
     /// Should be true, if all symbolic sizes can be evaluated to numeric sizes.
-    /// This is the case if the function ShapeSpec.canEval or SizeSpec.canEval respectively
+    /// This is the case if the function ShapeSpec.canEval or Size.canEval respectively
     /// return true on all sizes used in this op.
     abstract CanEvalAllSymSizes: bool
      
@@ -264,7 +264,7 @@ type BaseExpr private (op: IOp) =
     static member nDims (expr: BaseExpr) = expr.NDims
 
     /// Number of elements of channels.
-    member this.NElems = this.Shapes |> Map.map (fun _ s -> List.fold (*) SizeSpec.one s)
+    member this.NElems = this.Shapes |> Map.map (fun _ s -> List.fold (*) Size.one s)
     /// Number of elements of channels.
     static member nElems (expr: BaseExpr) = expr.NElems
 

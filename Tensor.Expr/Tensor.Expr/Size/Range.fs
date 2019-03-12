@@ -5,7 +5,7 @@ open DeepNet.Utils
 
 
 /// basic range specification for one dimension
-type BaseRangeSpec = SizeSpec * SizeSpec
+type BaseRangeSpec = Size * Size
 
 /// basic range specification for multiple dimensions
 type BaseRangesSpec = BaseRangeSpec list
@@ -18,7 +18,7 @@ module BaseRangesSpec =
         let rec doEval rng =
             match rng with
             | (first, last) :: rrng ->
-                match SizeSpec.tryEval first, SizeSpec.tryEval last, doEval rrng with
+                match Size.tryEval first, Size.tryEval last, doEval rrng with
                 | Some first, Some last, Some rrng -> Some ((first, last) :: rrng)
                 | _ -> None
             | [] -> Some []
@@ -93,10 +93,10 @@ type IDynElem =
 [<RequireQualifiedAccess; StructuralComparison; StructuralEquality>]
 type RangeSpec = 
     // ranges with symbolic size (length)
-    | SymElem            of SizeSpec                           
+    | SymElem            of Size                           
     | DynElem            of IDynElem
-    | SymStartSymEnd     of (SizeSpec option) * (SizeSpec option)
-    | DynStartSymSize    of IDynElem * SizeSpec                    
+    | SymStartSymEnd     of (Size option) * (Size option)
+    | DynStartSymSize    of IDynElem * Size                    
     | NewAxis                                                   
     | AllFill                                                   
     //| RngSymStartDynEnd     of SizeSpecT * ExprT<int>              // size: dynamic
@@ -112,8 +112,8 @@ type RangesSpec = RangeSpec list
 /// Simple range specification for one dimension.
 [<RequireQualifiedAccess; StructuralComparison; StructuralEquality; StructuredFormatDisplay("{Pretty}")>]
 type SimpleRangeSpec =
-    | SymStartSymEnd     of SizeSpec * (SizeSpec option)
-    | DynStartSymSize    of IDynElem * SizeSpec                    
+    | SymStartSymEnd     of Size * (Size option)
+    | DynStartSymSize    of IDynElem * Size                    
 
     member this.Pretty =
         match this with
@@ -121,38 +121,38 @@ type SimpleRangeSpec =
         | SimpleRangeSpec.SymStartSymEnd (first, None) -> sprintf "%A.." first
         | SimpleRangeSpec.DynStartSymSize (first, size) -> sprintf "D%A..D%A+%A-1" first first size
     
-    static member All = SimpleRangeSpec.SymStartSymEnd (SizeSpec.zero, None)
+    static member All = SimpleRangeSpec.SymStartSymEnd (Size.zero, None)
      
     ///// evaluate a SimpleRangeSpec to a Tensor.Rng
     //static member eval (dynEvaluator: IDynElem -> int64) (rs: SimpleRangeSpec) =
     //    match rs with
     //    | SimpleRangeSpec.SymStartSymEnd (s, fo) -> 
-    //        Tensor.Rng.Rng (Some (SizeSpec.eval s), Option.map SizeSpec.eval fo)
+    //        Tensor.Rng.Rng (Some (Size.eval s), Option.map Size.eval fo)
     //    | SimpleRangeSpec.DynStartSymSize (s, elems) -> 
     //        let sv = dynEvaluator s
-    //        Tensor.Rng.Rng (Some sv, Some (sv + SizeSpec.eval elems))
+    //        Tensor.Rng.Rng (Some sv, Some (sv + Size.eval elems))
 
     /// evaluate a SimpleRangeSpec to a Tensor.Rng
     static member eval (rs: SimpleRangeSpec) =
         match rs with
         | SimpleRangeSpec.SymStartSymEnd (s, fo) -> 
-            Tensor.Rng.Rng (Some (SizeSpec.eval s), Option.map SizeSpec.eval fo)
+            Tensor.Rng.Rng (Some (Size.eval s), Option.map Size.eval fo)
         | SimpleRangeSpec.DynStartSymSize (s, elems) -> 
             failwith "Dynamic elements must be resolved before evaluating a SimpleRangeSpec."
 
     static member canEvalSymbols (rs: SimpleRangeSpec) =
         match rs with
         | SimpleRangeSpec.SymStartSymEnd (s, fo) ->
-            SizeSpec.canEval s && Option.forall SizeSpec.canEval fo
+            Size.canEval s && Option.forall Size.canEval fo
         | SimpleRangeSpec.DynStartSymSize (_, elems) ->
-            SizeSpec.canEval elems
+            Size.canEval elems
 
     static member isDynamic (rs: SimpleRangeSpec) =
         match rs with
         | SimpleRangeSpec.DynStartSymSize _ -> true
         | _ -> false
 
-    static member toBaseRangeSpec (size: SizeSpec) (rs: SimpleRangeSpec) =
+    static member toBaseRangeSpec (size: Size) (rs: SimpleRangeSpec) =
         match rs with
         | SimpleRangeSpec.SymStartSymEnd (first, Some last) -> first, last
         | SimpleRangeSpec.SymStartSymEnd (first, None) -> first, size - 1L

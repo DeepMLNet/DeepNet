@@ -167,7 +167,7 @@ module UExprRngsSpec =
         (shp, srs) ||> List.iter2 (fun size rng ->           
             match rng with
             | SimpleRangeSpec.SymStartSymEnd (s, fo) ->
-                let s, fo = SizeSpec.eval s, Option.map SizeSpec.eval fo
+                let s, fo = Size.eval s, Option.map Size.eval fo
                 if not (0L <= s && s < size) then failRng ()
                 match fo with
                 | Some fo when not (0L <= fo && fo < size && fo >= s-1L) -> failRng ()
@@ -309,7 +309,7 @@ module UExpr =
                 |> List.map (fun ((ch, lv), uexpr) -> 
                     ch, {UExpr=uexpr; SliceDim=lv.SliceDim; OutputFrom=0L})
             let uLoopSpec = {
-                Length   = SizeSpec.eval loopSpec.Length
+                Length   = Size.eval loopSpec.Length
                 Vars     = loopSpec.Vars
                 Channels = uChannels |> Map.ofList
             }          
@@ -336,7 +336,7 @@ module UExpr =
                 |> Map.toSeq
                 |> Seq.choose (function
                                 | _, PreviousChannel pCh when pCh.Channel=channel -> 
-                                    Some (SizeSpec.eval pCh.Delay)
+                                    Some (Size.eval pCh.Delay)
                                 | _ -> None)
                 |> Seq.fold max 0L   
             match loopChFirst.[loopExpr].TryFind channel with

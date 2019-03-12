@@ -21,17 +21,17 @@ module Hold =
                     match heldOp with
                     // rewrite ReplicateTo into replicate and slicing once the necessary
                     // sizes can be evaluated
-                    | ReplicateTo (dim, size) when SizeSpec.canEval size && SizeSpec.canEval a.Shape.[dim] ->                 
-                        let nTrgt, nSrc = SizeSpec.eval size, SizeSpec.eval a.Shape.[dim]
+                    | ReplicateTo (dim, size) when Size.canEval size && Size.canEval a.Shape.[dim] ->                 
+                        let nTrgt, nSrc = Size.eval size, Size.eval a.Shape.[dim]
                         let nReps, haveRemaining = 
                             if nTrgt % nSrc = 0L then nTrgt / nSrc, false
                             else nTrgt / nSrc + 1L, true
-                        let aRep = a |> Expr.replicate dim (SizeSpec.fix nReps)
+                        let aRep = a |> Expr.replicate dim (Size.fix nReps)
                         if haveRemaining then
                             let slice : ExprRngsSpec = 
                                 [0 .. aRep.NDims-1]
                                 |> List.map (fun d -> 
-                                    if d = dim then SimpleRangeSpec.SymStartSymEnd (SizeSpec.zero, Some (size - 1L))
+                                    if d = dim then SimpleRangeSpec.SymStartSymEnd (Size.zero, Some (size - 1L))
                                     else SimpleRangeSpec.All)
                             aRep.[slice]
                         else aRep

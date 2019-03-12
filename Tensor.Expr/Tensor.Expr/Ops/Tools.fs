@@ -134,7 +134,7 @@ module SimpleRangesSpecArgs =
                         SimpleRangeSpec.DynStartSymSize (args.[Arg.N i], elems))
 
     /// Replaces all dynamic elements within the specified range using the specified replacement map.
-    let resolveDynElems (map: Map<Arg, SizeSpec>) (srs: SimpleRangesSpec) : SimpleRangesSpec =
+    let resolveDynElems (map: Map<Arg, Size>) (srs: SimpleRangesSpec) : SimpleRangesSpec =
         srs
         |> List.indexed
         |> List.map (function
