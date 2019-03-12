@@ -206,11 +206,11 @@ type UExpr (baseExpr: BaseExpr) =
 
     /// enables broadcasting in the given dimension, it must be of size one
     static member enableBroadcast dim (a: UExpr) = 
-        a |> UExpr.reshape (a.Shape |> Shape.enableBc dim)
+        a |> UExpr.reshape (a.Shape |> Shape.enableBroadcast dim)
 
     /// disables broadcasting in the given dimension
     static member disableBroadcast dim (a: UExpr) =
-        a |> UExpr.reshape (a.Shape |> Shape.disableBc dim)
+        a |> UExpr.reshape (a.Shape |> Shape.disableBroadcast dim)
   
     /// scalar constant of given value
     static member scalar dev (value: obj) : UExpr = 

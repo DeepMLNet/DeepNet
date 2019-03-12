@@ -149,17 +149,17 @@ module Shape =
                 failwithf "cannot broadcast shapes %A of different rank to same size" sas                
             broadcastToSameInDimsMany [0 .. (nDim sa - 1)] mustEqual sas
 
-    let enableBc dim (sa: Shape) : Shape =
+    let enableBroadcast dim (sa: Shape) : Shape =
         match sa.[dim] with
         | Size.Atom (SizeAtom.Fixed Frac.One) | Size.Broadcast -> List.set dim Size.Broadcast sa
         | _ -> failwithf "cannot enable broadcasting for dimension %d of shape %A" dim sa
 
-    let disableBc dim (sa: Shape) : Shape =
+    let disableBroadcast dim (sa: Shape) : Shape =
         match sa.[dim] with
         | Size.Atom (SizeAtom.Fixed Frac.One) | Size.Broadcast -> List.set dim (Size.Atom (SizeAtom.Fixed Frac.one)) sa
         | _ -> failwithf "cannot disable broadcasting for dimension %d of shape %A" dim sa
 
-    let disableAllBc sa : Shape =
+    let disableAllBroadcast sa : Shape =
         List.map (fun ss -> if ss = Size.Broadcast then Size.Atom (SizeAtom.Fixed Frac.one) else ss) sa
         
     /// True if both shape have the same number of elements and 
