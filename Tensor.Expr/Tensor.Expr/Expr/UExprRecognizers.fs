@@ -276,6 +276,16 @@ module UExpr =
         | :? CheckFinite as this -> Some (this.Label, UExpr this.X)
         | _ -> None
 
+    let (|Convert|_|) (expr: UExpr) =
+        match expr.Op with
+        | :? Convert as this -> Some (this.ToType, UExpr this.X)
+        | _ -> None
+
+    let (|Transfer|_|) (expr: UExpr) =
+        match expr.Op with
+        | :? Transfer as this -> Some (this.ToDev, UExpr this.X)
+        | _ -> None
+
     let (|Channel|_|) (expr: UExpr) =
         match expr.Op with
         | :? Channel as this -> Some (this.X.Channel, MultiChannelExpr this.X.Expr)

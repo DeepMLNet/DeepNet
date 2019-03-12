@@ -43,7 +43,7 @@ type SizeValue = { Value: SizeSpec; Dev: ITensorDevice } with
 
     interface IOpFormat with
         member this.Text =
-            sprintf "%A<@%A>" this.Value this.Dev
+            sprintf "Size<int64@%A>(%A)" this.Dev this.Value
 
 
 /// Identity matrix

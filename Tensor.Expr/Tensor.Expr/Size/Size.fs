@@ -204,8 +204,6 @@ type SizeSpec =
             | _ -> ss
         | _ -> ss
 
-    static member get_Zero () = SizeSpec.Base (BaseSize.Fixed Frac.zero)
-
     static member (~-) (ssa: SizeSpec) =
         match ssa with
         | SizeSpec.Base (BaseSize.Fixed Frac.Zero) -> ssa
@@ -311,9 +309,11 @@ type SizeSpec =
 
     /// size zero
     static member zero = SizeSpec.Base (BaseSize.Fixed Frac.zero)
+    static member Zero = SizeSpec.zero
 
     /// not-broadcastable size one
     static member one = SizeSpec.Base (BaseSize.Fixed Frac.one)
+    static member One = SizeSpec.one
 
     /// fixed integer size
     static member fix s = SizeSpec.Base (BaseSize.Fixed (Frac s))
@@ -344,11 +344,11 @@ type SizeSpec =
         | SizeSpec.Broadcast -> ss
         | SizeSpec.Multinom m -> 
             // rebuild multinom with substituted values
-            (zero, m.Products)
+            (SizeSpec.zero, m.Products)
             ||> Map.fold 
                 (fun substSum prod fac ->               
                     let substProd = 
-                        (one, prod.Symbols)
+                        (SizeSpec.one, prod.Symbols)
                         ||> Map.fold 
                             (fun substProd sBaseSym sPow ->
                                 let sBaseSubst = SizeSpec.substSymbols symVals (SizeSpec.Base (BaseSize.Sym sBaseSym))

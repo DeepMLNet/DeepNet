@@ -398,10 +398,27 @@ type CheckFiniteDeriv(op: CheckFinite) =
 
 
 [<OpExtender>]
+type ConvertDeriv(op: Convert) =
+    interface IDerivableOp with      
+        member this.Deriv dOp =
+            let env = DerivTools.Env.make op dOp 
+            env.DOp |> UExpr.convert env.Only.DataType |> DerivTools.unary
+
+
+[<OpExtender>]
+type TransferDeriv(op: Transfer) =
+    interface IDerivableOp with      
+        member this.Deriv dOp =
+            let env = DerivTools.Env.make op dOp 
+            env.DOp |> UExpr.transfer env.Only.Dev |> DerivTools.unary
+
+
+[<OpExtender>]
 type ChannelDeriv(op: Channel) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = DerivTools.Env.make op dOp 
-            failwith "TODO"
+            DerivTools.unary env.DOp
+
 
 

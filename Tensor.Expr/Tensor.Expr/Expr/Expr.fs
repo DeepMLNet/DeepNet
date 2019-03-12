@@ -164,6 +164,14 @@ type Expr<'T> (baseExpr: BaseExpr) =
     static member scalar dev (value: 'T) = 
         UExpr.scalar dev value |> Expr<'T>
 
+    /// Converts the expression data type from another type.
+    static member convert (expr: Expr<'C>) =
+        UExpr.convert typeof<'T> expr.Untyped |> Expr<'T>
+
+    /// Transfers the data to the specified device.
+    static member transfer (dev: ITensorDevice) (expr: Expr<'T>) =
+        UExpr.transfer dev expr.Untyped |> Expr<'T>
+
     /// Scalar with value of given size and type int64.
     static member size dev (size: SizeSpec) = 
         UExpr.size dev size |> Expr<int64>
@@ -437,6 +445,18 @@ type Expr<'T> (baseExpr: BaseExpr) =
     /// Index of minimum over given dimension, while keeping the axis with one (broadcastable) element.
     static member argMinKeepingAxis (axis: int) (x: Expr<'T>) =
         UExpr.argMinKeepingAxis axis x.Untyped |> Expr<'T>
+
+    /// mean over all elements
+    static member mean (x: Expr<'T>) = 
+        UExpr.mean x.Untyped |> Expr<'T>
+
+    /// mean over given dimension
+    static member meanAxis (axis: int) (x: Expr<'T>) =
+        UExpr.meanAxis axis x.Untyped |> Expr<'T>
+
+    /// mean over given dimension, while keeping the axis with one (broadcastable) element
+    static member meanKeepingAxis (axis: int) (x: Expr<'T>) =
+        UExpr.meanKeepingAxis axis x.Untyped |> Expr<'T>
 
     /// Select elements according to the specified index tensors.
     static member gather (indices: Expr<int64> option list) (x: Expr<'T>) =

@@ -69,6 +69,48 @@ with
         | Identity   -> ActFunc.id x
 
 
+
+/// A layer that calculates the loss between predictions and targets using a difference metric.
+module LossLayer =
+
+    /// Difference metrics.
+    type Measure =
+        /// mean-squared error 
+        | MSE 
+        /// binary cross entropy
+        | BinaryCrossEntropy
+        /// multi-class cross entropy
+        | CrossEntropy
+        /// soft-max followed by multi-class cross entropy
+        /// (use with identity transfer function in last layer)
+        | SoftMaxCrossEntropy
+
+    /// Returns an expression for the loss given the loss measure `lm`, the predictions
+    /// `pred` and the target values `target`.
+    /// If the multi-class cross entropy loss measure is used then
+    /// pred.[smpl, cls] must be the predicted probability that the sample
+    /// belong to class cls and target.[smpl, cls] must be 1 if the sample
+    /// actually belongs to class cls and 0 otherwise.
+    let loss lm (pred: Expr<'T>) (target: Expr<'T>) =
+        // pred   [smpl, cls]
+        // target [smpl, cls]
+        let one = Expr.scalar pred.Dev (conv<'T> 1)
+        let two = Expr.scalar pred.Dev (conv<'T> 2)
+        match lm with
+        | MSE -> 
+            (pred - target) ** two
+            |> Expr.mean
+        | BinaryCrossEntropy ->
+            -(target * log pred + (one - target) * log (one - pred))
+            |> Expr.mean
+        | CrossEntropy ->
+            -target * log pred |> Expr.sumAxis 1 |> Expr.mean
+        | SoftMaxCrossEntropy ->
+            let c = pred |> Expr.maxKeepingAxis 1
+            let logProb = pred - c - log (Expr.sumKeepingAxis 1 (exp (pred - c)))             
+            -target * logProb |> Expr.sumAxis 1 |> Expr.mean
+
+
 /// Regularization expressions.
 module Regul =
 
@@ -173,27 +215,30 @@ module User =
 
         // model
         let inputVar = Var<float32> (ctx / "input", [nSamples; nFeatures])
+        let targetVar = Var<float32> (ctx / "target", [nSamples; nOutputs])
         let input = Expr inputVar
+        let target = Expr targetVar
         let hyperPars = NeuralLayer.HyperPars.standard nFeatures nOutputs
         let pars = NeuralLayer.pars ctx rng hyperPars
         let pred = NeuralLayer.pred pars input
-        printfn "Original: %s\n" (pred.ToString())
+        let loss = LossLayer.loss LossLayer.MSE pred target
+        printfn "loss: %s\n" (loss.ToString())
 
         // substitute symbol sizes
         let sizeEnv = Map [
             SizeSpec.extractSymbol nFeatures, SizeSpec.fix 10L
-            SizeSpec.extractSymbol nOutputs, SizeSpec.fix 1L
+            SizeSpec.extractSymbol nOutputs, SizeSpec.fix 5L
         ]
-        let pred = pred |> Expr.substSymSizes sizeEnv
-        printfn "substituted: %s\n" (pred.ToString())
+        let loss = loss |> Expr.substSymSizes sizeEnv
+        printfn "substituted: %s\n" (loss.ToString())
 
         // parameter set
-        let parSet = ParSet.fromExpr ContextPath.root pred
+        let parSet = ParSet.fromExpr ContextPath.root loss
         let parSetInst = ParSet.inst ContextPath.root parSet
-        let pred = parSetInst.Use pred
+        let loss = parSetInst.Use loss 
+        printfn "with ParSet: %s\n" (loss.ToString())
 
-        printfn "with ParSet: %s\n" (pred.ToString())
+        // use optimizer
 
-        // next step: calculate derivatives and get optimizer working.
 
         ()

@@ -221,6 +221,21 @@ type UExpr (baseExpr: BaseExpr) =
         let v = System.Convert.ChangeType (value, expr.DataType) 
         UExpr.scalar expr.Dev v
 
+    /// Converts the data to the specified type.
+    static member convert (dataType: Type) (expr: UExpr) =
+        let typeName = TypeName.ofTypeInst dataType
+        if expr.TypeName <> typeName then
+            UExpr {Convert.ToType=TypeName.ofTypeInst dataType; X=expr.BaseExprCh}
+        else
+            expr
+
+    /// Transfers the data to the specified device.
+    static member transfer (dev: ITensorDevice) (expr: UExpr) =
+        if expr.Dev <> dev then
+            UExpr {Transfer.ToDev=dev; X=expr.BaseExprCh}
+        else
+            expr
+
     /// Scalar with value of given size and type int64.
     static member size dev (size: SizeSpec) = 
         UExpr {SizeValue.Value=size; Dev=dev} 
@@ -684,6 +699,20 @@ type UExpr (baseExpr: BaseExpr) =
     /// Index of minimum over given dimension, while keeping the axis with one (broadcastable) element.
     static member argMinKeepingAxis (axis: int) (x: UExpr) =
         x |> UExpr.minAxis axis |> UExpr.insertBroadcastAxis axis
+
+    /// mean over all elements
+    static member mean (x: UExpr) = 
+        let nElems = x.NElems |> UExpr.size x.Dev |> UExpr.convert x.DataType
+        UExpr.sum x / nElems
+
+    /// mean over given dimension
+    static member meanAxis (axis: int) (x: UExpr) =
+        let nElems = x.Shape.[axis] |> UExpr.size x.Dev |> UExpr.convert x.DataType
+        UExpr.sumAxis axis x / nElems
+
+    /// mean over given dimension, while keeping the axis with one (broadcastable) element
+    static member meanKeepingAxis (axis: int) (x: UExpr) =
+        x |> UExpr.meanAxis axis |> UExpr.insertBroadcastAxis axis
 
     /// Select elements according to the specified index tensors.
     static member gather (indices: UExpr option list) (x: UExpr) =

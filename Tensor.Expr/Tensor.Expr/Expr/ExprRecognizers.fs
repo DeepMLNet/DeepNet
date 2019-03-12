@@ -277,6 +277,16 @@ module Expr =
         | :? CheckFinite as this -> Some (this.Label, Expr<'T> this.X)
         | _ -> None
 
+    let (|Convert|_|) (expr: Expr<'T>) =
+        match expr.Op with
+        | :? Convert as this when typeof<'C> = this.X.DataType -> Some (Expr<'C> this.X)
+        | _ -> None
+
+    let (|Transfer|_|) (expr: Expr<'T>) =
+        match expr.Op with
+        | :? Transfer as this -> Some (this.ToDev, Expr<'T> this.X)
+        | _ -> None
+
     let (|Channel|_|) (expr: Expr<'T>) =
         match expr.Op with
         | :? Channel as this -> Some (this.X.Channel, MultiChannelExpr this.X.Expr)

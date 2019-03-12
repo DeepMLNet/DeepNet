@@ -3,6 +3,7 @@
 open DeepNet.Utils
 open Tensor.Expr
 open Tensor
+open Tensor.Backend
 
 
 /// Unary plus.
@@ -377,6 +378,7 @@ type Reshape = { X: BaseExprCh; Shape: ShapeSpec } with
         member this.Text =
             sprintf "Reshape%A" this.Shape
 
+
 /// Broadcast.
 type DoBroadcast = { X: BaseExprCh; Shape: ShapeSpec } with
     interface IOp with      
@@ -406,6 +408,7 @@ type DoBroadcast = { X: BaseExprCh; Shape: ShapeSpec } with
         member this.Text =
             sprintf "DoBroadcast%A" this.Shape
 
+
 /// Permute the axes.
 type PermuteAxes = {X: BaseExprCh; Permutation: int list} with
     interface IOp with      
@@ -427,6 +430,7 @@ type PermuteAxes = {X: BaseExprCh; Permutation: int list} with
     interface IOpFormat with
         member this.Text =
             sprintf "PermuteAxes%A" this.Permutation
+
 
 /// Read a slice from a tensor.
 type Subtensor = {X: BaseExprCh; Range: SimpleRangesSpec} with
@@ -472,6 +476,7 @@ type Subtensor = {X: BaseExprCh; Range: SimpleRangesSpec} with
     interface IOpFormat with
         member this.Text =
             sprintf "Subtensor%A" this.Range
+
 
 /// Reverses the tensor in the specified dimension.
 type ReverseAxis = {X: BaseExprCh; Axis: int} with
@@ -836,6 +841,40 @@ type CheckFinite = {Label: string; X: BaseExprCh} with
                 printfn "Infinity or NaN encountered in %s with value:\n%A" this.Label v
                 failwithf "Infinity or NaN encountered in %s." this.Label
             v |> Ch.only                            
+
+
+/// Converts the data to the specified type.
+type Convert = {ToType: TypeName; X: BaseExprCh} with
+    interface IOp with
+        member this.Check () = ()
+        member this.Channels = Ch.onlyOne
+        member this.TypeNames = this.ToType |> Ch.only
+        member this.Devs = this.X.Dev |> Ch.only
+        member this.Shapes = this.X.Shape |> Ch.only
+        member this.Args = Args.unary this.X
+        member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+        member this.SubstSymSizes env = this :> _
+        member this.CanEvalAllSymSizes = true
+        member this.Eval env argVals = 
+            let v = ArgValue.unaryX argVals
+            v |> ITensor.convertToType this.ToType.Type |> Ch.only     
+
+
+/// Transfers the data to the specified device.
+type Transfer = {ToDev: ITensorDevice; X: BaseExprCh} with
+    interface IOp with
+        member this.Check () = ()
+        member this.Channels = Ch.onlyOne
+        member this.TypeNames = this.X.TypeName |> Ch.only
+        member this.Devs = this.ToDev |> Ch.only
+        member this.Shapes = this.X.Shape |> Ch.only
+        member this.Args = Args.unary this.X
+        member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
+        member this.SubstSymSizes env = this :> _
+        member this.CanEvalAllSymSizes = true
+        member this.Eval env argVals = 
+            let v = ArgValue.unaryX argVals
+            v |> ITensor.transfer this.ToDev |> Ch.only     
 
 
 /// Returns the specified channel of a multi-channnel as its only channel.
