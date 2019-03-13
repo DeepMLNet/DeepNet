@@ -96,7 +96,7 @@ type MultiChannelExpr (baseExpr: BaseExpr) =
     static member evalWithEnv (evalEnv: EvalEnv) (expr: MultiChannelExpr) = 
         // Infer symbolic sizes from variable environment and substitute them into expression.
         let varValMap = VarValMap.make evalEnv.VarEnv expr.VarMap
-        let symSizeEnv = varValMap |> VarValMap.inferSymSizes SizeEnv.empty
+        let symSizeEnv = varValMap |> VarValMap.inferSymSizes Map.empty
         let substExpr = expr |> MultiChannelExpr.substSymSizes symSizeEnv
 
         // Evaluate.

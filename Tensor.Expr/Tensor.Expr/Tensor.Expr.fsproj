@@ -17,7 +17,6 @@
     <Compile Include="Size/Size.fs" />
     <Compile Include="Size/Shape.fs" />
     <Compile Include="Size/Range.fs" />
-    <Compile Include="Size\SizeEnv.fs" />
     <Compile Include="Data/TypeName.fs" />
     <Compile Include="Data/Const.fs" />
     <Compile Include="Data\Context.fs" />

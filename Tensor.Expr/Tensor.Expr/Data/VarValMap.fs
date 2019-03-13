@@ -51,7 +51,7 @@ module VarValMap =
 
                 match svSym |> Size.subst env with
                 | Size.Atom (SizeAtom.Sym sym) -> 
-                    env |> SizeEnv.add sym (Size.fix svVal)
+                    env |> Map.add sym (Size.fix svVal)
                 | Size.Atom (SizeAtom.Fixed f) -> 
                     if f .= svVal then env
                     else failShape ()

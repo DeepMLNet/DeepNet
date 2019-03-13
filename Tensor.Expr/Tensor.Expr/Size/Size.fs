@@ -320,7 +320,7 @@ type Size =
     static member broadcastable = Size.Broadcast
 
     /// Substitutes symbol values into size.
-    static member subst symVals ss =
+    static member subst (symVals: SizeEnv) ss =
         match ss with
         | Size.Atom (SizeAtom.Sym sym) ->
             match Map.tryFind sym symVals with
@@ -363,3 +363,8 @@ type Size =
 
     /// returns the set of all contained SizeSymbols
     static member containedSyms (ss: Size) = ss.ContainedSyms
+
+
+/// Map from symbolic size to its substitution.
+and SizeEnv = Map<SizeSym, Size>
+
