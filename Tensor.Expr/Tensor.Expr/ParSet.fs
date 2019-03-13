@@ -215,4 +215,22 @@ and ParSetInst = private {
     member this.Use (varEnv: VarEnv) =
         VarEnv.join varEnv this.VarEnv
 
+    /// Loads the parameter values from a previously saved HDF5 file using the specified prefix.
+    /// If no prefix is specified, the store path is used as prefix.
+    member this.Load (hdf, ?prefix) = 
+        let prefix = defaultArg prefix this.StorePath.Str
+        for KeyValue(_, pi) in this.ParInsts do
+            let value = HostTensor.readUntyped hdf (prefix + "/" + pi.Var.Name.Str)
+            pi.Data.TransferFrom value
+            
+    /// Saves the parameter values to a HDF5 file.
+    /// Each parameter is stored in a separate HDF5 record under its name using the specified prefixed.
+    /// If no prefix is specified, the store path is used as prefix.
+    member this.Save (hdf, ?prefix) =
+        let prefix = defaultArg prefix this.StorePath.Str
+        for KeyValue(_, pi) in this.ParInsts do
+            let value = ITensor.transfer HostTensor.Dev pi.Data
+            HostTensor.write hdf (prefix + "/" + pi.Var.Name.Str) value
+
+
         

@@ -42,6 +42,8 @@ type ITensor =
     abstract CopyFrom:          src:ITensor -> unit
     /// Transfers this tensor to the specifed device.
     abstract Transfer:          dev:ITensorDevice -> ITensor
+    /// Fills this tensor with a copy of the specified tensor which may be stored on another device.
+    abstract TransferFrom:      src:ITensor -> unit
     /// fills the tensors with zeros
     abstract FillZero:          unit -> unit
     /// fills the tensors with ones

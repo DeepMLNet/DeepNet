@@ -3885,6 +3885,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         member this.Copy (?order) = this.Copy (?order=order) :> ITensor
         member this.CopyFrom src = this.CopyFrom (src :?> Tensor<'T>)
         member this.Transfer (dev) = this.Transfer (dev) :> ITensor
+        member this.TransferFrom src = this.TransferFrom (src :?> Tensor<'T>)
         member this.FillZero () = this.FillConst zero<'T>
         member this.FillOnes () = this.FillConst one<'T>
         member this.ZerosOfSameType dev shape = Tensor<'T>.zeros dev shape :> ITensor
