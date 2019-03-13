@@ -3,6 +3,7 @@
 open DeepNet.Utils
 open Tensor
 open Tensor.Expr
+open Tensor.Expr.Opt
 open Tensor.Backend
 
 
@@ -246,7 +247,8 @@ module User =
         printfn "with ParSet: %s\n" (loss.ToString())
 
         // use optimizer
-        let opt = Optimizers.Adam.Adam.make (loss, parSetInst)
+        let optCfg = Adam.Cfg.standard
+        let opt = Adam.make (optCfg, loss, parSetInst)
         let minStep = opt.Step
         let minLossStep = minStep |> EvalUpdateBundle.addExpr loss
         printfn "Minimiziation step: %A\n" minStep
