@@ -235,17 +235,13 @@ module User =
         let loss = LossLayer.loss LossLayer.MSE pred target
         printfn "loss: %s\n" (loss.ToString())
 
-        // substitute symbol sizes
+        // parameter set
+        let parSet = ParSet.fromExpr ContextPath.root loss
         let sizeEnv = Map [
             nFeatures, Size.fix f.Shape.[1]
             nOutputs, Size.fix y.Shape.[1]
         ]
-        let loss = loss |> Expr.substSymSizes sizeEnv
-        printfn "substituted: %s\n" (loss.ToString())
-
-        // parameter set
-        let parSet = ParSet.fromExpr ContextPath.root loss
-        let parSetInst = ParSet.inst ContextPath.root parSet
+        let parSetInst = ParSet.inst ContextPath.root sizeEnv parSet
         let loss = parSetInst.Use loss 
         printfn "with ParSet: %s\n" (loss.ToString())
 

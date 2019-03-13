@@ -81,15 +81,18 @@ type ParSet = private {
         ||> Seq.fold (fun a var -> a |> ParSet.addUntyped var)
 
     /// Instantiate the parameter set using the specified path for storage.
-    static member inst (storePath: ContextPath) (pg: ParSet) =
+    static member inst (storePath: ContextPath) (sizeEnv: SizeEnv) (pg: ParSet) =
+        // substitutes shapes into parameter variables
+        let vars = pg.Vars |> List.map (Var.substSymSizes sizeEnv)
+
         // check that shapes of all variables can be evaluated
-        for pv in pg.Vars do
+        for pv in vars do
             if not (Shape.canEval pv.Shape) then
                 failwithf "Cannot evaluate shape of variable %A." pv
 
         // group variables by data type and storage device
         let pvGroups =
-            pg.Vars
+            vars
             |> List.groupBy (fun pv -> pv.TypeName, pv.Dev)
             |> Map.ofList
         
@@ -134,6 +137,7 @@ type ParSet = private {
         // build and initalize
         let pgi = {
             _ParSet = pg
+            _SizeEnv = sizeEnv
             _StorePath = storePath
             _TypeDeviceGroups = pvGroupStorages
             _ParInsts = pvInsts
@@ -147,6 +151,8 @@ type ParSet = private {
 and ParSetInst = private {
     /// The parameter set this instance belongs to.
     _ParSet: ParSet
+    /// Symbolic size substitutions.
+    _SizeEnv: SizeEnv
     /// Base path of parameter storage.
     _StorePath: ContextPath
     /// Storages for each contained type/device combination.
@@ -157,6 +163,9 @@ and ParSetInst = private {
 
     /// The parameter set this instance belongs to.
     member this.ParSet = this._ParSet
+
+    /// Symbolic size substitutions.
+    member this.SizeEnv = this._SizeEnv
 
     /// Base path of parameter storage.
     member this.StorePath = this._StorePath
@@ -192,15 +201,15 @@ and ParSetInst = private {
 
     /// Uses this ParameterGroupInstance for the placeholder variables in the expression.
     member this.Use (expr: UExpr) =
-        expr |> UExpr.substVars this.VarSubsts
+        expr |> UExpr.substSymSizes this.SizeEnv |> UExpr.substVars this.VarSubsts
     
     /// Uses this ParameterGroupInstance for the placeholder variables in the expression.
     member this.Use (expr: Expr<'T>) =
-        expr |> Expr<'T>.substVars this.VarSubsts
+        expr |> Expr<'T>.substSymSizes this.SizeEnv |> Expr<'T>.substVars this.VarSubsts
 
     /// Uses this ParameterGroupInstance for the placeholder variables in the expression.
     member this.Use (expr: MultiChannelExpr) =
-        expr |> MultiChannelExpr.substVars this.VarSubsts
+        expr |> MultiChannelExpr.substSymSizes this.SizeEnv |> MultiChannelExpr.substVars this.VarSubsts
 
     /// Uses this parameter group instance for evaluation of an expression.
     member this.Use (varEnv: VarEnv) =
