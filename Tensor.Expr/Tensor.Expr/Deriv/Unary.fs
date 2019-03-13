@@ -231,7 +231,7 @@ type SubtensorDeriv(op: Subtensor) =
             let agExpanded = 
                 UExpr.zeros env.DOp.DataType env.DOp.Dev (env.FunElems :: env.Only.Shape)
             env.DOp
-            |> UExpr.setSubtensor agExpanded.[SimpleRangeSpec.All :: op.Range] 
+            |> UExpr.setSubtensor agExpanded.[SimpleRange.All :: op.Range] 
             |> DerivTools.unary
 
 

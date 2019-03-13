@@ -232,9 +232,9 @@ type SetSubtensorDeriv(op: SetSubtensor) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = DerivTools.Env.make op dOp 
-            let dYExp = env.DOp.[SimpleRangeSpec.All :: op.Range]
+            let dYExp = env.DOp.[SimpleRange.All :: op.Range]
             let zeros = UExpr.zeros dYExp.DataType dYExp.Dev dYExp.Shape
-            let dXExp = UExpr.setSubtensor env.DOp.[SimpleRangeSpec.All :: op.Range] zeros
+            let dXExp = UExpr.setSubtensor env.DOp.[SimpleRange.All :: op.Range] zeros
             DerivTools.binary dXExp dYExp
 
 

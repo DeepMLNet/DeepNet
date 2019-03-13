@@ -483,14 +483,14 @@ module Optimizer =
                     Binary (IfThenElse (optRec cond), optRec a, optRec b)
 
                 // tranform SetSubtensor(Zero, X) into BuildTensor(X)
-                | Binary (SetSubtensor (SimpleRangesSpec.Static as rngs), Expr.ZeroExpr, part) ->
+                | Binary (SetSubtensor (SimpleRanges.Static as rngs), Expr.ZeroExpr, part) ->
                     let shp = Expr.shapeOf expr
-                    Expr.buildTensor shp [SimpleRangesSpec.toBaseRangesSpec shp rngs] [optRec part]
+                    Expr.buildTensor shp [SimpleRanges.toBaseRanges shp rngs] [optRec part]
 
                 // combine Add(BuildTensor, BuildTensor) into BuildTensor if ranges are not overlapping
                 | Binary (Add, Nary (BuildTensor (aShp, aRngs), aParts),
                                Nary (BuildTensor (bShp, bRngs), bParts)) when 
-                        aShp=bShp && not (BaseRangesSpec.areOverlapping (aRngs @ bRngs)) ->
+                        aShp=bShp && not (BaseRanges.areOverlapping (aRngs @ bRngs)) ->
                     let aParts = aParts |> List.map optRec
                     let bParts = bParts |> List.map optRec
                     Expr.buildTensor aShp (aRngs @ bRngs) (aParts @ bParts)

@@ -433,7 +433,7 @@ type PermuteAxes = {X: BaseExprCh; Permutation: int list} with
 
 
 /// Read a slice from a tensor.
-type Subtensor = {X: BaseExprCh; Range: SimpleRangesSpec} with
+type Subtensor = {X: BaseExprCh; Range: SimpleRanges} with
     interface IOp with      
         member this.Check () = 
             Check.range this.Range this.X
@@ -444,21 +444,21 @@ type Subtensor = {X: BaseExprCh; Range: SimpleRangesSpec} with
             (this.Range, this.X.Shape)
             ||> List.map2 (fun sr shp ->
                 match sr with
-                | SimpleRangeSpec.SymStartSymEnd (s, fo)    -> (fo |? (shp - Size.one)) + 1L - s
-                | SimpleRangeSpec.DynStartSymSize (_, size) -> size)            
+                | SimpleRange.SymStartSymEnd (s, fo)    -> (fo |? (shp - Size.one)) + 1L - s
+                | SimpleRange.DynStartSymSize (_, size) -> size)            
             |> Ch.only
         member this.Args = 
             let xArgs = Args.unary this.X 
             let dynArgs = 
-                SimpleRangesSpecArgs.toArgs this.Range
+                SimpleRangesArgs.toArgs this.Range
                 |> Map.map (fun _ v -> v :?> BaseExprCh)
             Map.join xArgs dynArgs
         member this.ReplaceArgs args = 
             let dynArgs = args |> Map.map (fun _ v -> v :> IDynElem)
-            let range = this.Range |> SimpleRangesSpecArgs.replaceFromArgs dynArgs               
+            let range = this.Range |> SimpleRangesArgs.replaceFromArgs dynArgs               
             {this with X=Args.unaryX args; Range=range} :> _
-        member this.SubstSymSizes env = {this with Range = SimpleRangesSpec.subst env this.Range} :> _
-        member this.CanEvalAllSymSizes = SimpleRangesSpec.canEvalSymbols this.Range
+        member this.SubstSymSizes env = {this with Range = SimpleRanges.subst env this.Range} :> _
+        member this.CanEvalAllSymSizes = SimpleRanges.canEvalSymbols this.Range
         member this.Eval env argVals = 
             // TODO: dynamic range is always copied to host
             let dynVals = 
@@ -470,8 +470,8 @@ type Subtensor = {X: BaseExprCh; Range: SimpleRangesSpec} with
                 |> Map.map (fun _ v -> Tensor.value (v :?> Tensor<int64>) |> Size.fix)
             let range = 
                 this.Range 
-                |> SimpleRangesSpecArgs.resolveDynElems dynVals 
-                |> SimpleRangesSpec.eval
+                |> SimpleRangesArgs.resolveDynElems dynVals 
+                |> SimpleRanges.eval
             (ArgValue.unaryX argVals).[range] |> Ch.only
     interface IOpFormat with
         member this.Text =

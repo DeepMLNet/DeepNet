@@ -342,7 +342,7 @@ module CudaExecUnit =
         | UNaryOp (BuildTensor (shp, rngs)) ->
             match trgtDfltChReq () with
             | Some req when not (TensorManikin.isBroadcasted req) && 
-                    BaseRangesSpec.areCoveringWithoutOverlap shp rngs -> 
+                    BaseRanges.areCoveringWithoutOverlap shp rngs -> 
                 rngs |> List.map (fun rng ->
                     let aryRng = rng |> List.map (fun (first, last) -> 
                         Rng.Rng (Some (Size.eval first), Some (Size.eval last)))
@@ -656,12 +656,12 @@ module CudaExecUnit =
 
         | UUnaryOp (UnaryOp.Subtensor _) -> needExtra op
         | UExtraOp (Subtensor srs) -> 
-            if SimpleRangesSpec.isDynamic srs then 
+            if SimpleRanges.isDynamic srs then 
                 // dynamic sub-tensors will be copied out of the src
                 dfltChOutplaceTrgt ()
             else
                 // symbolic sub-tensors use a view of the src 
-                let rng = SimpleRangesSpec.eval (fun _ -> failwith "must be static") srs
+                let rng = SimpleRanges.eval (fun _ -> failwith "must be static") srs
                 dfltChTrgt (firstSrcDfltCh() |> TensorManikin.range rng) (firstSrcDfltChShared())
 
         | UBinaryOp (BinaryOp.SetSubtensor _) -> needExtra op
@@ -842,18 +842,18 @@ module CudaExecUnit =
     let dynamicSubtensorTmplAndIdx (bas: TensorManikin) (rngs: UExprRngsSpecT) (rngManikins: TensorManikin list) =
         // Apply symbolic ranges to src, and leave dynamic axes unharmed.
         // (0 is added to offset and their size is changed appropriately)
-        let evalRngs = SimpleRangesSpec.eval (fun _ -> 0L) rngs
+        let evalRngs = SimpleRanges.eval (fun _ -> 0L) rngs
         let basStatic = bas |> TensorManikin.range evalRngs
 
         // convert simplified range specification to array of pointers to expressions calculating
         // the indices
         let rec rngToIdxPntrs rngs rngManikins =
             match rngs, rngManikins with
-            | SimpleRangeSpec.DynStartSymSize _ :: rrngs, rngManikin :: rrngManikins ->
+            | SimpleRange.DynStartSymSize _ :: rrngs, rngManikin :: rrngManikins ->
                 // for dynamic range pass pointer to result of expression calculating the index
                 (IdxTPtrFromArrayNDIdxTmpl (Some rngManikin) :> ICudaArrayMemberArgTmpl<IntPtr>) :: 
                     rngToIdxPntrs rrngs rrngManikins 
-            | SimpleRangeSpec.SymStartSymEnd _ :: rrngs, _ ->
+            | SimpleRange.SymStartSymEnd _ :: rrngs, _ ->
                 // symbolic range has already been applied, pass null (meaning no offset to add)
                 (IdxTPtrFromArrayNDIdxTmpl None :> ICudaArrayMemberArgTmpl<IntPtr>) :: 
                     rngToIdxPntrs rrngs rngManikins 
@@ -1316,7 +1316,7 @@ module CudaExecUnit =
 
         | UNaryOp (BuildTensor (shp, rngs)) ->
             let zeroItems =
-                if BaseRangesSpec.areCoveringWithoutOverlap shp rngs then []
+                if BaseRanges.areCoveringWithoutOverlap shp rngs then []
                 else 
                     let cs = Const.zero (trgtDfltChType().Type)                    
                     execItemsForElemwise (dfltChTrgt()) (ConstEOpArgTmpl cs) [] 
@@ -1399,7 +1399,7 @@ module CudaExecUnit =
 
         | UUnaryOp (UnaryOp.Subtensor _) -> needExtra op
         | UExtraOp (Subtensor srs) ->
-            if SimpleRangesSpec.isDynamic srs then 
+            if SimpleRanges.isDynamic srs then 
                 // copy dynamic subtensor out of the src
                 execItemsForCopyFromDynamicSubtensor (dfltChTrgt())
                     (firstSrcDfltCh()) srs (List.tail (srcsDfltCh()))

@@ -191,13 +191,13 @@ type UnaryHeldOp =
     | ReplicateTo of dim:int * size:SizeSpec // ignore for now, perhaps we find a better method to implement this.
 
 /// a simplified range specification of one dimension
-type ExprRngSpec = SimpleRangeSpec<Expr>
+type ExprRngSpec = SimpleRange<Expr>
 
 /// a simplified range specification of all dimensions
-type ExprRngsSpec = SimpleRangesSpec<Expr>
+type ExprRngsSpec = SimpleRanges<Expr>
 
-type FullExprRngSpecT = RangeSpec<Expr>
-type FullExprRngsSpecT = RangesSpec<Expr>
+type FullExprRngSpecT = Range<Expr>
+type FullExprRngsSpecT = Ranges<Expr>
 
 
 /// ops with two exprs as arguments
@@ -246,7 +246,7 @@ type NaryOp =
     /// evaluate all subexpressions but discard them
     | Discard                                                   // DONE
     /// build tensor using numeric ranges
-    | BuildTensor of shp:Shape * rngs:BaseRangesSpec list   // DONE
+    | BuildTensor of shp:Shape * rngs:BaseRanges list   // DONE
     /// elementwise calculated tensor
     | Elements of shape:Shape * elemExpr:Elem.Expr          // DONE
     /// elementwise interpolation
@@ -548,42 +548,42 @@ type Expr =
 
             // slices
             | (:? (SizeSpec option) as so)  :: (:? (SizeSpec option) as fo)    :: rest ->
-                RangeSpec.SymStartSymEnd (so, fo) :: parseArgs rest
+                Range.SymStartSymEnd (so, fo) :: parseArgs rest
             | (:? (SizeSpec option) as so)  :: null                             :: rest ->
-                RangeSpec.SymStartSymEnd (so, None) :: parseArgs rest
+                Range.SymStartSymEnd (so, None) :: parseArgs rest
             | null                           :: (:? (SizeSpec option) as fo)    :: rest ->
-                RangeSpec.SymStartSymEnd (None, fo) :: parseArgs rest
+                Range.SymStartSymEnd (None, fo) :: parseArgs rest
             | (:? (Expr option) as so)      :: (:? (PlusElems option) as fo)    :: rest ->
                 if Expr.typename so.Value <> TypeName.ofType<int> then
                     failwith "need int expression for range start"
-                RangeSpec.DynStartSymSize (so.Value, fo.Value.Elems) :: parseArgs rest
+                Range.DynStartSymSize (so.Value, fo.Value.Elems) :: parseArgs rest
             | null                           :: null                             :: rest ->
-                RangeSpec.SymStartSymEnd (None, None) :: parseArgs rest
+                Range.SymStartSymEnd (None, None) :: parseArgs rest
 
             // items
-            | (:? SizeSpec as s)     :: rest -> RangeSpec.SymElem s :: parseArgs rest
-            | (:? int64 as s)        :: rest when s = Tensor.TensorVal.NewAxis -> RangeSpec.NewAxis :: parseArgs rest
-            | (:? int64 as s)        :: rest when s = Tensor.TensorVal.Fill ->    RangeSpec.AllFill :: parseArgs rest
+            | (:? SizeSpec as s)     :: rest -> Range.SymElem s :: parseArgs rest
+            | (:? int64 as s)        :: rest when s = Tensor.TensorVal.NewAxis -> Range.NewAxis :: parseArgs rest
+            | (:? int64 as s)        :: rest when s = Tensor.TensorVal.Fill ->    Range.AllFill :: parseArgs rest
             | (:? Expr as e)         :: rest -> if Expr.typename e <> TypeName.ofType<int> then
                                                     failwith "need int expression for element"               
-                                                RangeSpec.DynElem e :: parseArgs rest
+                                                Range.DynElem e :: parseArgs rest
             | []                              -> []
             | _                               -> failwithf "invalid item/slice specification: %A" allArgs
 
         /// converts a full range specification into a simple range specification
         let rec splitFRS (rngs: FullExprRngsSpecT) (shps: Shape) (simpleRs: ExprRngsSpec) (newShape: Shape) =
             match rngs, shps with
-            | RangeSpec.SymElem e :: rngs, _::shps -> splitFRS rngs shps (SimpleRangeSpec.SymStartSymEnd (e, Some e)::simpleRs) newShape
-            | RangeSpec.DynElem e :: rngs, _::shps -> splitFRS rngs shps (SimpleRangeSpec.DynStartSymSize (e, Size.one)::simpleRs) newShape
-            | RangeSpec.SymStartSymEnd (so, fo) :: rngs, size::shps -> 
+            | Range.SymElem e :: rngs, _::shps -> splitFRS rngs shps (SimpleRange.SymStartSymEnd (e, Some e)::simpleRs) newShape
+            | Range.DynElem e :: rngs, _::shps -> splitFRS rngs shps (SimpleRange.DynStartSymSize (e, Size.one)::simpleRs) newShape
+            | Range.SymStartSymEnd (so, fo) :: rngs, size::shps -> 
                 let size = (fo |? (size-1L)) - (so |? Size.zero) + 1L
-                splitFRS rngs shps (SimpleRangeSpec.SymStartSymEnd (so |? Size.zero, fo)::simpleRs) (size::newShape)
-            | RangeSpec.DynStartSymSize (s, size) :: rngs, _::shps ->
-                splitFRS rngs shps (SimpleRangeSpec.DynStartSymSize (s, size)::simpleRs) (size::newShape)
-            | RangeSpec.NewAxis :: rngs, _ ->
+                splitFRS rngs shps (SimpleRange.SymStartSymEnd (so |? Size.zero, fo)::simpleRs) (size::newShape)
+            | Range.DynStartSymSize (s, size) :: rngs, _::shps ->
+                splitFRS rngs shps (SimpleRange.DynStartSymSize (s, size)::simpleRs) (size::newShape)
+            | Range.NewAxis :: rngs, _ ->
                 splitFRS rngs shps simpleRs (Size.broadcastable::newShape)
-            | RangeSpec.AllFill :: rrngs, _ ->
-                if List.length rngs <= List.length shps then splitFRS (RangeSpec.All::rngs) shps simpleRs newShape
+            | Range.AllFill :: rrngs, _ ->
+                if List.length rngs <= List.length shps then splitFRS (Range.All::rngs) shps simpleRs newShape
                 else splitFRS rrngs shps simpleRs newShape
             | [], [] -> List.rev simpleRs, List.rev newShape
             | _ -> failwith "item/slice processing error"
@@ -758,8 +758,8 @@ type Expr =
                     (srs, Expr.shapeOf a)
                     ||> List.map2 (fun sr shp ->
                          match sr with
-                         | SimpleRangeSpec.SymStartSymEnd (s, fo)    -> (fo |? (shp - Size.one)) + 1L - s
-                         | SimpleRangeSpec.DynStartSymSize (_, size) -> size)
+                         | SimpleRange.SymStartSymEnd (s, fo)    -> (fo |? (shp - Size.one)) + 1L - s
+                         | SimpleRange.DynStartSymSize (_, size) -> size)
                 | Unary(ReverseAxis _, a) -> Expr.shapeOf a
                 | Unary(Held ([], ReplicateTo (dim, s)), a) -> Expr.shapeOf a |> Shape.set dim s
                 | Unary(Gather indices, a) -> indices |> List.pick id |> Expr.shapeOf
@@ -1226,7 +1226,7 @@ type Expr =
         let subTest = Expr.testEvalAllSymSizes failIfNot
         let tSize = Size.canEval
         let tShp = Shape.canEval
-        let tSrs = SimpleRangesSpec.canEvalSymbols
+        let tSrs = SimpleRanges.canEvalSymbols
         let evalable =
             if Cache.exprsWithEvalableSymSizes.LockedContains expr then true
             else 
@@ -1263,7 +1263,7 @@ type Expr =
 
                 | Nary (BuildTensor (shp, rngs), es) -> 
                     tShp shp && 
-                    List.forall BaseRangesSpec.canEval rngs &&
+                    List.forall BaseRanges.canEval rngs &&
                     List.forall subTest es
                 | Nary (Elements (trgtShp, elemExpr), es) -> 
                     tShp trgtShp && 
@@ -1960,8 +1960,8 @@ type Expr =
             ||> List.fold (fun (concatSoFar, pos) e ->
                 let len = e.Shape.[dim]
                 let slice : FullExprRngsSpecT = 
-                    List.replicate e.NDims RangeSpec.All
-                    |> List.set dim (RangeSpec.SymStartSymEnd (Some pos, Some (pos + len - 1L)))
+                    List.replicate e.NDims Range.All
+                    |> List.set dim (Range.SymStartSymEnd (Some pos, Some (pos + len - 1L)))
                 Expr.setSubtensor concatSoFar.[slice] e, pos + len)
         concatenated
 

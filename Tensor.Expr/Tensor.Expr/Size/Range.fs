@@ -5,16 +5,16 @@ open DeepNet.Utils
 
 
 /// basic range specification for one dimension
-type BaseRangeSpec = Size * Size
+type BaseRange = Size * Size
 
 /// basic range specification for multiple dimensions
-type BaseRangesSpec = BaseRangeSpec list
+type BaseRanges = BaseRange list
 
-/// Functions for working with BaseRangesSpec.
-module BaseRangesSpec =
+/// Functions for working with BaseRanges.
+module BaseRanges =
 
-    /// Try to evalualte a BaseRangesSpecT to a numeric range.
-    let tryEval (rng: BaseRangesSpec) =
+    /// Try to evalualte a BaseRangesT to a numeric range.
+    let tryEval (rng: BaseRanges) =
         let rec doEval rng =
             match rng with
             | (first, last) :: rrng ->
@@ -24,30 +24,30 @@ module BaseRangesSpec =
             | [] -> Some []
         doEval rng
 
-    /// True if a BaseRangesSpecT can be evaluated to a numeric range.
-    let canEval (rng: BaseRangesSpec) =
+    /// True if a BaseRangesT can be evaluated to a numeric range.
+    let canEval (rng: BaseRanges) =
         match tryEval rng with
         | Some _ -> true
         | None -> false
 
-    /// Evaluates a BaseRangesSpecT to a numeric range.
-    let eval (rng: BaseRangesSpec) =
+    /// Evaluates a BaseRangesT to a numeric range.
+    let eval (rng: BaseRanges) =
         match tryEval rng with
         | Some rng -> rng
-        | None -> failwithf "cannot evaluate BaseRangesSpecT %A to numeric range" rng
+        | None -> failwithf "cannot evaluate BaseRangesT %A to numeric range" rng
 
-    /// checks that the BaseRangesSpec is valid
-    let check (rng: BaseRangesSpec) =
+    /// checks that the BaseRanges is valid
+    let check (rng: BaseRanges) =
         match tryEval rng with
         | Some rng ->
             for first, last in rng do
                 if last < first then 
-                    failwithf "invalid BaseRangesSpec: %A" rng
+                    failwithf "invalid BaseRanges: %A" rng
         | None -> ()
 
-    /// True if two BaseRangesSpec overlap.
-    /// Both BaseRangesSpec must be evaluateble to numeric ranges.
-    let overlapping (a: BaseRangesSpec) (b: BaseRangesSpec) =
+    /// True if two BaseRanges overlap.
+    /// Both BaseRanges must be evaluateble to numeric ranges.
+    let overlapping (a: BaseRanges) (b: BaseRanges) =
         check a; check b
         (eval a, eval b)
         ||> List.forall2 (fun (aFirst, aLast) (bFirst, bLast) ->
@@ -57,8 +57,8 @@ module BaseRangesSpec =
 
     /// True if any two ranges are overlapping.
     /// This has complexity O(N^2) currently.
-    /// All BaseRangesSpec must be evaluateble to numeric ranges.
-    let areOverlapping (rngs: BaseRangesSpec list) =       
+    /// All BaseRanges must be evaluateble to numeric ranges.
+    let areOverlapping (rngs: BaseRanges list) =       
         let rec testOvlp nonOvlp cands =
             match cands with
             | cand::rCands ->
@@ -67,10 +67,10 @@ module BaseRangesSpec =
             | [] -> false
         testOvlp [] rngs
 
-    /// True if the BaseRangesSpecTs cover a tensor of the specified shape completely without overlap.
-    /// All BaseRangesSpecT and the ShapeT must be evaluatable to numeric ranges and a
+    /// True if the BaseRangesTs cover a tensor of the specified shape completely without overlap.
+    /// All BaseRangesT and the ShapeT must be evaluatable to numeric ranges and a
     /// numeric shape respectively.
-    let areCoveringWithoutOverlap (shp: Shape) (rngs: BaseRangesSpec list) =       
+    let areCoveringWithoutOverlap (shp: Shape) (rngs: BaseRanges list) =       
         if areOverlapping rngs then false
         else
             let shpElems = 
@@ -91,7 +91,7 @@ type IDynElem =
 
 /// symbolic/dynamic range specification for one dimension
 [<RequireQualifiedAccess; StructuralComparison; StructuralEquality>]
-type RangeSpec = 
+type Range = 
     // ranges with symbolic size (length)
     | SymElem            of Size                           
     | DynElem            of IDynElem
@@ -104,98 +104,100 @@ type RangeSpec =
     //| RngDynStartSymEnd     of ExprT<int> * SizeSpecT              // size: dynamic
     //| RngDynStartToEnd      of ExprT<int>                          // size: dynamic
 
-    static member All = RangeSpec.SymStartSymEnd (None, None)
+    static member All = Range.SymStartSymEnd (None, None)
 
 // symbolic/dynamic subtensor specification
-type RangesSpec = RangeSpec list
+type Ranges = Range list
 
 /// Simple range specification for one dimension.
 [<RequireQualifiedAccess; StructuralComparison; StructuralEquality; StructuredFormatDisplay("{Pretty}")>]
-type SimpleRangeSpec =
+type SimpleRange =
     | SymStartSymEnd     of Size * (Size option)
     | DynStartSymSize    of IDynElem * Size                    
 
     member this.Pretty =
         match this with
-        | SimpleRangeSpec.SymStartSymEnd (first, Some last) -> sprintf "%A..%A" first last
-        | SimpleRangeSpec.SymStartSymEnd (first, None) -> sprintf "%A.." first
-        | SimpleRangeSpec.DynStartSymSize (first, size) -> sprintf "D%A..D%A+%A-1" first first size
+        | SimpleRange.SymStartSymEnd (first, Some last) -> sprintf "%A..%A" first last
+        | SimpleRange.SymStartSymEnd (first, None) -> sprintf "%A.." first
+        | SimpleRange.DynStartSymSize (first, size) -> sprintf "D%A..D%A+%A-1" first first size
     
-    static member All = SimpleRangeSpec.SymStartSymEnd (Size.zero, None)
+    static member All = SimpleRange.SymStartSymEnd (Size.zero, None)
      
-    ///// evaluate a SimpleRangeSpec to a Tensor.Rng
-    //static member eval (dynEvaluator: IDynElem -> int64) (rs: SimpleRangeSpec) =
+    ///// evaluate a SimpleRange to a Tensor.Rng
+    //static member eval (dynEvaluator: IDynElem -> int64) (rs: SimpleRange) =
     //    match rs with
-    //    | SimpleRangeSpec.SymStartSymEnd (s, fo) -> 
+    //    | SimpleRange.SymStartSymEnd (s, fo) -> 
     //        Tensor.Rng.Rng (Some (Size.eval s), Option.map Size.eval fo)
-    //    | SimpleRangeSpec.DynStartSymSize (s, elems) -> 
+    //    | SimpleRange.DynStartSymSize (s, elems) -> 
     //        let sv = dynEvaluator s
     //        Tensor.Rng.Rng (Some sv, Some (sv + Size.eval elems))
 
-    /// evaluate a SimpleRangeSpec to a Tensor.Rng
-    static member eval (rs: SimpleRangeSpec) =
+    /// evaluate a SimpleRange to a Tensor.Rng
+    static member eval (rs: SimpleRange) =
         match rs with
-        | SimpleRangeSpec.SymStartSymEnd (s, fo) -> 
+        | SimpleRange.SymStartSymEnd (s, fo) -> 
             Tensor.Rng.Rng (Some (Size.eval s), Option.map Size.eval fo)
-        | SimpleRangeSpec.DynStartSymSize (s, elems) -> 
-            failwith "Dynamic elements must be resolved before evaluating a SimpleRangeSpec."
+        | SimpleRange.DynStartSymSize (s, elems) -> 
+            failwith "Dynamic elements must be resolved before evaluating a SimpleRange."
 
-    static member canEvalSymbols (rs: SimpleRangeSpec) =
+    static member canEvalSymbols (rs: SimpleRange) =
         match rs with
-        | SimpleRangeSpec.SymStartSymEnd (s, fo) ->
+        | SimpleRange.SymStartSymEnd (s, fo) ->
             Size.canEval s && Option.forall Size.canEval fo
-        | SimpleRangeSpec.DynStartSymSize (_, elems) ->
+        | SimpleRange.DynStartSymSize (_, elems) ->
             Size.canEval elems
 
-    static member isDynamic (rs: SimpleRangeSpec) =
+    static member isDynamic (rs: SimpleRange) =
         match rs with
-        | SimpleRangeSpec.DynStartSymSize _ -> true
+        | SimpleRange.DynStartSymSize _ -> true
         | _ -> false
 
-    static member toBaseRangeSpec (size: Size) (rs: SimpleRangeSpec) =
+    static member toBaseRange (size: Size) (rs: SimpleRange) =
         match rs with
-        | SimpleRangeSpec.SymStartSymEnd (first, Some last) -> first, last
-        | SimpleRangeSpec.SymStartSymEnd (first, None) -> first, size - 1L
-        | _ -> failwithf "cannot convert %A to BaseRangeSpec" rs
+        | SimpleRange.SymStartSymEnd (first, Some last) -> first, last
+        | SimpleRange.SymStartSymEnd (first, None) -> first, size - 1L
+        | _ -> failwithf "cannot convert %A to BaseRange" rs
 
-/// Active patterns for SimpleRangeSpec.
-module SimpleRangeSpec =
+
+
+/// Active patterns for SimpleRange.
+module SimpleRange =
 
    let (|Dynamic|Static|) rs =
-        if SimpleRangeSpec.isDynamic rs then Dynamic else Static
+        if SimpleRange.isDynamic rs then Dynamic else Static
 
 
 /// Simple range specification for multiple dimensions.
-type SimpleRangesSpec = SimpleRangeSpec list
+type SimpleRanges = SimpleRange list
 
-/// Functions for working with SimpleRangesSpec.
-module SimpleRangesSpec =
+/// Functions for working with SimpleRanges.
+module SimpleRanges =
 
-    ///// evaluate a RangesSpecT to a RangeT list
+    ///// evaluate a RangesT to a RangeT list
     //let eval dynEvaluator rs =
-    //    rs |> List.map (SimpleRangeSpec.eval dynEvaluator)
+    //    rs |> List.map (SimpleRange.eval dynEvaluator)
 
-    /// evaluate a RangesSpecT to a RangeT list
+    /// evaluate a RangesT to a RangeT list
     let eval rs =
-        rs |> List.map SimpleRangeSpec.eval
+        rs |> List.map SimpleRange.eval
 
     let isDynamic rs =
-        rs |> List.exists SimpleRangeSpec.isDynamic
+        rs |> List.exists SimpleRange.isDynamic
 
     let canEvalSymbols rs =
-        rs |> List.forall SimpleRangeSpec.canEvalSymbols
+        rs |> List.forall SimpleRange.canEvalSymbols
 
     let (|Dynamic|Static|) rs =
         if isDynamic rs then Dynamic else Static
 
-    let toBaseRangesSpec (shape: Shape) rs =
-        (shape, rs) ||> List.map2 SimpleRangeSpec.toBaseRangeSpec
+    let toBaseRanges (shape: Shape) rs =
+        (shape, rs) ||> List.map2 SimpleRange.toBaseRange
 
     /// substitutes all symbols into the simplified range specification
-    let subst env (srs: SimpleRangesSpec) = 
+    let subst env (srs: SimpleRanges) = 
         srs
         |> List.map (function
-                     | SimpleRangeSpec.SymStartSymEnd (s, fo) -> 
-                         SimpleRangeSpec.SymStartSymEnd (Size.subst env s, Option.map (Size.subst env) fo)
-                     | SimpleRangeSpec.DynStartSymSize (s, elems) ->
-                         SimpleRangeSpec.DynStartSymSize (s, Size.subst env elems))
+                     | SimpleRange.SymStartSymEnd (s, fo) -> 
+                         SimpleRange.SymStartSymEnd (Size.subst env s, Option.map (Size.subst env) fo)
+                     | SimpleRange.DynStartSymSize (s, elems) ->
+                         SimpleRange.DynStartSymSize (s, Size.subst env elems))

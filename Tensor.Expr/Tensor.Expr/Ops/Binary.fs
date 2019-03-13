@@ -348,7 +348,7 @@ type TensorProduct = { X: BaseExprCh; Y: BaseExprCh } with
 
 
 /// Replace a slice of a tensor with another tensor.
-type SetSubtensor = {X: BaseExprCh; Y: BaseExprCh; Range: SimpleRangesSpec} with
+type SetSubtensor = {X: BaseExprCh; Y: BaseExprCh; Range: SimpleRanges} with
     interface IOp with      
         member this.Check () = 
             Check.sameType [this.X; this.Y]
@@ -363,15 +363,15 @@ type SetSubtensor = {X: BaseExprCh; Y: BaseExprCh; Range: SimpleRangesSpec} with
         member this.Args = 
             let xyArgs = Args.binary this.X this.Y
             let dynArgs = 
-                SimpleRangesSpecArgs.toArgs this.Range
+                SimpleRangesArgs.toArgs this.Range
                 |> Map.map (fun _ v -> v :?> BaseExprCh)
             Map.join xyArgs dynArgs
         member this.ReplaceArgs args = 
             let dynArgs = args |> Map.map (fun _ v -> v :> IDynElem)
-            let range = this.Range |> SimpleRangesSpecArgs.replaceFromArgs dynArgs               
+            let range = this.Range |> SimpleRangesArgs.replaceFromArgs dynArgs               
             {this with X=Args.binaryX args; Y=Args.binaryY args; Range=range} :> _
-        member this.SubstSymSizes env = {this with Range = SimpleRangesSpec.subst env this.Range} :> _
-        member this.CanEvalAllSymSizes = SimpleRangesSpec.canEvalSymbols this.Range
+        member this.SubstSymSizes env = {this with Range = SimpleRanges.subst env this.Range} :> _
+        member this.CanEvalAllSymSizes = SimpleRanges.canEvalSymbols this.Range
         member this.Eval env argVals = 
             // TODO: dynamic range is always copied to host
             let dynVals = 
@@ -383,8 +383,8 @@ type SetSubtensor = {X: BaseExprCh; Y: BaseExprCh; Range: SimpleRangesSpec} with
                 |> Map.map (fun _ v -> Tensor.value (v :?> Tensor<int64>) |> Size.fix)
             let range = 
                 this.Range 
-                |> SimpleRangesSpecArgs.resolveDynElems dynVals 
-                |> SimpleRangesSpec.eval
+                |> SimpleRangesArgs.resolveDynElems dynVals 
+                |> SimpleRanges.eval
             let trgt = ArgValue.binaryX argVals |> ITensor.copy
             trgt.[range] <- ArgValue.binaryY argVals
             trgt |> Ch.only

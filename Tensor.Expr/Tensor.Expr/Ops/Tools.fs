@@ -32,12 +32,12 @@ module Check =
             failwithf "Cannot apply reduction operation over non-existant axis %d of tensor with shape %A." 
                       ax expr.Shape
 
-    let range (range: SimpleRangesSpec) (x: BaseExprCh) =
+    let range (range: SimpleRanges) (x: BaseExprCh) =
         if range.Length <> x.NDims then
             failwithf "Invalid range specification for expression of shape %A." x.Shape                
         range |> List.iter (function 
-            | SimpleRangeSpec.SymStartSymEnd _ -> ()
-            | SimpleRangeSpec.DynStartSymSize (s, _) -> 
+            | SimpleRange.SymStartSymEnd _ -> ()
+            | SimpleRange.DynStartSymSize (s, _) -> 
                 if (s :?> BaseExpr).[Ch.Default].DataType <> typeof<int64> then
                     failwithf "Dynamic range start must be of type int64.")
 
@@ -112,34 +112,34 @@ module Args =
 
 
 
-/// Functions for converting SimpleRangesSpec from and to args.
-module SimpleRangesSpecArgs =
+/// Functions for converting SimpleRanges from and to args.
+module SimpleRangesArgs =
 
     /// Returns a map of all dynamic elements within the specified range.
-    let toArgs (srs: SimpleRangesSpec) =
+    let toArgs (srs: SimpleRanges) =
         srs 
         |> List.indexed
         |> List.choose (function
-                        | _, SimpleRangeSpec.SymStartSymEnd _  -> None
-                        | i, SimpleRangeSpec.DynStartSymSize (s, _) -> Some (Arg.N i, s))
+                        | _, SimpleRange.SymStartSymEnd _  -> None
+                        | i, SimpleRange.DynStartSymSize (s, _) -> Some (Arg.N i, s))
         |> Map.ofList
 
     /// Replaces all dynamic elements within the specified range using the specified replacement map.
-    let replaceFromArgs (args: Map<Arg, IDynElem>) (srs: SimpleRangesSpec) : SimpleRangesSpec =
+    let replaceFromArgs (args: Map<Arg, IDynElem>) (srs: SimpleRanges) : SimpleRanges =
         srs
         |> List.indexed
         |> List.map (function
-                     | _, (SimpleRangeSpec.SymStartSymEnd _ as r) -> r
-                     | i, SimpleRangeSpec.DynStartSymSize (s, elems) -> 
-                        SimpleRangeSpec.DynStartSymSize (args.[Arg.N i], elems))
+                     | _, (SimpleRange.SymStartSymEnd _ as r) -> r
+                     | i, SimpleRange.DynStartSymSize (s, elems) -> 
+                        SimpleRange.DynStartSymSize (args.[Arg.N i], elems))
 
     /// Replaces all dynamic elements within the specified range using the specified replacement map.
-    let resolveDynElems (map: Map<Arg, Size>) (srs: SimpleRangesSpec) : SimpleRangesSpec =
+    let resolveDynElems (map: Map<Arg, Size>) (srs: SimpleRanges) : SimpleRanges =
         srs
         |> List.indexed
         |> List.map (function
-                     | _, (SimpleRangeSpec.SymStartSymEnd _ as r) -> r
-                     | i, SimpleRangeSpec.DynStartSymSize (s, elems) -> 
+                     | _, (SimpleRange.SymStartSymEnd _ as r) -> r
+                     | i, SimpleRange.DynStartSymSize (s, elems) -> 
                         let s = map.[Arg.N i]
-                        SimpleRangeSpec.SymStartSymEnd (s, Some (s + elems)))
+                        SimpleRange.SymStartSymEnd (s, Some (s + elems)))
 

@@ -63,7 +63,7 @@ type Discard = {Xs: BaseExprCh list} with
 
 
 /// Build tensor using numeric ranges.
-type BuildTensor = {Shape: Shape; Ranges: BaseRangesSpec list; Xs: BaseExprCh list} with
+type BuildTensor = {Shape: Shape; Ranges: BaseRanges list; Xs: BaseExprCh list} with
     interface IOp with       
         member this.Check () = 
             Check.sameType this.Xs
@@ -97,7 +97,7 @@ type BuildTensor = {Shape: Shape; Ranges: BaseRangesSpec list; Xs: BaseExprCh li
                        Ranges=this.Ranges |> List.map (List.map (fun (f,l) -> sSize f, sSize l))} :> _
         member this.CanEvalAllSymSizes = 
             Shape.canEval this.Shape &&
-            List.forall BaseRangesSpec.canEval this.Ranges
+            List.forall BaseRanges.canEval this.Ranges
         member this.Eval env argVals = 
             let vs = ArgValue.naryXs argVals
             let trgt = vs.Head.ZerosOfSameType vs.Head.Dev (Shape.eval this.Shape)

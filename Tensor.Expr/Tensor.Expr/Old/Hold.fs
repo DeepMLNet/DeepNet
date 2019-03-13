@@ -31,8 +31,8 @@ module Hold =
                             let slice : ExprRngsSpec = 
                                 [0 .. aRep.NDims-1]
                                 |> List.map (fun d -> 
-                                    if d = dim then SimpleRangeSpec.SymStartSymEnd (Size.zero, Some (size - 1L))
-                                    else SimpleRangeSpec.All)
+                                    if d = dim then SimpleRange.SymStartSymEnd (Size.zero, Some (size - 1L))
+                                    else SimpleRange.All)
                             aRep.[slice]
                         else aRep
 
