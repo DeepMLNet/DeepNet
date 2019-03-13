@@ -319,12 +319,12 @@ type Size =
     /// broadcastable size one
     static member broadcastable = Size.Broadcast
 
-    /// substitute the symbols into the SizeSpec and simplifies it
-    static member substSyms symVals ss =
+    /// Substitutes symbol values into size.
+    static member subst symVals ss =
         match ss with
         | Size.Atom (SizeAtom.Sym sym) ->
             match Map.tryFind sym symVals with
-            | Some sv -> Size.substSyms symVals sv
+            | Some sv -> Size.subst symVals sv
             | None -> ss
         | Size.Atom (SizeAtom.Fixed _) -> ss
         | Size.Broadcast -> ss
@@ -337,7 +337,7 @@ type Size =
                         (Size.one, prod.Symbols)
                         ||> Map.fold 
                             (fun substProd sBaseSym sPow ->
-                                let sBaseSubst = Size.substSyms symVals (Size.Atom (SizeAtom.Sym sBaseSym))
+                                let sBaseSubst = Size.subst symVals (Size.Atom (SizeAtom.Sym sBaseSym))
                                 substProd * (sBaseSubst ** sPow))
                     substSum + fac * substProd)
         |> Size.simplify

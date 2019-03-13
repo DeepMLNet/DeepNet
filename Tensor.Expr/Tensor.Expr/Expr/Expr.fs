@@ -85,7 +85,7 @@ type Expr<'T> (baseExpr: BaseExpr) =
     member this.CanEvalAllSymSizes = this.Untyped.CanEvalAllSymSizes
     static member canEvalAllSymSizes (expr: Expr<'T>) = expr.CanEvalAllSymSizes
 
-    static member substSymSizes (env: SymSizeEnv) (expr: Expr<'T>) : Expr<'T> =
+    static member substSymSizes (env: SizeEnv) (expr: Expr<'T>) : Expr<'T> =
         UExpr.substSymSizes env expr.Untyped |> Expr<'T>
 
     interface System.IEquatable<Expr<'T>> with

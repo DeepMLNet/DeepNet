@@ -196,9 +196,9 @@ module Shape =
     let eval (sa: Shape) : int64 list =
         List.map (Size.eval) sa
 
-    /// substitute the symbols into the Shape and simplifies it
-    let substSymbols symVals (sa: Shape) : Shape =
-        List.map (Size.substSyms symVals) sa
+    /// Substitutes symbol values into shape.
+    let subst symVals (sa: Shape) : Shape =
+        List.map (Size.subst symVals) sa
 
     type SolutionT = {
         LeftValues:     Map<SizeSym, Size>

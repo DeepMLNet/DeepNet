@@ -191,3 +191,11 @@ module SimpleRangesSpec =
     let toBaseRangesSpec (shape: Shape) rs =
         (shape, rs) ||> List.map2 SimpleRangeSpec.toBaseRangeSpec
 
+    /// substitutes all symbols into the simplified range specification
+    let subst env (srs: SimpleRangesSpec) = 
+        srs
+        |> List.map (function
+                     | SimpleRangeSpec.SymStartSymEnd (s, fo) -> 
+                         SimpleRangeSpec.SymStartSymEnd (Size.subst env s, Option.map (Size.subst env) fo)
+                     | SimpleRangeSpec.DynStartSymSize (s, elems) ->
+                         SimpleRangeSpec.DynStartSymSize (s, Size.subst env elems))

@@ -43,7 +43,7 @@ type MultiChannelExpr (baseExpr: BaseExpr) =
     member this.CanEvalAllSymSizes = baseExpr.CanEvalAllSymSizes
     static member canEvalAllSymSizes (expr: MultiChannelExpr) = expr.CanEvalAllSymSizes
     
-    static member substSymSizes (env: SymSizeEnv) (expr: MultiChannelExpr) =
+    static member substSymSizes (env: SizeEnv) (expr: MultiChannelExpr) =
         expr.BaseExpr |> BaseExpr.substSymSizes env |> MultiChannelExpr
 
     interface System.IEquatable<MultiChannelExpr> with
@@ -96,7 +96,7 @@ type MultiChannelExpr (baseExpr: BaseExpr) =
     static member evalWithEnv (evalEnv: EvalEnv) (expr: MultiChannelExpr) = 
         // Infer symbolic sizes from variable environment and substitute them into expression.
         let varValMap = VarValMap.make evalEnv.VarEnv expr.VarMap
-        let symSizeEnv = varValMap |> VarValMap.inferSymSizes SymSizeEnv.empty
+        let symSizeEnv = varValMap |> VarValMap.inferSymSizes SizeEnv.empty
         let substExpr = expr |> MultiChannelExpr.substSymSizes symSizeEnv
 
         // Evaluate.

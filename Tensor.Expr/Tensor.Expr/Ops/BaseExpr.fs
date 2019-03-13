@@ -115,7 +115,7 @@ type IOp =
     /// Should return the expression with all symbolic sizes substituted using the specified
     /// substitution table.
     /// Return a *new* op with substitution applied. Do not apply the mapping in-place.
-    abstract SubstSymSizes: env: SymSizeEnv -> IOp
+    abstract SubstSymSizes: env: SizeEnv -> IOp
 
     /// Should be true, if all symbolic sizes can be evaluated to numeric sizes.
     /// This is the case if the function Shape.canEval or Size.canEval respectively
@@ -321,7 +321,7 @@ type BaseExpr private (op: IOp) =
         mapStep expr
 
     /// Substitutes the symbolic sizes within the expression tree.
-    static member substSymSizes (env: SymSizeEnv) (expr: BaseExpr) =
+    static member substSymSizes (env: SizeEnv) (expr: BaseExpr) =
         expr |> BaseExpr.mapOpRec (fun op -> op.SubstSymSizes env)
 
     /// Substitutes the variables within the expression tree.

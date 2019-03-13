@@ -93,7 +93,7 @@ type Var = {
 
     /// substitutes the size symbol environment into the variable
     static member substSymSizes symSizes (vs: Var) = 
-        {vs with Shape=SymSizeEnv.substShape symSizes vs.Shape} 
+        {vs with Shape=Shape.subst symSizes vs.Shape} 
 
 
 

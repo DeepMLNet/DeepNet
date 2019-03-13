@@ -34,7 +34,7 @@ module VarValMap =
 
 
     /// Infers symbol sizes from variables values.
-    let inferSymSizes (symSizeEnv: SymSizeEnv) (varMap: VarValMap) : SymSizeEnv =
+    let inferSymSizes (symSizeEnv: SizeEnv) (varMap: VarValMap) : SizeEnv =
         // TODO: allow shape inference for multinoms
         (symSizeEnv, varMap) 
         ||> Map.fold (fun env vSym vVal -> 
@@ -47,11 +47,11 @@ module VarValMap =
 
                 let failShape () =
                     failwithf "Variable %A with shape %A is not compatible with value of shape %A." 
-                        vSym (vSym.Shape |> Shape.substSymbols env) vVal.Shape
+                        vSym (vSym.Shape |> Shape.subst env) vVal.Shape
 
-                match svSym |> Size.substSyms env with
+                match svSym |> Size.subst env with
                 | Size.Atom (SizeAtom.Sym sym) -> 
-                    env |> SymSizeEnv.add sym (Size.fix svVal)
+                    env |> SizeEnv.add sym (Size.fix svVal)
                 | Size.Atom (SizeAtom.Fixed f) -> 
                     if f .= svVal then env
                     else failShape ()

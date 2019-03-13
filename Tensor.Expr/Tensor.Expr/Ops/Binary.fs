@@ -370,7 +370,7 @@ type SetSubtensor = {X: BaseExprCh; Y: BaseExprCh; Range: SimpleRangesSpec} with
             let dynArgs = args |> Map.map (fun _ v -> v :> IDynElem)
             let range = this.Range |> SimpleRangesSpecArgs.replaceFromArgs dynArgs               
             {this with X=Args.binaryX args; Y=Args.binaryY args; Range=range} :> _
-        member this.SubstSymSizes env = {this with Range = SymSizeEnv.substRange env this.Range} :> _
+        member this.SubstSymSizes env = {this with Range = SimpleRangesSpec.subst env this.Range} :> _
         member this.CanEvalAllSymSizes = SimpleRangesSpec.canEvalSymbols this.Range
         member this.Eval env argVals = 
             // TODO: dynamic range is always copied to host

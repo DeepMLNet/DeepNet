@@ -247,8 +247,8 @@ with
     /// substitutes the specified size symbols with their replacements 
     static member substSymSizes symSizes expr = 
         let sSub = Expr.substSymSizes symSizes
-        let sSize = SymSizeEnv.subst symSizes
-        let sShp = SymSizeEnv.substShape symSizes
+        let sSize = Size.subst symSizes
+        let sShp = Shape.subst symSizes
 
         match expr with
         | Leaf (SizeValue (sc, tn)) -> Leaf (SizeValue ((sSize sc), tn))

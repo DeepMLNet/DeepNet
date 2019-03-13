@@ -249,14 +249,14 @@ type Loop = {
 
         member this.SubstSymSizes env = 
             {this with
-                Length = Size.substSyms env this.Length
+                Length = Size.subst env this.Length
                 Vars = this.Vars
                         |> Map.toSeq
                         |> Seq.map (fun (vs, li) ->
-                            let vs = {vs with Shape = Shape.substSymbols env vs.Shape}
+                            let vs = {vs with Shape = Shape.subst env vs.Shape}
                             let li = match li with
                                      | Loop.PreviousChannel pc -> 
-                                        Loop.PreviousChannel {pc with Delay = Size.substSyms env pc.Delay}
+                                        Loop.PreviousChannel {pc with Delay = Size.subst env pc.Delay}
                                      | _ -> li
                             vs, li)
                         |> Map.ofSeq

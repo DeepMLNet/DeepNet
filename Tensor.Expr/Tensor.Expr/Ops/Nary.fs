@@ -92,8 +92,8 @@ type BuildTensor = {Shape: Shape; Ranges: BaseRangesSpec list; Xs: BaseExprCh li
         member this.Args = Args.nary this.Xs
         member this.ReplaceArgs args = {this with Xs=Args.naryXs args} :> _
         member this.SubstSymSizes env = 
-            let sSize = Size.substSyms env
-            {this with Shape=Shape.substSymbols env this.Shape
+            let sSize = Size.subst env
+            {this with Shape=Shape.subst env this.Shape
                        Ranges=this.Ranges |> List.map (List.map (fun (f,l) -> sSize f, sSize l))} :> _
         member this.CanEvalAllSymSizes = 
             Shape.canEval this.Shape &&
@@ -126,7 +126,7 @@ type Elements = {Shape: Shape; ElemExpr: Elem.Expr; Xs: BaseExprCh list} with
         member this.Args = Args.nary this.Xs
         member this.ReplaceArgs args = {this with Xs=Args.naryXs args} :> _
         member this.SubstSymSizes env = 
-            {this with Shape=Shape.substSymbols env this.Shape
+            {this with Shape=Shape.subst env this.Shape
                        ElemExpr=Elem.Expr.substSymSizes env this.ElemExpr} :> _
         member this.CanEvalAllSymSizes = 
             Shape.canEval this.Shape &&

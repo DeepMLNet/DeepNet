@@ -36,7 +36,7 @@ type SizeValue = { Value: Size; Dev: ITensorDevice } with
         member this.Shapes = Shape.scalar |> Ch.only
         member this.Args = Map.empty
         member this.ReplaceArgs args = this :> _
-        member this.SubstSymSizes env = {this with Value = SymSizeEnv.subst env this.Value} :> _
+        member this.SubstSymSizes env = {this with Value = Size.subst env this.Value} :> _
         member this.CanEvalAllSymSizes = Size.canEval this.Value
         member this.Eval env argVals = 
             Size.eval this.Value |> Tensor.scalar this.Dev :> ITensor |> Ch.only     
@@ -56,7 +56,7 @@ type Identity = { Size: Size; Type: TypeName; Dev: ITensorDevice } with
         member this.Shapes = Shape.matrix this.Size this.Size |> Ch.only
         member this.Args = Map.empty
         member this.ReplaceArgs args = this :> _
-        member this.SubstSymSizes env = {this with Size = SymSizeEnv.subst env this.Size} :> _
+        member this.SubstSymSizes env = {this with Size = Size.subst env this.Size} :> _
         member this.CanEvalAllSymSizes = Size.canEval this.Size
         member this.Eval env argVals = 
             (Generic<IdentityTyped<_>, IIdentityTyped> [this.Type.Type]).Eval this env
@@ -85,7 +85,7 @@ type Arange = { Size: Size; Type: TypeName; Dev: ITensorDevice } with
         member this.Shapes = Shape.vector this.Size |> Ch.only
         member this.Args = Map.empty
         member this.ReplaceArgs args = this :> _
-        member this.SubstSymSizes env = {this with Size = SymSizeEnv.subst env this.Size} :> _
+        member this.SubstSymSizes env = {this with Size = Size.subst env this.Size} :> _
         member this.CanEvalAllSymSizes = Size.canEval this.Size
         member this.Eval env argVals = 
             (Generic<ArangeTyped<_>, IArangeTyped> [this.Type.Type]).Eval this env  
@@ -115,7 +115,7 @@ type VarArg = { Var: Var } with
         member this.Args = Map.empty
         member this.ReplaceArgs args = this :> _
         member this.SubstSymSizes env = 
-            {Var={this.Var with Shape=SymSizeEnv.substShape env this.Var.Shape}} :> _
+            {Var={this.Var with Shape=Shape.subst env this.Var.Shape}} :> _
         member this.CanEvalAllSymSizes = Shape.canEval this.Var.Shape
         member this.Eval env argVals = 
             env.VarEnv.[this.Var.Name] |> Ch.only       

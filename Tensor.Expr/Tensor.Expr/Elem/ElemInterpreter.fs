@@ -61,10 +61,10 @@ module Interpreter =
                 match op with
                 | LeafOp.Const v -> unbox v.Value
                 | SizeValue (ss, _) ->
-                    let sv = ss |> Size.substSyms symVals |> Size.eval
+                    let sv = ss |> Size.subst symVals |> Size.eval
                     conv<'T> sv
                 | ArgElement ((Arg n, argIdxs), _) ->
-                    let argIdxs = Shape.substSymbols symVals argIdxs
+                    let argIdxs = Shape.subst symVals argIdxs
                     let argIdxsVal = Shape.eval argIdxs
                     args.[n].[argIdxsVal]
 
@@ -99,9 +99,9 @@ module Interpreter =
                             doEval (symVals |> Map.add sym (Size.fix symVal)) a
                         typedApply2 (unsp) (+) (+) (+) (+) sumSoFar sumElem) 
                 | KroneckerRng (s, first, last) ->
-                    let sVal = s |> Size.substSyms symVals |> Size.eval
-                    let firstVal = first |> Size.substSyms symVals |> Size.eval
-                    let lastVal = last |> Size.substSyms symVals |> Size.eval
+                    let sVal = s |> Size.subst symVals |> Size.eval
+                    let firstVal = first |> Size.subst symVals |> Size.eval
+                    let lastVal = last |> Size.subst symVals |> Size.eval
                     if firstVal <= sVal && sVal <= lastVal then av ()
                     else conv<'T> 0
 
@@ -116,8 +116,8 @@ module Interpreter =
                 | Modulo ->     typedApply2 (unsp) (%) (%) (%) (%) (av()) (bv())
                 | Power ->      typedApply2 (unsp) ( ** ) ( ** ) (unsp) (unsp) (av()) (bv())
                 | IfThenElse (left, right) ->
-                    let leftVal = left |> Size.substSyms symVals |> Size.eval
-                    let rightVal = right |> Size.substSyms symVals |> Size.eval
+                    let leftVal = left |> Size.subst symVals |> Size.eval
+                    let rightVal = right |> Size.subst symVals |> Size.eval
                     if leftVal = rightVal then av () else bv ()
 
         let initialSymVals =

@@ -369,7 +369,7 @@ type Reshape = { X: BaseExprCh; Shape: Shape } with
         member this.Args = Args.unary this.X
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = 
-            { this with Shape = SymSizeEnv.substShape env this.Shape } :> _
+            { this with Shape = Shape.subst env this.Shape } :> _
         member this.CanEvalAllSymSizes = 
             Shape.canEval this.Shape
         member this.Eval env argVals =
@@ -400,7 +400,7 @@ type DoBroadcast = { X: BaseExprCh; Shape: Shape } with
         member this.Args = Args.unary this.X
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = 
-            { this with Shape = SymSizeEnv.substShape env this.Shape } :> _
+            { this with Shape = Shape.subst env this.Shape } :> _
         member this.CanEvalAllSymSizes = 
             Shape.canEval this.Shape
         member this.Eval env argVals = (ArgValue.unaryX argVals) |> ITensor.broadcastTo (Shape.eval this.Shape) |> Ch.only
@@ -457,7 +457,7 @@ type Subtensor = {X: BaseExprCh; Range: SimpleRangesSpec} with
             let dynArgs = args |> Map.map (fun _ v -> v :> IDynElem)
             let range = this.Range |> SimpleRangesSpecArgs.replaceFromArgs dynArgs               
             {this with X=Args.unaryX args; Range=range} :> _
-        member this.SubstSymSizes env = {this with Range = SymSizeEnv.substRange env this.Range} :> _
+        member this.SubstSymSizes env = {this with Range = SimpleRangesSpec.subst env this.Range} :> _
         member this.CanEvalAllSymSizes = SimpleRangesSpec.canEvalSymbols this.Range
         member this.Eval env argVals = 
             // TODO: dynamic range is always copied to host
@@ -721,7 +721,7 @@ type Store = {X: BaseExprCh; Var: Var} with
         member this.ReplaceArgs args = 
             {this with X=Args.unaryX args} :> _
         member this.SubstSymSizes env = 
-            {this with Var={this.Var with Shape=SymSizeEnv.substShape env this.Var.Shape}} :> _
+            {this with Var={this.Var with Shape=Shape.subst env this.Var.Shape}} :> _
         member this.CanEvalAllSymSizes = Shape.canEval this.Var.Shape
         member this.Eval env argVals = 
             let tv = env.VarEnv.[this.Var.Name]
