@@ -18,7 +18,7 @@
     <None Include="Pickle.fs" />
     <Compile Include="Linear.fs" />
     <Compile Include="Neural.fs" />
-    <None Include="Config.fs" />
+    <Compile Include="Config.fs" />
     <None Include="Train.fs" />
     <None Include="Quality.fs" />
     <None Include="GaussianProcess.fs" />
