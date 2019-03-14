@@ -2,7 +2,7 @@
   <Import Project="../../Common.targets" />
 
   <PropertyGroup>
-    <PackageId>MLOptimizers</PackageId>
+    <PackageId>Tensor.Expr.Opt</PackageId>
     <Platforms>x64</Platforms>
   </PropertyGroup>
 

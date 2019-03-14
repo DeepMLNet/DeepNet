@@ -1,16 +1,15 @@
-﻿namespace Models
+﻿namespace Tensor.Expr.ML
 
 open DeepNet.Utils
 open Tensor
-open SymTensor
-
+open Tensor.Expr
 
 
 /// A layer that calculates the loss between predictions and targets using a difference metric.
 module LossLayer =
 
     /// Difference metrics.
-    type Measures =
+    type Measure =
         /// mean-squared error 
         | MSE 
         /// binary cross entropy
@@ -27,11 +26,11 @@ module LossLayer =
     /// pred.[smpl, cls] must be the predicted probability that the sample
     /// belong to class cls and target.[smpl, cls] must be 1 if the sample
     /// actually belongs to class cls and 0 otherwise.
-    let loss lm (pred: Expr) (target: Expr) =
+    let loss lm (pred: Expr<'T>) (target: Expr<'T>) =
         // pred   [smpl, cls]
         // target [smpl, cls]
-        let one = Expr.oneOfSameType pred
-        let two = Expr.twoOfSameType pred
+        let one = Expr.scalar pred.Dev (conv<'T> 1)
+        let two = Expr.scalar pred.Dev (conv<'T> 2)
         match lm with
         | MSE -> 
             (pred - target) ** two
@@ -47,57 +46,53 @@ module LossLayer =
             -target * logProb |> Expr.sumAxis 1 |> Expr.mean
 
 
+
+
 /// A layer of neurons (perceptrons).
 module NeuralLayer = 
 
     /// Neural layer hyper-parameters.
-    type HyperPars = {
+    type HyperPars<'T> = {
         /// number of inputs
-        NInput:             SizeSpec
+        NInput:             Size
         /// number of outputs
-        NOutput:            SizeSpec
+        NOutput:            Size
         /// transfer (activation) function
-        TransferFunc:       ActivationFunc
-        /// weights trainable
-        WeightsTrainable:   bool
-        /// bias trainable
-        BiasTrainable:      bool
+        ActFunc:            ActFunc
         /// l1 regularization weight
-        L1Regularization:   single option
+        L1Regul:            float 
         /// l2 regularization weight
-        L2Regularization:   single option
-    }
-
-    let defaultHyperPars = {
-        NInput              = SizeSpec.fix 0L
-        NOutput             = SizeSpec.fix 0L
-        TransferFunc        = ActivationFunc.Tanh
-        WeightsTrainable    = true
-        BiasTrainable       = true
-        L1Regularization    = None
-        L2Regularization    = None
-    }
+        L2Regul:            float 
+    } with 
+        static member standard nInput nOutput : HyperPars<'T> = {
+            NInput     = nInput
+            NOutput    = nOutput
+            ActFunc    = ActFunc.Tanh
+            L1Regul    = 0.0
+            L2Regul    = 0.0
+        }
 
 
     /// Neural layer parameters.
     type Pars<'T> = {
-        /// expression for the weights
-        Weights:        Expr 
-        /// expression for the biases
-        Bias:           Expr 
+        /// weights
+        Weights:        Var<'T>
+        /// bias
+        Bias:           Var<'T>
         /// hyper-parameters
-        HyperPars:      HyperPars
+        HyperPars:      HyperPars<'T>
     }
 
-    let internal initWeights seed (shp: int64 list) : Tensor<'T> = 
-        let rng = System.Random seed
-        let fanOut = shp.[0] |> float
-        let fanIn = shp.[1] |> float
-        let r = 4.0 * sqrt (6.0 / (fanIn + fanOut)) 
-        HostTensor.randomUniform rng (conv<'T> -r, conv<'T> r) shp
+    let internal initWeights (rng: System.Random) (weights: Tensor<'T>) = 
+        let fanOut = weights.Shape.[0] |> float
+        let fanIn = weights.Shape.[1] |> float
+        let r = 4.0 * sqrt (6.0 / (fanIn + fanOut))
+        let weightsHost = 
+            HostTensor.randomUniform rng (conv<'T> -r, conv<'T> r) weights.Shape
+        weights.TransferFrom weightsHost
         
-    let internal initBias seed (shp: int64 list) : Tensor<'T> =
-        HostTensor.zeros shp
+    let internal initBias (rng: System.Random) (bias: Tensor<'T>) =
+        bias.FillZeros ()
 
     /// Creates the parameters for the neural-layer in the supplied
     /// model builder `mb` using the hyper-parameters `hp`.
@@ -105,56 +100,43 @@ module NeuralLayer =
     /// distribution with support [-r, r] where
     /// r = 4 * sqrt (6 / (hp.NInput + hp.NOutput)).
     /// The biases are initialized to zero.
-    let pars (mb: ModelBuilder<_>) hp = {
-        Weights   = mb.Param ("Weights", [hp.NOutput; hp.NInput], initWeights)
-        Bias      = mb.Param ("Bias",    [hp.NOutput],            initBias)
-        HyperPars = hp
+    let pars (ctx: Context) rng (hp: HyperPars<'T>) = {
+        Weights     = Var<'T> (ctx / "Weights", [hp.NOutput; hp.NInput]) |> Var<_>.toPar (initWeights rng)
+        Bias        = Var<'T> (ctx / "Bias",    [hp.NOutput])            |> Var<_>.toPar (initBias rng)
+        HyperPars   = hp
     }
 
     /// Returns an expression for the output (predictions) of the
     /// neural layer with parameters `pars` given the input `input`.
     /// If the soft-max transfer function is used, the normalization
     /// is performed over axis 0.
-    let pred pars (input: Expr) =
+    let pred (pars: Pars<'T>) (input: Expr<'T>) =
         // weights [outUnit, inUnit]
         // bias    [outUnit]
         // input   [smpl, inUnit]
         // pred    [smpl, outUnit]
-        let weights = 
-            if pars.HyperPars.WeightsTrainable then pars.Weights 
-            else Expr.assumeZeroDerivative pars.Weights
-        let bias = 
-            if pars.HyperPars.BiasTrainable then pars.Bias
-            else Expr.assumeZeroDerivative pars.Bias
-        let act = input .* weights.T + bias
-        ActivationFunc.apply pars.HyperPars.TransferFunc act
+        let act = input .* (Expr pars.Weights).T + Expr pars.Bias
+        ActFunc.apply pars.HyperPars.ActFunc act
 
-    /// Calculates sum of all regularization terms of this layer.
-    let regularizationTerm pars  =
-        let weights = pars.Weights
-        if pars.HyperPars.WeightsTrainable then
-            let l1reg =
-                match pars.HyperPars.L1Regularization with
-                | Some f    -> f * Regularization.l1Regularization weights
-                | None      -> Expr.zeroOfSameType weights
-            let l2reg =
-                match pars.HyperPars.L2Regularization with
-                | Some f    -> f * Regularization.l1Regularization weights
-                | None      -> Expr.zeroOfSameType weights
-            l1reg + l2reg
-        else 
-            Expr.zeroOfSameType weights
+    /// The regularization term for this layer.
+    let regul (pars: Pars<'T>) =
+        let l1reg = Regul.lRegul pars.HyperPars.L1Regul 1.0 (Expr pars.Weights)
+        let l2reg = Regul.lRegul pars.HyperPars.L2Regul 2.0 (Expr pars.Weights)
+        l1reg + l2reg
+
+
+
 
 /// A neural network (multi-layer perceptron) of multiple 
 /// NeuralLayers and one LossLayer on top.
 module MLP =
 
     /// MLP hyper-parameters.
-    type HyperPars = {
+    type HyperPars<'T> = {
         /// a list of the hyper-parameters of the neural layers
-        Layers:         NeuralLayer.HyperPars list
+        Layers:         NeuralLayer.HyperPars<'T> list
         /// the loss measure
-        LossMeasure:    LossLayer.Measures
+        LossMeasure:    LossLayer.Measure
     }
 
     /// MLP parameters.
@@ -162,16 +144,16 @@ module MLP =
         /// a list of the parameters of the neural layers
         Layers:         NeuralLayer.Pars<'T> list
         /// hyper-parameters
-        HyperPars:      HyperPars
+        HyperPars:      HyperPars<'T>
     }
 
     /// Creates the parameters for the neural network in the supplied
     /// model builder `mb` using the hyper-parameters `hp`.
     /// See `NeuralLayer.pars` for documentation about the initialization.
-    let pars (mb: ModelBuilder<'T>) (hp: HyperPars) : Pars<'T> = {
+    let pars (ctx: Context) rng (hp: HyperPars<'T>) : Pars<'T> = {
         Layers = hp.Layers 
                  |> List.mapi (fun idx nhp -> 
-                    NeuralLayer.pars (mb.Module (sprintf "Layer%d" idx)) nhp)
+                        NeuralLayer.pars (ctx / sprintf "Layer%d" idx) rng nhp)
         HyperPars = hp
     }
 
@@ -184,13 +166,13 @@ module MLP =
     /// Returns an expression for the loss of the
     /// neural network with parameters `pars` given the input `input` and
     /// target values `target`.       
-    let loss pars input target =
+    let loss (pars: Pars<'T>) input target =
         LossLayer.loss pars.HyperPars.LossMeasure (pred pars input) target
 
     /// Calculates sum of all regularization terms of this model.
-    let regualrizationTerm pars input=
-        (Expr.zeroOfSameType input, pars.Layers)
-        ||> List.fold (fun reg p -> NeuralLayer.regularizationTerm p)
+    let regualrizationTerm (pars: Pars<'T>) (input: Expr<'T>) =
+        (input.Scalar 0, pars.Layers)
+        ||> List.fold (fun reg p -> reg + NeuralLayer.regul p)
         
 
 //module Autoencoder =

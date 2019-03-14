@@ -2,22 +2,21 @@
   <Import Project="../../Common.targets" />
 
   <PropertyGroup>
-    <PackageId>MLModels</PackageId>
+    <PackageId>Tensor.Expr.ML</PackageId>
     <Platforms>x64</Platforms>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="../../Tensor/Tensor/Tensor.fsproj" />
     <ProjectReference Include="..\..\Tensor.Expr\Tensor.Expr\Tensor.Expr.fsproj" />
-    <ProjectReference Include="..\MLDatasets\MLDatasets.fsproj" />
-    <ProjectReference Include="..\MLOptimizers\MLOptimizers.fsproj" />
+    <ProjectReference Include="..\Tensor.Expr.Opt\Tensor.Expr.Opt.fsproj" />
   </ItemGroup>
 
   <ItemGroup>
     <Compile Include="..\..\Utils\Utils.fs" Link="Utils.fs" />
-    <None Include="Util.fs" />
+    <Compile Include="Common.fs" />
     <None Include="Pickle.fs" />
-    <None Include="Linear.fs" />
+    <Compile Include="Linear.fs" />
     <Compile Include="Neural.fs" />
     <None Include="Config.fs" />
     <None Include="Train.fs" />

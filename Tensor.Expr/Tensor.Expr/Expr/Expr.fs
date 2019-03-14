@@ -164,6 +164,10 @@ type Expr<'T> (baseExpr: BaseExpr) =
     static member scalar dev (value: 'T) = 
         UExpr.scalar dev value |> Expr<'T>
 
+    /// Scalar constant of same type and stored on same device as this expression.
+    member this.Scalar (value: obj) =
+        UExpr.scalar this.Dev (convTo this.DataType value) |> Expr<'T>
+
     /// Converts the expression data type from another type.
     static member convert (expr: Expr<'C>) =
         UExpr.convert typeof<'T> expr.Untyped |> Expr<'T>
