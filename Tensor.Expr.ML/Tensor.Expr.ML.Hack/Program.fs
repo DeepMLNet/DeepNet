@@ -1,5 +1,4 @@
-﻿open DeepNet.Utils
-open Tensor
+﻿open Tensor
 open Tensor.Expr
 open Tensor.Expr.Opt
 open Tensor.Expr.ML
