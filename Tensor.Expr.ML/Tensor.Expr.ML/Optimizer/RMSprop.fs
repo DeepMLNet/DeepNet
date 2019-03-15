@@ -1,9 +1,8 @@
-﻿namespace Tensor.Expr.Opt
+﻿namespace Tensor.Expr.ML.Opt
 
 open DeepNet.Utils
 open Tensor
 open Tensor.Expr
-
 
 
 /// RMSprop optimizer.

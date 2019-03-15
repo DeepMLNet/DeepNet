@@ -1,4 +1,4 @@
-﻿namespace Tensor.Expr.Opt
+﻿namespace Tensor.Expr.ML.Opt
 
 open DeepNet.Utils
 open Tensor

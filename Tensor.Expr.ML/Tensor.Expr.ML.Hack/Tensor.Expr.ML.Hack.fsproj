@@ -14,7 +14,6 @@
     <ProjectReference Include="..\..\Tensor.Expr\Tensor.Expr\Tensor.Expr.fsproj" />
     <ProjectReference Include="..\..\Tensor\Tensor\Tensor.fsproj" />
     <ProjectReference Include="..\Tensor.Expr.ML\Tensor.Expr.ML.fsproj" />
-    <ProjectReference Include="..\Tensor.Expr.Opt\Tensor.Expr.Opt.fsproj" />
   </ItemGroup>
 
 </Project>
