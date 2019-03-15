@@ -3,13 +3,13 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.28621.142
 MinimumVisualStudioVersion = 15.0.26124.0
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "1. Tensor", "1. Tensor", "{99EB6FBC-381C-41A7-9378-A619A79751BD}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "1. Tensor (numeric)", "1. Tensor (numeric)", "{99EB6FBC-381C-41A7-9378-A619A79751BD}"
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Tensor", "Tensor\Tensor\Tensor.fsproj", "{0C4F8C34-412C-4CF3-83AD-EEDE17658501}"
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Tensor.Test", "Tensor\Tensor.Test\Tensor.Test.fsproj", "{A4CCBFF4-86BD-4B9B-BBFE-C266C7156FCF}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "2. Tensor.Expr", "2. Tensor.Expr", "{2C53BDC4-C10F-4442-909A-A9B83F09A849}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "2. Tensor.Expr (symbolic)", "2. Tensor.Expr (symbolic)", "{2C53BDC4-C10F-4442-909A-A9B83F09A849}"
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Tensor.Expr", "Tensor.Expr\Tensor.Expr\Tensor.Expr.fsproj", "{2DE8B6ED-EBE1-4E08-BBF7-6A174725ED46}"
 EndProject
@@ -28,7 +28,7 @@ Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Tensor.Expr.Test", "Tensor.
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Tensor.Expr.Hack", "Tensor.Expr\Tensor.Expr.Hack\Tensor.Expr.Hack.fsproj", "{D163FB40-E2B5-4D59-8FB5-7ADF567FDD21}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "3. Tensor.Expr.ML", "3. Tensor.Expr.ML", "{F7C7FA66-CF55-427D-9FB6-8E9D980AE52C}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "3. Tensor.Expr.ML (machine learning)", "3. Tensor.Expr.ML (machine learning)", "{F7C7FA66-CF55-427D-9FB6-8E9D980AE52C}"
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Tensor.Expr.Opt", "Tensor.Expr.ML\Tensor.Expr.Opt\Tensor.Expr.Opt.fsproj", "{5B396E2B-790B-4C67-A8D3-DF2645A8EF8C}"
 EndProject

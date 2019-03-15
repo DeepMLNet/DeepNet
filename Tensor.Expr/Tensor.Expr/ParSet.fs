@@ -232,5 +232,18 @@ and ParSetInst = private {
             let value = ITensor.transfer HostTensor.Dev pi.Data
             HostTensor.write hdf (prefix + "/" + pi.Var.Name.Str) value
 
+    /// Copies all parameter values from the specified parameter set instance.
+    member this.CopyFrom (src: ParSetInst) =
+        for KeyValue (key, (_, dstValue)) in this.TypeDeviceGroups do
+            let _, srcValue = src.TypeDeviceGroups.[key]
+            dstValue.CopyFrom srcValue
+
+    /// Clones this parameter set instance.
+    static member copy (psi: ParSetInst) =
+        let clone = ParSet.inst psi.StorePath psi.SizeEnv psi.ParSet
+        clone.CopyFrom psi
+        clone
+
+
 
         

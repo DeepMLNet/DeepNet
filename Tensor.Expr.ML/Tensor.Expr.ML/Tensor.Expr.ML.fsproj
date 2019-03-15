@@ -9,23 +9,30 @@
   <ItemGroup>
     <ProjectReference Include="../../Tensor/Tensor/Tensor.fsproj" />
     <ProjectReference Include="..\..\Tensor.Expr\Tensor.Expr\Tensor.Expr.fsproj" />
+    <ProjectReference Include="..\..\Tensor\Tensor.Algorithm\Tensor.Algorithm.fsproj" />
     <ProjectReference Include="..\Tensor.Expr.Opt\Tensor.Expr.Opt.fsproj" />
   </ItemGroup>
 
   <ItemGroup>
     <Compile Include="..\..\Utils\Utils.fs" Link="Utils.fs" />
-    <Compile Include="Common.fs" />
-    <None Include="Pickle.fs" />
-    <Compile Include="Linear.fs" />
-    <Compile Include="Neural.fs" />
-    <Compile Include="Config.fs" />
-    <None Include="Train.fs" />
-    <None Include="Quality.fs" />
-    <None Include="GaussianProcess.fs" />
+    <Compile Include="Dataset\Dataset.fs" />
+    <Compile Include="Dataset\TrnValTst.fs" />
+    <Compile Include="Dataset\InpTgtSmpl.fs" />
+    <Compile Include="Loader\CSV.fs" />
+    <Compile Include="Loader\Cifar10.fs" />
+    <Compile Include="Loader\Mnist.fs" />
+    <Compile Include="Preprocess\Normalization.fs" />
+    <Compile Include="Model\Common.fs" />
+    <Compile Include="Model\Linear.fs" />
+    <Compile Include="Model\Neural.fs" />
+    <None Include="Model\GaussianProcess.fs" />
+    <None Include="Model\Quality.fs" />
+    <Compile Include="Train\Pickle.fs" />
+    <Compile Include="Train\Train.fs" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="FSharp.Compiler.Service" Version="25.0.1" />
+    <PackageReference Include="FSharp.Data" Version="3.0.0" />
     <PackageReference Include="FSPickler" Version="5.2" />
     <PackageReference Include="FSPickler.Json" Version="5.2" />
   </ItemGroup>

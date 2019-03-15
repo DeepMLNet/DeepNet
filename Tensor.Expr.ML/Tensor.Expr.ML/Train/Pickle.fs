@@ -1,4 +1,4 @@
-namespace Models
+namespace Tensor.Expr.ML
 
 open System.IO
 open MBrace.FsPickler

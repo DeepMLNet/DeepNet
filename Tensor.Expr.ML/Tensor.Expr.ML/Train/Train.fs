@@ -1,102 +1,96 @@
-﻿namespace Models
+﻿namespace Tensor.Expr.ML
 
 open System
 open System.Diagnostics
 open System.IO
-open MBrace.FsPickler.Json
+//open MBrace.FsPickler.Json
 
 open DeepNet.Utils
 open Tensor
-open Datasets
-open SymTensor
-open Optimizers
+open Tensor.Expr
 
 
-[<AutoOpen>]
-module TrainingTypes = 
-
-    /// Partition of the dataset.
-    type Partition =
-        /// training parition of the dataset
-        | Training
-        /// validation partition of the dataset
-        | Validation
-
-    /// User-defined quality metric values
-    type UserQuality = {
-        /// quality on training set
-        TrnQuality: float
-        /// quality on test set
-        ValQuality: float
-        /// quality on validation set
-        TstQuality: float
-    }
-
-    /// User-defined quality metrics
-    type UserQualities = Map<string, UserQuality>
+/// Training, validation and test losses.
+type PartVals = {
+    Trn: float
+    Val: float
+    Tst: float
+}
 
 
-/// Training history module.
+/// Collection of losses.
+type Losses = {
+    Primary: PartVals
+    Custom: Map<string, PartVals>
+}
+
+
+
+/// Training history.
 module TrainingLog =
 
+    /// Training history entry.
     type Entry = {
         Iter:               int
-        TrnLoss:            float
-        ValLoss:            float
-        TstLoss:            float
-        MultiTrnLoss:       float list
-        MultiValLoss:       float list
-        MultiTstLoss:       float list
-        UserQualities:      UserQualities
+        Loss:               Losses
+        Quality:            Map<string, PartVals>
         LearningRate:       float
     }
 
-    type Log<'P> = {
-        MinImprovement:     float
-        BestOn:             Partition
-        Best:               (Entry * Tensor<'P>) option
-        History:            Entry list
+
+/// Training history.
+type TrainingLog = {
+    MinImprovement:     float
+    BestOn:             Partition
+    Best:               (TrainingLog.Entry * ParSetInst) option
+    History:            TrainingLog.Entry list
+} with
+
+    static member create minImprovement bestOn = {
+        MinImprovement=minImprovement
+        BestOn=bestOn
+        Best=None
+        History=[]
     }
 
-    let create minImprovement bestOn =
-        {MinImprovement=minImprovement; BestOn=bestOn; Best=None; History=[]}
-
-    let relevantLoss bestOn (entry: Entry) =
+    static member relevantLoss bestOn (entry: TrainingLog.Entry) =
         match bestOn with
-        | Training -> entry.TrnLoss
-        | Validation -> entry.ValLoss
+        | Partition.Trn -> entry.Loss.Primary.Trn
+        | Partition.Val -> entry.Loss.Primary.Val
+        | Partition.Tst -> failwith "You must not optimize with respect to the test set."
 
-    let record (entry: Entry) parVals (log: Log<_>) =
+    static member record (entry: TrainingLog.Entry) parVals (log: TrainingLog) =
         let best =
             match log.Best with
             | None -> Some (entry, parVals)
             | Some (bestEntry, _) when
-                    (relevantLoss log.BestOn entry) 
-                     <= (relevantLoss log.BestOn bestEntry) - log.MinImprovement ->
-                Some (entry, Tensor.copy parVals)
+                    (TrainingLog.relevantLoss log.BestOn entry) 
+                     <= (TrainingLog.relevantLoss log.BestOn bestEntry) - log.MinImprovement ->
+                Some (entry, ParSetInst.copy parVals)
             | _ -> log.Best
         {log with Best=best; History=entry :: log.History}
 
-    let lastIter (log: Log<_>) =
+    static member lastIter (log: TrainingLog) =
         match log.History with
         | {Iter=iter}::_ -> iter
         | [] -> -1
 
-    let bestIter (log: Log<_>) =
+    static member bestIter (log: TrainingLog) =
         match log.Best with
         | Some ({Iter=iter}, _) -> iter
         | None -> 0
 
-    let best (log: Log<_>) =
+    static member best (log: TrainingLog) =
         log.Best
 
-    let itersWithoutImprovement (log: Log<_>) =
+    static member itersWithoutImprovement (log: TrainingLog) =
         match log.Best with
         | None -> 0
-        | Some ({Iter=bestIter}, _) -> lastIter log - bestIter
+        | Some ({Iter=bestIter}, _) -> TrainingLog.lastIter log - bestIter
 
-    let removeToIter iter (log: Log<_>) =
+    static member removeToIter iter (log: TrainingLog) =
         {log with History = log.History |> List.skipWhile (fun {Iter=i} -> i > iter)}
+
 
 
 /// Generic training module.
@@ -126,7 +120,7 @@ module Train =
         /// Function that takes the current iteration number and 
         /// calculates one or more user-defined quality metrics 
         /// using the current model state.
-        UserQualityFunc:                int -> UserQualities
+        UserQualityFunc:                int -> Map<string, PartVals>
         /// termination criterium
         Termination:                    TerminationCriterium
         /// minimum loss decrease to count as improvement
@@ -171,7 +165,7 @@ module Train =
         UserQualityFunc             = fun _ -> Map.empty
         Termination                 = IterGain 1.25
         MinImprovement              = 1e-7
-        BestOn                      = Validation
+        BestOn                      = Partition.Val
         TargetLoss                  = None
         MinIters                    = Some 100
         MaxIters                    = None
@@ -209,7 +203,7 @@ module Train =
 
 
     /// Interface for a trainable model.
-    type ITrainable<'Smpl, 'T> =
+    type ITrainable<'Smpl> =
         /// Loss of given sample.
         abstract member Losses: sample:'Smpl -> float list
         /// Perform an optimization step with the given learning rate and sample and return the loss.
@@ -223,7 +217,7 @@ module Train =
         /// Save model parameters to specified file.
         abstract member SaveModel: hdf:HDF5 -> prefix:string -> unit
         /// Model parameter values (i.e. weights).
-        abstract member ModelParameters: Tensor<'T> with get, set
+        abstract member ModelParameters: ParSetInst with get, set
         /// Resets the internal model state. (for example the latent state of an RNN)
         abstract member ResetModelState: unit -> unit
         /// Initialize optimizer state.
@@ -233,20 +227,24 @@ module Train =
         /// Save optimizer state to specified file.
         abstract member SaveOptState: hdf:HDF5 -> prefix:string -> unit
 
+    type TrainableFromExpr<'Smpl, 'OptCfg> = {
+        ParSetInst: ParSetInst
+        PrimaryLoss: Expr<float>
+        CustomLoss: Map<string, Expr<float>>
+        NextState: EvalUpdateBundle option
+        VarEnvBuilder: ITensor option -> 'Smpl -> VarEnv
+        OptNew: 'OptCfg -> Expr<float> -> ParSetInst -> IOptimizer
+        OptCfg: 'OptCfg
+    }
+
     /// Constructs an ITrainable<_> from expressions.
-    let internal newTrainable
-            (modelInstance: ModelInstance<'T>) 
-            (losses: Expr list) 
-            (nextStateExpr: Expr option)
-            (varEnvBuilder: Tensor<'T> option -> 'Smpl -> VarEnv)
-            (optNew: Expr -> Expr -> IDevice -> IOptimizer<'T, 'OptCfg, 'OptState>)
-            (optCfg: 'OptCfg) =         
+    let internal newTrainable (data: TrainableFromExpr<'Smpl, 'OptCfg>) =         
    
-        let usingState = Option.isSome nextStateExpr
+        let usingState = Option.isSome data.NextState
         let mutable modelState = None
 
-        let losses = losses |> List.map modelInstance.Use 
-        let mainLoss = losses.Head
+        let mainLoss = data.ParSetInst.Use data.PrimaryLoss 
+        let customLoss = data.CustomLoss |> Map.map (fun _ loss -> data.ParSetInst.Use loss)
         let stateAndLosses = 
             if usingState then nextStateExpr.Value :: losses else losses
             
