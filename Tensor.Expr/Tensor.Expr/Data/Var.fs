@@ -21,8 +21,9 @@ type VarName = VarName of ContextPath with
     member this.Str = this.Path.Str
 
 
-
+/// Parameter specification.
 type ParameterSpec = {
+    /// Initialization function.
     Init:   OrdRef<ITensor -> unit>
 }
 
@@ -38,7 +39,7 @@ type Var = {
     Dev:       ITensorDevice
     /// symbolic shape
     Shape:     Shape
-    /// parameter
+    /// parameter specification, if this variable is a parameter
     Par:       ParameterSpec option
 } with
     /// data type

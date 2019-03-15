@@ -15,9 +15,9 @@ type IOptimizerState =
     /// A new state with initial state values.
     abstract Initial: unit -> IOptimizerState  
     /// Load state from a HDF5 file.
-    abstract Load: hdf:HDF5 -> prefix:string -> unit
+    abstract Load: hdf:HDF5 * ?prefix:string -> unit
     /// Save state to a HDF5 file.
-    abstract Save: hdf:HDF5 -> prefix:string -> unit
+    abstract Save: hdf:HDF5 * ?prefix:string -> unit
 
 /// The configuration of an optimizer.
 and IOptimizerCfg =
@@ -25,6 +25,8 @@ and IOptimizerCfg =
     abstract LearningRate: float with get
     /// Returns a new configuration with the specified learning rate.
     abstract SetLearningRate: float -> IOptimizerCfg
+    /// Creates a new optimizer using this configuration.
+    abstract NewOptimizer: UExpr -> ParSetInst -> IOptimizer
 
 /// Optimizer.
 and IOptimizer =
@@ -106,13 +108,15 @@ type OptimizerState<'SP when 'SP :> IOptimizerStatePart> =
         member this.Initial () =
             this.Initial () :> _ 
 
-        member this.Load hdf prefix =
+        member this.Load (hdf, ?prefix) =
+            let prefix = defaultArg prefix ""
             this |> OptimizerState.iterData (fun typ dev name value ->
                 let path = sprintf "%s/%A/%A/%s" prefix typ dev name 
                 let data = HostTensor.readUntyped hdf path
                 value.TransferFrom data)             
 
-        member this.Save hdf prefix =
+        member this.Save (hdf, ?prefix) =
+            let prefix = defaultArg prefix ""
             this |> OptimizerState.iterData (fun typ dev name value ->
                 let path = sprintf "%s/%A/%A/%s" prefix typ dev name 
                 let data = ITensor.transfer HostTensor.Dev value

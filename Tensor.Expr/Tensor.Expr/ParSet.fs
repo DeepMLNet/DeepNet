@@ -142,7 +142,7 @@ type ParSet = private {
             _TypeDeviceGroups = pvGroupStorages
             _ParInsts = pvInsts
         }
-        ParSetInst.init pgi
+        pgi.Init()
         pgi
 
 
@@ -183,8 +183,8 @@ and ParSetInst = private {
     member this.TypeDeviceValues = this.TypeDeviceGroups |> Map.map (fun _ (var, value) -> value)
 
     /// Initializes all parameters.
-    static member init (pgi: ParSetInst) =
-        for KeyValue (varName, pi) in pgi.ParInsts do
+    member this.Init () =
+        for KeyValue (varName, pi) in this.ParInsts do
             pi.Var.Par.Value.Init.Value pi.Data
 
     /// Placeholder substituions to use this parameter group instance in an expression.
@@ -193,11 +193,19 @@ and ParSetInst = private {
 
     /// Variable values to use this parameter group instance for evaluation of an expression.
     member this.VarEnv =
-        this.TypeDeviceGroups
-        |> Map.toSeq
-        |> Seq.map (fun (_, (var, data)) -> var.Name, data)
-        |> Map.ofSeq
-        |> VarEnv
+        // flat storages
+        let storageVarEnv =
+            this.TypeDeviceGroups
+            |> Map.toSeq
+            |> Seq.map (fun (_, (var, data)) -> var.Name, data)
+            |> Map.ofSeq
+            |> VarEnv
+        // individual parameter storages
+        let parVarEnv =
+            this.ParInsts
+            |> Map.map (fun _varName pi -> pi.Data)
+            |> VarEnv
+        VarEnv.join storageVarEnv parVarEnv
 
     /// Uses this ParameterGroupInstance for the placeholder variables in the expression.
     member this.Use (expr: UExpr) =
@@ -211,7 +219,14 @@ and ParSetInst = private {
     member this.Use (expr: MultiChannelExpr) =
         expr |> MultiChannelExpr.substSymSizes this.SizeEnv |> MultiChannelExpr.substVars this.VarSubsts
 
-    /// Uses this parameter group instance for evaluation of an expression.
+    /// Uses this ParameterGroupInstance for the placeholder variables in the EvalUpdateBundle.
+    member this.Use (bndl: EvalUpdateBundle) =
+        let exprs = bndl.Exprs |> Set.map this.Use
+        let varUpdates = bndl.VarUpdates |> Map.map (fun _ expr -> this.Use expr)
+        let dataUpdates = bndl.DataUpdates |> Map.map (fun _ expr -> this.Use expr)
+        EvalUpdateBundle.make exprs varUpdates dataUpdates
+
+    /// Uses this parameter group instance for evaluation of an expression or EvalUpdateBundle.
     member this.Use (varEnv: VarEnv) =
         VarEnv.join varEnv this.VarEnv
 
@@ -238,7 +253,7 @@ and ParSetInst = private {
             let _, srcValue = src.TypeDeviceGroups.[key]
             dstValue.CopyFrom srcValue
 
-    /// Clones this parameter set instance.
+    /// Clones the specified parameter set instance.
     static member copy (psi: ParSetInst) =
         let clone = ParSet.inst psi.StorePath psi.SizeEnv psi.ParSet
         clone.CopyFrom psi

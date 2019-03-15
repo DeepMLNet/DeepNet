@@ -11,7 +11,6 @@
     <Compile Include="../../Utils/NativeLib.fs" Link="Utils/NativeLib.fs" />
     <Compile Include="../../Utils/DiskMap.fs" Link="Utils/DiskMap.fs" />
     <Compile Include="../../Tensor/Tensor/Cuda/CudaUtils.fs" Link="Utils/CudaUtils.fs" />
-    <Compile Include="Common/DiskMapOld.fs" />
     <Compile Include="Debug.fs" />
     <Compile Include="Size/Frac.fs" />
     <Compile Include="Size/Size.fs" />

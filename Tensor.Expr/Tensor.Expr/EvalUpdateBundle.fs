@@ -29,13 +29,17 @@ type ExprVals = ExprVals of Map<UExpr, ITensor> with
 /// Evaluates a set of expressions and updates variables.
 type EvalUpdateBundle = private {
     /// Expressions to evaluate.
-    Exprs:       Set<UExpr>
+    _Exprs:       Set<UExpr>
     /// New values for variables.
-    VarUpdates:  Map<VarName, UExpr>
+    _VarUpdates:  Map<VarName, UExpr>
     /// New values for data.
-    DataUpdates: Map<OrdRef<ITensor>, UExpr>
+    _DataUpdates: Map<OrdRef<ITensor>, UExpr>
 } with
 
+    member this.Exprs = this._Exprs
+    member this.VarUpdates = this._VarUpdates
+    member this.DataUpdates = this._DataUpdates
+    
     static member internal exprToCh (exprIdx: int) =
         Ch.Custom (sprintf "Expr:%d" exprIdx)   
 
@@ -46,18 +50,23 @@ type EvalUpdateBundle = private {
         Ch.Custom (sprintf "DataUpdate:%d" dataIdx)        
 
     static member empty = {
-        Exprs = Set.empty
-        VarUpdates = Map.empty
-        DataUpdates = Map.empty
+        _Exprs = Set.empty
+        _VarUpdates = Map.empty
+        _DataUpdates = Map.empty
     }
 
     static member addUExpr (expr: UExpr) (bndl: EvalUpdateBundle) = 
         { bndl with
-            Exprs = bndl.Exprs |> Set.add expr
+            _Exprs = bndl._Exprs |> Set.add expr
         }
 
     static member addExpr (expr: Expr<'T>) (bndl: EvalUpdateBundle) = 
         EvalUpdateBundle.addUExpr expr.Untyped bndl
+
+    static member addVarName (varName: VarName) (expr: UExpr) (bndl: EvalUpdateBundle) = 
+        { bndl with
+            _VarUpdates = bndl._VarUpdates |> Map.add varName expr
+        }    
 
     static member addVar (var: Var) (expr: UExpr) (bndl: EvalUpdateBundle) = 
         if var.DataType <> expr.DataType then
@@ -69,11 +78,10 @@ type EvalUpdateBundle = private {
         if var.Shape <> expr.Shape then
             failwithf "Variable %A does not match expression shape %A."
                 var expr.Shape
-        { bndl with
-            VarUpdates = bndl.VarUpdates |> Map.add var.Name expr
-        }        
+        EvalUpdateBundle.addVarName var.Name expr bndl
 
-    static member addData (data: ITensor) (expr: UExpr) (bndl: EvalUpdateBundle) = 
+    static member addDataRef (dataRef: OrdRef<ITensor>) (expr: UExpr) (bndl: EvalUpdateBundle) = 
+        let data = dataRef.Value
         if data.DataType <> expr.DataType then
             failwithf "Tensor data type %A does not match expression data type %A."
                 data.DataType expr.DataType
@@ -88,14 +96,24 @@ type EvalUpdateBundle = private {
         | None ->
             failwithf "Cannot evaluate expression shape %A." expr.Shape
         { bndl with
-            DataUpdates = bndl.DataUpdates |> Map.add (OrdRef data) expr
+            _DataUpdates = bndl._DataUpdates |> Map.add dataRef expr
         }       
+
+    static member addData (data: ITensor) (expr: UExpr) (bndl: EvalUpdateBundle) = 
+        EvalUpdateBundle.addDataRef (OrdRef data) expr bndl
+
+    static member make (exprs: UExpr seq) (varUpdates: Map<VarName, UExpr>) (dataUpdates: Map<OrdRef<ITensor>, UExpr>) =
+        let bndl = EvalUpdateBundle.empty
+        let bndl = (bndl, exprs) ||> Seq.fold (fun bndl expr -> bndl |> EvalUpdateBundle.addUExpr expr)
+        let bndl = (bndl, varUpdates) ||> Map.fold (fun bndl varName expr -> bndl |> EvalUpdateBundle.addVarName varName expr)
+        let bndl = (bndl, dataUpdates) ||> Map.fold (fun bndl data expr -> bndl |> EvalUpdateBundle.addDataRef data expr)
+        bndl
 
     static member merge (a: EvalUpdateBundle) (b: EvalUpdateBundle) =
         {
-            Exprs = Set.union a.Exprs b.Exprs
-            VarUpdates = Map.join a.VarUpdates b.VarUpdates
-            DataUpdates = Map.join a.DataUpdates b.DataUpdates
+            _Exprs = Set.union a._Exprs b._Exprs
+            _VarUpdates = Map.join a._VarUpdates b._VarUpdates
+            _DataUpdates = Map.join a._DataUpdates b._DataUpdates
         }
 
     static member mergeMany (bndls: EvalUpdateBundle seq) =
@@ -105,7 +123,7 @@ type EvalUpdateBundle = private {
     /// The variables are updated in-place the VarEnv,
     static member exec (varEnv: VarEnv) (bundle: EvalUpdateBundle) : ExprVals =
         // create channels for expression evaluation
-        let exprList = bundle.Exprs |> Set.toList
+        let exprList = bundle._Exprs |> Set.toList
         let exprChs =
             exprList
             |> Seq.indexed
@@ -114,11 +132,11 @@ type EvalUpdateBundle = private {
 
         // create channels for variable updates
         let varUpdateChs = 
-            bundle.VarUpdates 
+            bundle._VarUpdates 
             |> Map.mapKeyValue (fun var expr -> EvalUpdateBundle.varToCh var, expr)
 
         // create channel for data updates
-        let dataUpdateList = bundle.DataUpdates |> Map.toList
+        let dataUpdateList = bundle._DataUpdates |> Map.toList
         let dataUpdateChs =
             dataUpdateList
             |> Seq.indexed
@@ -140,7 +158,7 @@ type EvalUpdateBundle = private {
             |> Map.ofSeq
 
         // perform variable updates
-        for var in Map.keys bundle.VarUpdates do
+        for var in Map.keys bundle._VarUpdates do
             varEnv.[var].CopyFrom vals.[EvalUpdateBundle.varToCh var]
 
         // perform data updates

@@ -1,4 +1,4 @@
-﻿namespace Tensor.Expr.ML.Opt
+﻿namespace rec Tensor.Expr.ML.Opt
 
 open DeepNet.Utils
 open Tensor
@@ -22,6 +22,8 @@ module RMSprop =
         interface IOptimizerCfg with
             member this.LearningRate = this.Step
             member this.SetLearningRate step = {this with Step=step} :> _
+            member this.NewOptimizer loss parSetInst =
+                RMSprop.make (this, loss, parSetInst) :> _
 
     /// RMSprop optimizer state.
     type State = {

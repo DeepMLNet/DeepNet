@@ -8,22 +8,25 @@ open System.IO
 open DeepNet.Utils
 open Tensor
 open Tensor.Expr
+open Tensor.Expr.ML.Opt
 
+
+/// Training, validation and test values.
+type PartVals<'T> = {
+    Trn: 'T
+    Val: 'T
+    Tst: 'T
+}
+
+
+/// Collection of primary and custom losses.
+type Losses = {
+    Primary: float
+    Custom: Map<string, float>
+}
 
 /// Training, validation and test losses.
-type PartVals = {
-    Trn: float
-    Val: float
-    Tst: float
-}
-
-
-/// Collection of losses.
-type Losses = {
-    Primary: PartVals
-    Custom: Map<string, PartVals>
-}
-
+type PartLosses = PartVals<Losses>
 
 
 /// Training history.
@@ -32,8 +35,8 @@ module TrainingLog =
     /// Training history entry.
     type Entry = {
         Iter:               int
-        Loss:               Losses
-        Quality:            Map<string, PartVals>
+        Loss:               PartLosses
+        Quality:            Map<string, PartVals<float>>
         LearningRate:       float
     }
 
@@ -55,9 +58,9 @@ type TrainingLog = {
 
     static member relevantLoss bestOn (entry: TrainingLog.Entry) =
         match bestOn with
-        | Partition.Trn -> entry.Loss.Primary.Trn
-        | Partition.Val -> entry.Loss.Primary.Val
-        | Partition.Tst -> failwith "You must not optimize with respect to the test set."
+        | Partition.Trn -> entry.Loss.Trn.Primary
+        | Partition.Val -> entry.Loss.Val.Primary
+        | Partition.Tst -> failwith "The termination criterium cannot depend on the test loss."
 
     static member record (entry: TrainingLog.Entry) parVals (log: TrainingLog) =
         let best =
@@ -120,7 +123,7 @@ module Train =
         /// Function that takes the current iteration number and 
         /// calculates one or more user-defined quality metrics 
         /// using the current model state.
-        UserQualityFunc:                int -> Map<string, PartVals>
+        UserQualityFunc:                int -> Map<string, PartVals<float>>
         /// termination criterium
         Termination:                    TerminationCriterium
         /// minimum loss decrease to count as improvement
@@ -204,103 +207,166 @@ module Train =
 
     /// Interface for a trainable model.
     type ITrainable<'Smpl> =
-        /// Loss of given sample.
-        abstract member Losses: sample:'Smpl -> float list
-        /// Perform an optimization step with the given learning rate and sample and return the loss.
-        abstract member Optimize: learningRate:float -> sample:'Smpl -> Lazy<float list>
+        /// Losses of given sample.
+        abstract Losses: sample:'Smpl -> Losses
+        /// Perform an optimization step and return the losses.
+        abstract Step: sample:'Smpl -> Lazy<Losses>
+        /// Learning rate.
+        abstract LearningRate: float with set
         /// Prints information about the model.
-        abstract member PrintInfo: unit -> unit
+        abstract PrintInfo: unit -> unit
         /// Initializes the model using the given random seed.
-        abstract member InitModel: seed:int -> unit
+        abstract InitModel: unit -> unit
         /// Load model parameters from specified file.
-        abstract member LoadModel: hdf:HDF5 -> prefix:string -> unit
+        abstract LoadModel: hdf:HDF5 -> prefix:string -> unit
         /// Save model parameters to specified file.
-        abstract member SaveModel: hdf:HDF5 -> prefix:string -> unit
+        abstract SaveModel: hdf:HDF5 -> prefix:string -> unit
         /// Model parameter values (i.e. weights).
-        abstract member ModelParameters: ParSetInst with get, set
+        abstract ModelParameters: ParSetInst with get, set
+        /// Model state. (for example the latent state of an RNN)
+        abstract ModelState: Option<ParSetInst> with get, set
         /// Resets the internal model state. (for example the latent state of an RNN)
-        abstract member ResetModelState: unit -> unit
+        abstract ResetModelState: unit -> unit
         /// Initialize optimizer state.
-        abstract member InitOptState: unit -> unit
+        abstract InitOptState: unit -> unit
         /// Load optimizer state from specified file.
-        abstract member LoadOptState: hdf:HDF5 -> prefix:string -> unit
+        abstract LoadOptState: hdf:HDF5 -> prefix:string -> unit
         /// Save optimizer state to specified file.
-        abstract member SaveOptState: hdf:HDF5 -> prefix:string -> unit
+        abstract SaveOptState: hdf:HDF5 -> prefix:string -> unit
 
-    type TrainableFromExpr<'Smpl, 'OptCfg> = {
-        ParSetInst: ParSetInst
+    type TrainableFromExpr<'Smpl> = {
+        /// Primary loss function.
+        /// It is minimized during training.
         PrimaryLoss: Expr<float>
+        /// Secondary loss functions that are evaluated during training.
+        /// They do not enter the optimization objective.
         CustomLoss: Map<string, Expr<float>>
-        NextState: EvalUpdateBundle option
-        VarEnvBuilder: ITensor option -> 'Smpl -> VarEnv
-        OptNew: 'OptCfg -> Expr<float> -> ParSetInst -> IOptimizer
-        OptCfg: 'OptCfg
-    }
-
-    /// Constructs an ITrainable<_> from expressions.
-    let internal newTrainable (data: TrainableFromExpr<'Smpl, 'OptCfg>) =         
-   
-        let usingState = Option.isSome data.NextState
-        let mutable modelState = None
-
-        let mainLoss = data.ParSetInst.Use data.PrimaryLoss 
-        let customLoss = data.CustomLoss |> Map.map (fun _ loss -> data.ParSetInst.Use loss)
-        let stateAndLosses = 
-            if usingState then nextStateExpr.Value :: losses else losses
-            
-        let opt = optNew mainLoss modelInstance.ParameterVector modelInstance.Device       
-        let mutable optState = opt.InitialState optCfg modelInstance.ParameterValues
-
-        let updateStateAndGetLosses result = 
-            match result with
-            | nextState :: losses when usingState -> 
-                modelState <- Some nextState
-                losses
-            | losses when not usingState -> losses
-            | _ -> failwith "unexpected result"
-
-        let lossesFn =
-            let fn = modelInstance.Func stateAndLosses
-            fun smpl ->                
-                fn <| varEnvBuilder modelState smpl 
-                |> updateStateAndGetLosses
-
-        let lossesOptFn = 
-            let fn = modelInstance.Func (opt.OptStepExpr :: stateAndLosses) |> opt.Use
-            fun smpl optCfg optState ->
-                fn <| varEnvBuilder modelState smpl <| optCfg <| optState
-                |> List.tail |> updateStateAndGetLosses
-   
-        {new ITrainable<'Smpl, 'T> with
-            member this.Losses sample = lossesFn sample |> List.map (Tensor.value >> conv<float>)
-            member this.Optimize learningRate sample = 
-                let losses = lossesOptFn sample (opt.CfgWithLearningRate learningRate optCfg) optState
-                lazy (losses |> List.map (Tensor.value >> conv<float>))
-            member this.PrintInfo () = modelInstance.ParameterStorage.PrintShapes ()
-            member this.InitModel seed = modelInstance.InitPars seed
-            member this.LoadModel hdf prefix = modelInstance.LoadPars (hdf, prefix)
-            member this.SaveModel hdf prefix = modelInstance.SavePars (hdf, prefix)
-            member this.ModelParameters
-                with get () = modelInstance.ParameterValues
-                and set (value) = modelInstance.ParameterValues <- value
-            member this.ResetModelState () = modelState <- None
-            member this.InitOptState () = optState <- opt.InitialState optCfg modelInstance.ParameterValues
-            member this.LoadOptState hdf prefix = optState <- opt.LoadState hdf prefix
-            member this.SaveOptState hdf prefix = opt.SaveState hdf prefix optState    
+        /// Parameter set instance that contains the model parameters.
+        /// Optimization takes place w.r.t. these parameters.
+        Pars: ParSetInst
+        /// Optional model state that should persist between samples and its assoicated
+        /// update expression.
+        /// (For example the latent state of an RNN).
+        State: (ParSetInst * EvalUpdateBundle) option
+        /// Function that takes a sample (mini-batch) and returns the corresponding VarEnv.
+        VarEnvForSample: 'Smpl -> VarEnv
+        /// Optimizer configuration.
+        OptCfg: IOptimizerCfg
+    } with
+        static member simple loss pars varEnvForSample optCfg = {
+            PrimaryLoss = loss
+            CustomLoss = Map.empty
+            Pars = pars
+            State = None
+            VarEnvForSample = varEnvForSample
+            OptCfg = optCfg
         }
 
-    /// Constructs an ITrainable<_> for the given stateful model using the specified loss
-    /// expressions, state update expression and optimizer.
-    let newStatefulTrainable modelInstance losses nextState varEnvBuilder optNew optCfg =
-        newTrainable modelInstance losses (Some nextState) varEnvBuilder optNew optCfg
+    /// Constructs an ITrainable<_> from expressions.
+    let internal newTrainable (spec: TrainableFromExpr<'Smpl>) =         
+   
+        // state variable environment
+        let stateEnv =
+            match spec.State with
+            | Some (state, _) -> state.VarEnv
+            | None -> VarEnv.empty
+        
+        // state update bundle
+        let stateBndl =
+            match spec.State with
+            | Some (state, stateBndl) -> 
+                stateBndl
+                |> spec.Pars.Use
+                |> state.Use
+            | None -> EvalUpdateBundle.empty
 
-    /// Constructs an ITrainable<_> for the given model instance, loss expressions and optimizer.
-    let trainableFromLossExprs modelInstance losses varEnvBuilder optNew optCfg =
-        newTrainable modelInstance losses None (fun _ -> varEnvBuilder) optNew optCfg
+        /// use state and parameter ParSets in an expression und EvalUpdateBundle
+        let useStateAndPars (x: Expr<float>) =
+            let x = spec.Pars.Use x
+            match spec.State with 
+            | Some (state, _) -> state.Use x
+            | None -> x
 
-    /// Constructs an ITrainable<_> for the given model instance, loss expression and optimizer.
-    let trainableFromLossExpr modelInstance loss varEnvBuilder optNew optCfg =     
-        trainableFromLossExprs modelInstance [loss] varEnvBuilder optNew optCfg
+        // losses
+        let primaryLoss = useStateAndPars spec.PrimaryLoss  
+        let customLoss = spec.CustomLoss |> Map.map (fun _ loss -> useStateAndPars loss)
+           
+        // loss bundle
+        let lossBndl = 
+            (EvalUpdateBundle.empty, Map.toSeq customLoss)
+            ||> Seq.fold (fun bndl (_, expr) -> bndl |> EvalUpdateBundle.addExpr expr)
+            |> EvalUpdateBundle.addExpr primaryLoss
+
+        // loss claculation and state update bundle
+        let lossStateBndl = EvalUpdateBundle.merge lossBndl stateBndl
+
+        // optimizer
+        let opt = spec.OptCfg.NewOptimizer primaryLoss.Untyped spec.Pars
+        let optStep = opt.Step
+        let optLossStateBndl = EvalUpdateBundle.merge lossStateBndl optStep
+
+        // function that extracts losses from evaluated expression values
+        let extractLosses (res: ExprVals) = {
+            Primary = res.Get primaryLoss |> Tensor.value
+            Custom = customLoss |> Map.map (fun _ expr -> res.Get expr |> Tensor.value)
+        }
+   
+        {new ITrainable<'Smpl> with
+            member this.Losses smpl = 
+                let varEnv = VarEnv.joinMany [spec.VarEnvForSample smpl; spec.Pars.VarEnv; stateEnv]
+                lossStateBndl |> EvalUpdateBundle.exec varEnv |> extractLosses
+
+            member this.Step smpl = 
+                let varEnv = VarEnv.joinMany [spec.VarEnvForSample smpl; spec.Pars.VarEnv; stateEnv]
+                let res = optLossStateBndl |> EvalUpdateBundle.exec varEnv
+                lazy (extractLosses res)
+
+            member this.LearningRate
+                with set lr = opt.Cfg <- opt.Cfg.SetLearningRate lr
+
+            member this.PrintInfo () = printfn "%A" spec.Pars
+
+            member this.InitModel () = spec.Pars.Init()
+            member this.LoadModel hdf prefix = spec.Pars.Load (hdf, prefix)
+            member this.SaveModel hdf prefix = spec.Pars.Save (hdf, prefix)
+            member this.ModelParameters
+                with get () = spec.Pars
+                and set (value) = spec.Pars.CopyFrom value
+
+            member this.ModelState
+                with get () = spec.State |> Option.map fst
+                and set (value) = 
+                    match spec.State, value with
+                    | Some (statePars, _), Some value -> statePars.CopyFrom value
+                    | None, None -> ()
+                    | _ -> failwith "Trainable state mismatch."
+            member this.ResetModelState () = 
+                match spec.State with
+                | Some (statePars, _) -> statePars.Init()
+                | None -> ()
+
+            member this.InitOptState () = 
+                opt.State <- opt.State.Initial()
+            member this.LoadOptState hdf prefix = 
+                let state = opt.State
+                state.Load (hdf, prefix)
+                opt.State <- state
+            member this.SaveOptState hdf prefix = 
+                opt.State.Save (hdf, prefix)
+        }
+
+    ///// Constructs an ITrainable<_> for the given stateful model using the specified loss
+    ///// expressions, state update expression and optimizer.
+    //let newStatefulTrainable modelInstance losses nextState varEnvBuilder optNew optCfg =
+    //    newTrainable modelInstance losses (Some nextState) varEnvBuilder optNew optCfg
+
+    ///// Constructs an ITrainable<_> for the given model instance, loss expressions and optimizer.
+    //let trainableFromLossExprs modelInstance losses varEnvBuilder optNew optCfg =
+    //    newTrainable modelInstance losses None (fun _ -> varEnvBuilder) optNew optCfg
+
+    ///// Constructs an ITrainable<_> for the given model instance, loss expression and optimizer.
+    //let trainableFromLossExpr modelInstance loss varEnvBuilder optNew optCfg =     
+    //    trainableFromLossExprs modelInstance [loss] varEnvBuilder optNew optCfg
 
 
     /// Current training state for checkpoints.
@@ -314,7 +380,7 @@ module Train =
 
     /// Trains a model instance using the given loss and optimization functions on the given dataset.
     /// Returns the training history.
-    let train (trainable: ITrainable<'Smpl, 'T>) (dataset: TrnValTst<'Smpl>) (cfg: Cfg) =
+    let train (trainable: ITrainable<'Smpl>) (dataset: TrnValTst<'Smpl>) (cfg: Cfg) =
         // checkpoint data
         let mutable checkpointRequested = false
         use ctrlCHandler = Console.CancelKeyPress.Subscribe (fun evt ->            
@@ -346,7 +412,7 @@ module Train =
 
         // initialize model parameters
         printfn "Initializing model parameters for training"
-        trainable.InitModel cfg.Seed
+        trainable.InitModel ()
         trainable.InitOptState ()
         trainable.PrintInfo ()
 
@@ -365,7 +431,8 @@ module Train =
             // execute training and calculate training loss
             trainable.ResetModelState ()
             setDumpPrefix iter "trn"
-            let trnLosses = trnBatches |> Seq.map (trainable.Optimize learningRate) |> Seq.toList
+            // TODO: set learning rate
+            let trnLosses = trnBatches |> Seq.map trainable.Step |> Seq.toList
 
             // record loss if needed
             let recordBecauseCP = 

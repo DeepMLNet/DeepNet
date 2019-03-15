@@ -58,6 +58,10 @@ type VarEnv = VarEnv of Map<VarName, ITensor> with
     static member join (a: VarEnv) (b: VarEnv) : VarEnv =
         Map.join a.Values b.Values |> VarEnv    
 
+    /// Joins a sequence of variable environments.
+    static member joinMany (ves: VarEnv seq) : VarEnv =
+        (VarEnv.empty, ves) ||> Seq.fold VarEnv.join
+
     /// Constructs a VarEnv from a sequence of variable, value tuples.
     static member ofSeq (entries: (Var * ITensor) seq) =
         (VarEnv.empty, entries)
