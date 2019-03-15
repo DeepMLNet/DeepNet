@@ -13,17 +13,17 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\..\Utils\Utils.fs" Link="Utils.fs" />
     <Compile Include="Optimizer\Optimizer.fs" />
     <Compile Include="Optimizer\GradientDescent.fs" />
     <Compile Include="Optimizer\RMSprop.fs" />
     <Compile Include="Optimizer\Adam.fs" />
-    <Compile Include="..\..\Utils\Utils.fs" Link="Utils.fs" />
     <Compile Include="Dataset\Dataset.fs" />
     <Compile Include="Dataset\TrnValTst.fs" />
     <Compile Include="Dataset\InpTgtSmpl.fs" />
-    <Compile Include="Loader\CSV.fs" />
-    <Compile Include="Loader\Cifar10.fs" />
-    <Compile Include="Loader\Mnist.fs" />
+    <Compile Include="Dataset\Loader\CSV.fs" />
+    <Compile Include="Dataset\Loader\Cifar10.fs" />
+    <Compile Include="Dataset\Loader\Mnist.fs" />
     <Compile Include="Preprocess\Normalization.fs" />
     <Compile Include="Model\Common.fs" />
     <Compile Include="Model\Linear.fs" />

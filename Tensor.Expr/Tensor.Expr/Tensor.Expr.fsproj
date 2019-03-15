@@ -78,8 +78,5 @@
     <None Include="Old\CudaEval.fs" />
     <None Include="Old\VarEnvReg.fs" />
   </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="FsPickler" Version="5.2.0" />
-  </ItemGroup>
   <Import Project="../../Common.targets" />
 </Project>
