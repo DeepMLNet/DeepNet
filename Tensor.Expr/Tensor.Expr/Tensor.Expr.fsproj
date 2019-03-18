@@ -55,6 +55,8 @@
     <Compile Include="TextTracer.fs" />
     <Compile Include="EvalUpdateBundle.fs" />
     <Compile Include="ParSet.fs" />
+    <Compile Include="ExprFunc.fs" />
+    <None Include="Old\Function.fs" />
     <None Include="Old\RecordParams.fs" />
     <None Include="Old\ModelContext.fs" />
     <None Include="Old\Expr.fs" />
@@ -66,7 +68,6 @@
     <None Include="Old\ExecUnitTypes.fs" />
     <None Include="Old\DiagnosticsVisualizer.fs" />
     <None Include="Old\ExecUnit.fs" />
-    <None Include="Old\Function.fs" />
     <None Include="Old\DebugCuda.fs" />
     <None Include="Old\CudaTypes.fs" />
     <None Include="Old\CudaElemExpr.fs" />

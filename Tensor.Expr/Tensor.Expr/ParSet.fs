@@ -61,10 +61,12 @@ type ParSet = private {
             _VarNames = pg._VarNames |> Set.remove varName
         }
 
-    /// Create a parameter set from all parameter within the given expression that are
+    /// Create a parameter set from all parameter within the given expressions that are
     /// under the specified path.
-    static member fromUExpr (path: ContextPath) (expr: UExpr)  =
-        expr.VarMap
+    static member fromUExprs (path: ContextPath) (exprs: UExpr seq)  =
+        exprs
+        |> Seq.map UExpr.varMap
+        |> Map.joinMany
         |> Map.toSeq
         |> Seq.choose (fun (_, var) ->
             match var.Par with
@@ -72,10 +74,15 @@ type ParSet = private {
             | _ -> None)
         |> Seq.fold (fun parSet var -> parSet |> ParSet.addUntyped var) ParSet.empty
 
+    /// Create a parameter set from all parameter within the given expressions that are
+    /// under the specified path.
+    static member fromExprs (path: ContextPath) (expr: Expr<_> seq)  =
+        expr |> Seq.map Expr.untyped |> ParSet.fromUExprs path
+
     /// Create a parameter set from all parameter within the given expression that are
     /// under the specified path.
     static member fromExpr (path: ContextPath) (expr: Expr<_>)  =
-        ParSet.fromUExpr path expr.Untyped
+        ParSet.fromExprs path [expr]
 
     /// Merges two parameter set.
     /// The variables contained in the sets must be disjoint.

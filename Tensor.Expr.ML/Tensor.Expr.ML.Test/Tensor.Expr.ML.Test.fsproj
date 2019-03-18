@@ -21,7 +21,7 @@
     <Compile Include="..\..\Utils\TestUtils.fs" Link="Utils/TestUtils.fs" />
     <Compile Include="DatasetTests.fs" />
     <Compile Include="NormalizationTests.fs" />
-    <None Include="NeuralNetOnMNIST.fs" />
+    <Compile Include="NeuralNetOnMNIST.fs" />
     <Content Include="TestData\*.csv">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
