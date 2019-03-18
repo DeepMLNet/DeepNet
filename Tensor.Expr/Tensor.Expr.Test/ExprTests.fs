@@ -9,7 +9,7 @@ open Tensor.Utils
 open Tensor
 open Tensor.Backend
 open Tensor.Expr
-open Utils
+open TestUtils
 
 
 

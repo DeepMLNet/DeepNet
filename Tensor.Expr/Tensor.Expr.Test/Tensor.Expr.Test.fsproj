@@ -7,10 +7,15 @@
     <Platforms>x64</Platforms>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Utils.fs" />
+    <Compile Include="..\..\Utils\TestUtils.fs" Link="TestUtils.fs" />
     <Compile Include="BaseExprTests.fs" />
     <Compile Include="DerivCheck.fs" />
-    <Compile Include="ExprTests.fs" />  
+    <Compile Include="ExprTests.fs" />
+    <None Include="OpTests.fs" />
+    <None Include="CompilerPipeline.fs" />
+    <None Include="DerivTests.fs" />
+    <None Include="ElemExprTests.fs" />
+    <None Include="LoopTests.fs" />  
   </ItemGroup>
   <ItemGroup />
   <ItemGroup>

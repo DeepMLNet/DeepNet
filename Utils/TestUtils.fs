@@ -1,4 +1,4 @@
-﻿module Utils
+﻿module TestUtils
 
 open System.IO
 open Xunit
@@ -9,9 +9,6 @@ open DeepNet.Utils
 open Tensor.Utils
 open Tensor
 open Tensor.Expr
-//open Models
-//open Datasets
-//open Optimizers
 
 
 let dumpExpr (output: ITestOutputHelper) (expr: UExpr) =

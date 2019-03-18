@@ -2,21 +2,23 @@
 
 open Xunit
 open FsUnit.Xunit
+open Xunit.Abstractions
 open System.IO
 
-open Tensor.Utils
+open DeepNet.Utils
 open Tensor
-open Datasets
+open Tensor.Algorithm
+open Tensor.Expr.ML
 
 
-let dataDir = Util.assemblyDirectory + "/../../TestData/curve"
+let dataDir = Util.assemblyDir + "/TestData/"
 
-type Arrayf = Tensor<float>
-type CurveSample = {Time: Arrayf; Pos: Arrayf; Vels: Arrayf; Biotac: Arrayf}
+type Tensorf = Tensor<float>
+type CurveSample = {Time: Tensorf; Pos: Tensorf; Vels: Tensorf; Biotac: Tensorf}
 
-let dataSamples = 
+let curveSamples = 
     seq {
-        for filename in Directory.EnumerateFiles(dataDir, "*.npz") |> Seq.sort do
+        for filename in Directory.EnumerateFiles(dataDir + "curve/", "*.npz") |> Seq.sort do
             use tactile = NPZFile.Open filename
             yield  {Time=tactile.Get "time"
                     Pos=tactile.Get "pos"
@@ -24,18 +26,25 @@ let dataSamples =
                     Biotac=tactile.Get "biotac"}
     } |> Seq.cache
 
-[<Fact>]
-let ``Loading curve dataset`` () =
-    let dataset = Dataset.ofSamples dataSamples
-    printfn "Number of samples: %d" dataset.NSamples
 
-type CurveDataset () =
-    let dataset = Dataset.ofSamples dataSamples
+type CurveDatasetLoading (output: ITestOutputHelper) =
+    let printfn format = Printf.kprintf (fun msg -> output.WriteLine(msg)) format 
+
+    [<Fact>]
+    let ``Loading curve dataset`` () =
+        let dataset = Dataset.ofSamples curveSamples
+        printfn "Number of samples: %d" dataset.NSamples
+
+
+type CurveDataset (output: ITestOutputHelper) =
+    let printfn format = Printf.kprintf (fun msg -> output.WriteLine(msg)) format 
+
+    let dataset = Dataset.ofSamples curveSamples
 
     [<Fact>]
     member this.``Accessing elements`` () =
         printfn "\naccessing elements:"
-        for idx, (smpl, orig) in Seq.indexed (Seq.zip dataset dataSamples) |> Seq.take 3 do
+        for idx, (smpl, orig) in Seq.indexed (Seq.zip dataset curveSamples) |> Seq.take 3 do
             printfn "idx %d has sample biotac %A pos %A" 
                 idx (smpl.Biotac |> Tensor.shape) (smpl.Pos |> Tensor.shape)
             smpl.Biotac ==== orig.Biotac |> Tensor.all |> should equal true
@@ -66,41 +75,43 @@ type CurveDataset () =
     [<Fact>]
     [<Trait("Category", "Skip_CI")>]
     member this.``To CUDA GPU`` () =
-        let dsCuda = dataset |> Dataset.toCuda
+        let dsCuda = dataset |> Dataset.transfer CudaTensor.Dev
         printfn "copied to CUDA: %A" dsCuda
 
     [<Fact>]
     member this.``Saving and loading`` () =
         dataset.Save "DatasetTests.h5"
         printfn "Saved"
-        let dataset2 : Dataset<CurveSample> = Dataset.Load "DatasetTests.h5"
+        let dataset2 : Dataset<CurveSample> = Dataset.load "DatasetTests.h5"
         printfn "Loaded."
 
 
 
+type CsvDataset (output: ITestOutputHelper) =
+    let printfn format = Printf.kprintf (fun msg -> output.WriteLine(msg)) format 
 
-[<Fact>]
-let ``Loading CSV datasets`` () =
-    
-    let paths = ["abalone.txt",       CsvLoader.DefaultParameters 
-                 //"arrhythmia.txt.gz", {CsvLoader.DefaultParameters 
-                 //                      with CsvLoader.IntTreatment=CsvLoader.IntAsNumerical}
-                 "imports-85.data",   {CsvLoader.DefaultParameters 
-                                       with CsvLoader.IntTreatment=CsvLoader.IntAsNumerical}
-                 "SPECT.txt",         CsvLoader.DefaultParameters]
-    for path, pars in paths do
-        printfn "Loading %s" path
-        let data = CsvLoader.loadFile pars path |> Seq.cache
-        let ds = Dataset.ofSamples data
-        printfn "%A" ds
-        for smpl in data |> Seq.take 10 do
-            printfn "Input: %s\nTarget: %s" smpl.Input.Full smpl.Target.Full
-        printfn ""
+    let paths = [dataDir + "abalone.csv",      Loader.Csv.DefaultParameters 
+                 dataDir + "imports-85.csv",  {Loader.Csv.DefaultParameters with Loader.Csv.IntTreatment=Loader.Csv.IntAsNumerical}
+                 dataDir + "SPECT.csv",        Loader.Csv.DefaultParameters]
+
+    [<Fact>]
+    let ``Loading CSV datasets`` () =
+        for path, pars in paths do
+            printfn "Loading %s" path
+            let data = Loader.Csv.loadFile pars path |> Seq.cache
+            let ds = Dataset.ofSamples data
+            printfn "%A" ds
+            for smpl in data |> Seq.take 10 do
+                printfn "Input: %s\nTarget: %s" smpl.Input.Full smpl.Target.Full
+            printfn ""
+
 
 
 type SeqSample = {SeqData: Tensor<int64>}
 
-type SequenceDataset () = 
+type SequenceDataset (output: ITestOutputHelper) =
+    let printfn format = Printf.kprintf (fun msg -> output.WriteLine(msg)) format 
+
     let smpl1 = {SeqData = HostTensor.counting 98L}
     let smpl2 = {SeqData = 100L + HostTensor.counting 98L}
     let smpl3 = {SeqData = 200L + HostTensor.counting 98L}
