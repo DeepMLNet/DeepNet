@@ -13,7 +13,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="..\..\Utils\Utils.fs" Link="Utils.fs" />
+    <Compile Include="..\..\Utils\Utils.fs" Link="Utils\Utils.fs" />
+    <Compile Include="Utils\Serialization.fs" />
     <Compile Include="Optimizer\Optimizer.fs" />
     <Compile Include="Optimizer\GradientDescent.fs" />
     <Compile Include="Optimizer\RMSprop.fs" />
@@ -30,7 +31,6 @@
     <Compile Include="Model\Neural.fs" />
     <None Include="Model\GaussianProcess.fs" />
     <None Include="Model\Quality.fs" />
-    <Compile Include="Train\Pickle.fs" />
     <Compile Include="Train\Train.fs" />
   </ItemGroup>
 

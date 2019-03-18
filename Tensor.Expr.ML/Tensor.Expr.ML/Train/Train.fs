@@ -1,9 +1,8 @@
-﻿namespace Tensor.Expr.ML
+﻿module Tensor.Expr.ML.Train
 
 open System
 open System.Diagnostics
 open System.IO
-//open MBrace.FsPickler.Json
 
 open DeepNet.Utils
 open Tensor
@@ -13,8 +12,11 @@ open Tensor.Expr.ML.Opt
 
 /// Training, validation and test values.
 type PartVals<'T> = {
+    /// Value on training set.
     Trn: 'T
+    /// Value on validation set.
     Val: 'T
+    /// Value on test set.
     Tst: 'T
 }
 
@@ -35,6 +37,7 @@ type Losses = {
         Custom = a.Custom |> Map.map (fun _ av -> av / float n)
     }
 
+    /// Calculates the average loss.
     static member average (ls: Losses seq) =
         let ls = Seq.cache ls
         let sum = ls |> Seq.reduce (+)
@@ -45,24 +48,25 @@ type Losses = {
 type PartLosses = PartVals<Losses>
 
 
+/// Training history entry.
+type Epoch = {
+    /// Training iteration.
+    Iter:               int
+    /// Losses.
+    Loss:               PartLosses
+    /// User-specified quality measures.
+    Quality:            Map<string, PartVals<float>>
+    /// Learning rate.
+    LearningRate:       float
+}
+
+
 /// Training history.
-module TrainingLog =
-
-    /// Training history entry.
-    type Entry = {
-        Iter:               int
-        Loss:               PartLosses
-        Quality:            Map<string, PartVals<float>>
-        LearningRate:       float
-    }
-
-
-/// Training history.
-type TrainingLog = {
+type private TrainingLog = {
     MinImprovement:     float
     BestOn:             Partition
-    Best:               (TrainingLog.Entry * ParSetInst) option
-    History:            TrainingLog.Entry list
+    Best:               (Epoch * ParSetInst) option
+    History:            Epoch list
 } with
 
     static member create minImprovement bestOn = {
@@ -72,13 +76,13 @@ type TrainingLog = {
         History=[]
     }
 
-    static member relevantLoss bestOn (entry: TrainingLog.Entry) =
+    static member relevantLoss bestOn (entry: Epoch) =
         match bestOn with
         | Partition.Trn -> entry.Loss.Trn.Primary
         | Partition.Val -> entry.Loss.Val.Primary
         | Partition.Tst -> failwith "The termination criterium cannot depend on the test loss."
 
-    static member record (entry: TrainingLog.Entry) parVals (log: TrainingLog) =
+    static member record (entry: Epoch) parVals (log: TrainingLog) =
         let best =
             match log.Best with
             | None -> Some (entry, parVals)
@@ -111,71 +115,68 @@ type TrainingLog = {
         {log with History = log.History |> List.skipWhile (fun {Iter=i} -> i > iter)}
 
 
+/// Training termination criterium
+type TermCrit =
+    /// terminates after the given number of iterations with improvement of the validation loss
+    | ItersWithoutImprovement of int
+    /// trains for IterGain*BestIterSoFar iterations
+    | IterGain of float
+    /// does not use this termination criterium
+    | Forever
 
-/// Generic training module.
-module Train =
 
-    /// Training termination criterium
-    type TerminationCriterium =
-        /// terminates after the given number of iterations with improvement of the validation loss
-        | ItersWithoutImprovement of int
-        /// trains for IterGain*BestIterSoFar iterations
-        | IterGain of float
-        /// does not use this termination criterium
-        | Forever
-
-    /// Training configuration.
-    type Cfg = {
-        /// seed for parameter initialization
-        Seed:                           int
-        /// batch size
-        BatchSize:                      int64
-        /// time slot length for sequence training
-        SlotSize:                       int64 option
-        /// number of iterations between evaluation of the loss
-        LossRecordInterval:             int
-        /// function that is called after loss has been evaluated
-        LossRecordFunc:                 TrainingLog.Entry -> unit
-        /// Function that takes the current iteration number and 
-        /// calculates one or more user-defined quality metrics 
-        /// using the current model state.
-        UserQualityFunc:                int -> Map<string, PartVals<float>>
-        /// termination criterium
-        Termination:                    TerminationCriterium
-        /// minimum loss decrease to count as improvement
-        MinImprovement:                 float
-        /// partition to use for determination of best loss
-        BestOn:                         Partition
-        /// target loss that should lead to termination of training
-        TargetLoss:                     float option
-        /// minimum training iterations
-        MinIters:                       int option
-        /// maximum training iterations
-        MaxIters:                       int option
-        /// Learning rates that will be used. After training terminates with
-        /// one learning rate, it continues using the next learning rate from this list.
-        LearningRates:                  float list
-        /// Path to a checkpoint file (HDF5 format).
-        /// Used to save the training state if training is interrupted and/or periodically.
-        /// If the file exists, the training state is loaded from it and training resumes.
-        /// The string %ITER% in the filename is replaced with the iteration number.
-        CheckpointFile:                 string option
-        /// number of iterations between automatic writing of checkpoints
-        CheckpointInterval:             int option
-        /// If true, checkpoint is not loaded from disk.
-        DiscardCheckpoint:              bool
-        /// If specified, loads the checkpoint corresponding to the specified iteration.
-        /// Otherwise, the latest checkpoint is loaded.
-        LoadCheckpointIter:             int option
-        /// If false, no training is performed after loading the checkpoint.
-        PerformTraining:                bool
-        /// If set, during each iteration the dump prefix will be set to the given string
-        /// concatenated with the iteration number.
-        DumpPrefix:                     string option
-    } 
+/// Training configuration.
+type Cfg = {
+    /// seed for parameter initialization
+    Seed:                           int
+    /// batch size
+    BatchSize:                      int64
+    /// time slot length for sequence training
+    SlotSize:                       int64 option
+    /// number of iterations between evaluation of the loss
+    LossRecordInterval:             int
+    /// function that is called after loss has been evaluated
+    LossRecordFunc:                 Epoch -> unit
+    /// Function that takes the current iteration number and 
+    /// calculates one or more user-defined quality metrics 
+    /// using the current model state.
+    UserQualityFunc:                int -> Map<string, PartVals<float>>
+    /// termination criterium
+    Termination:                    TermCrit
+    /// minimum loss decrease to count as improvement
+    MinImprovement:                 float
+    /// partition to use for determination of best loss
+    BestOn:                         Partition
+    /// target loss that should lead to termination of training
+    TargetLoss:                     float option
+    /// minimum training iterations
+    MinIters:                       int option
+    /// maximum training iterations
+    MaxIters:                       int option
+    /// Learning rates that will be used. After training terminates with
+    /// one learning rate, it continues using the next learning rate from this list.
+    LearningRates:                  float list
+    /// Path to a checkpoint file (HDF5 format).
+    /// Used to save the training state if training is interrupted and/or periodically.
+    /// If the file exists, the training state is loaded from it and training resumes.
+    /// The string %ITER% in the filename is replaced with the iteration number.
+    CheckpointFile:                 string option
+    /// number of iterations between automatic writing of checkpoints
+    CheckpointInterval:             int option
+    /// If true, checkpoint is not loaded from disk.
+    DiscardCheckpoint:              bool
+    /// If specified, loads the checkpoint corresponding to the specified iteration.
+    /// Otherwise, the latest checkpoint is loaded.
+    LoadCheckpointIter:             int option
+    /// If false, no training is performed after loading the checkpoint.
+    PerformTraining:                bool
+    /// If set, during each iteration the dump prefix will be set to the given string
+    /// concatenated with the iteration number.
+    DumpPrefix:                     string option
+} with 
 
     /// Default training configuration.
-    let defaultCfg = {
+    static member standard = {
         Seed                        = 1
         BatchSize                   = 10000L
         SlotSize                    = None
@@ -197,209 +198,185 @@ module Train =
         DumpPrefix                  = None
     }
 
-    /// training faith
-    type Faith =
-        | Continue
-        | NoImprovement
-        | IterLimitReached
-        | TargetLossReached
-        | UserTerminated
-        | CheckpointRequested
-        | CheckpointIntervalReached
-        | NaNEncountered
 
-    /// Result of training
-    type TrainingResult = {
-        Best:               TrainingLog.Entry option
-        TerminationReason:  Faith
-        Duration:           TimeSpan
-        History:            TrainingLog.Entry list
-    } with
-        /// save as JSON file
-        member this.Save path = Json.save path this
-        /// load from JSON file
-        static member Load path : TrainingResult = Json.load path           
+/// Training termination reason.
+type TermReason =
+    /// Training will continue.
+    | Continue
+    /// No improvement as specifed by termination criterium.
+    | NoImprovement
+    /// Iteration limit reached.
+    | IterLimitReached
+    /// Target loss reached.
+    | TargetLossReached
+    /// Terminated by user pressing 'q'.
+    | UserTerminated
+    /// Checkpoint was requested by sending signal to process.
+    | CheckpointRequested
+    /// Checkpoing due to checkpoint interval. (Training will continue.)
+    | CheckpointIntervalReached
+    /// A NaN was encountered in a loss.
+    | NaNEncountered
 
 
-    /// Interface for a trainable model.
-    type ITrainable<'Smpl> =
-        /// Losses of given sample.
-        abstract Losses: sample:'Smpl -> Losses
-        /// Perform an optimization step and return the losses.
-        abstract Step: sample:'Smpl -> Lazy<Losses>
-        /// Learning rate.
-        abstract LearningRate: float with set
-        /// Prints information about the model.
-        abstract PrintInfo: unit -> unit
-        /// Initializes the model using the given random seed.
-        abstract InitModel: unit -> unit
-        /// Load model parameters from specified file.
-        abstract LoadModel: hdf:HDF5 -> prefix:string -> unit
-        /// Save model parameters to specified file.
-        abstract SaveModel: hdf:HDF5 -> prefix:string -> unit
-        /// Model parameter values (i.e. weights).
-        abstract ModelParameters: ParSetInst with get, set
-        /// Model state. (for example the latent state of an RNN)
-        abstract ModelState: Option<ParSetInst> with get, set
-        /// Resets the internal model state. (for example the latent state of an RNN)
-        abstract ResetModelState: unit -> unit
-        /// Initialize optimizer state.
-        abstract InitOptState: unit -> unit
-        /// Load optimizer state from specified file.
-        abstract LoadOptState: hdf:HDF5 -> prefix:string -> unit
-        /// Save optimizer state to specified file.
-        abstract SaveOptState: hdf:HDF5 -> prefix:string -> unit
+/// Result of training
+type Result = {
+    /// Best iteration.
+    Best:               Epoch option
+    /// Reason for termination of training.
+    TermReason:         TermReason
+    /// Training duration.
+    Duration:           TimeSpan
+    /// Training log.
+    History:            Epoch list
+} with
+    /// save as JSON file
+    member this.Save path = Json.save path this
+    /// load from JSON file
+    static member Load path : Result = Json.load path           
 
-    type TrainableFromExpr<'Smpl> = {
-        /// Primary loss function.
-        /// It is minimized during training.
-        PrimaryLoss: Expr<float>
-        /// Secondary loss functions that are evaluated during training.
-        /// They do not enter the optimization objective.
-        CustomLoss: Map<string, Expr<float>>
-        /// Parameter set instance that contains the model parameters.
-        /// Optimization takes place w.r.t. these parameters.
-        Pars: ParSetInst
-        /// Optional model state that should persist between samples and its assoicated
-        /// update expression.
-        /// (For example the latent state of an RNN).
-        State: (ParSetInst * EvalUpdateBundle) option
-        /// Function that takes a sample (mini-batch) and returns the corresponding VarEnv.
-        VarEnvForSample: 'Smpl -> VarEnv
-        /// Optimizer configuration.
-        OptCfg: IOptimizerCfg
-    } with
-        static member simple loss pars varEnvForSample optCfg = {
-            PrimaryLoss = loss
-            CustomLoss = Map.empty
-            Pars = pars
-            State = None
-            VarEnvForSample = varEnvForSample
-            OptCfg = optCfg
-        }
 
-    /// Constructs an ITrainable<_> from expressions.
-    let internal newTrainable (spec: TrainableFromExpr<'Smpl>) =         
-   
-        // state variable environment
-        let stateEnv =
-            match spec.State with
-            | Some (state, _) -> state.VarEnv
-            | None -> VarEnv.empty
+/// Current training state for checkpoints.
+type private TrainState = {
+    History:            Epoch list
+    BestEntry:          Epoch option
+    LearningRates:      float list
+    Duration:           TimeSpan
+    Faith:              TermReason
+}
+
+
+/// A model together with information that allow its training.
+type Trainable<'Smpl> ( /// Primary loss function. It is minimized during training.
+                        primaryLoss: Expr<float>,
+                        /// Parameter set instance that contains the model parameters.
+                        /// Optimization takes place w.r.t. these parameters.
+                        pars: ParSetInst,
+                        /// Function that takes a sample (mini-batch) and returns the corresponding VarEnv.
+                        varEnvForSmpl: 'Smpl -> VarEnv,
+                        /// Optimizer configuration.
+                        optCfg: IOptimizerCfg,
+                        /// Optional model state that should persist between samples and its assoicated
+                        /// update expression. (For example the latent state of an RNN).
+                        ?state: ParSetInst * EvalUpdateBundle,
+                        /// Optional secondary loss functions that are evaluated during training.
+                        /// They do not enter the optimization objective.
+                        ?customLoss: Map<string, Expr<float>>) =
+
+    let customLoss = defaultArg customLoss Map.empty
+
+    /// variable environment containing the model state variables
+    let stateEnv =
+        match state with
+        | Some (state, _) -> state.VarEnv
+        | None -> VarEnv.empty
         
-        // state update bundle
-        let stateBndl =
-            match spec.State with
-            | Some (state, stateBndl) -> 
-                stateBndl
-                |> spec.Pars.Use
-                |> state.Use
-            | None -> EvalUpdateBundle.empty
+    /// update bundle for updates the model state
+    let stateBndl =
+        match state with
+        | Some (state, stateBndl) -> 
+            stateBndl
+            |> pars.Use
+            |> state.Use
+        | None -> EvalUpdateBundle.empty
 
-        /// use state and parameter ParSets in an expression und EvalUpdateBundle
-        let useStateAndPars (x: Expr<float>) =
-            let x = spec.Pars.Use x
-            match spec.State with 
-            | Some (state, _) -> state.Use x
-            | None -> x
+    /// use state and parameter ParSets in an expression und EvalUpdateBundle
+    let useStateAndPars (x: Expr<float>) =
+        let x = pars.Use x
+        match state with 
+        | Some (state, _) -> state.Use x
+        | None -> x
 
-        // losses
-        let primaryLoss = useStateAndPars spec.PrimaryLoss  
-        let customLoss = spec.CustomLoss |> Map.map (fun _ loss -> useStateAndPars loss)
+    // loss expressions using the model parameters and state variables
+    let primaryLoss = useStateAndPars primaryLoss  
+    let customLoss = customLoss |> Map.map (fun _ loss -> useStateAndPars loss)
            
-        // loss bundle
-        let lossBndl = 
-            (EvalUpdateBundle.empty, Map.toSeq customLoss)
-            ||> Seq.fold (fun bndl (_, expr) -> bndl |> EvalUpdateBundle.addExpr expr)
-            |> EvalUpdateBundle.addExpr primaryLoss
+    /// bundle for evaluating all losses 
+    let lossBndl = 
+        (EvalUpdateBundle.empty, Map.toSeq customLoss)
+        ||> Seq.fold (fun bndl (_, expr) -> bndl |> EvalUpdateBundle.addExpr expr)
+        |> EvalUpdateBundle.addExpr primaryLoss
 
-        // loss claculation and state update bundle
-        let lossStateBndl = EvalUpdateBundle.merge lossBndl stateBndl
+    /// bundle for evaluating all losses and updating the model state
+    let lossStateBndl = EvalUpdateBundle.merge lossBndl stateBndl
 
-        // optimizer
-        let opt = spec.OptCfg.NewOptimizer primaryLoss.Untyped spec.Pars
-        let optStep = opt.Step
-        let optLossStateBndl = EvalUpdateBundle.merge lossStateBndl optStep
+    // create bundle for evaluating all losses, updating the model state and 
+    // optimizing the model parameters 
+    let opt = optCfg.NewOptimizer primaryLoss.Untyped pars
+    let optStep = opt.Step
+    let optLossStateBndl = EvalUpdateBundle.merge lossStateBndl optStep
 
-        // function that extracts losses from evaluated expression values
-        let extractLosses (res: ExprVals) = {
-            Primary = res.Get primaryLoss |> Tensor.value
-            Custom = customLoss |> Map.map (fun _ expr -> res.Get expr |> Tensor.value)
-        }
-   
-        {new ITrainable<'Smpl> with
-            member this.Losses smpl = 
-                let varEnv = VarEnv.joinMany [spec.VarEnvForSample smpl; spec.Pars.VarEnv; stateEnv]
-                lossStateBndl |> EvalUpdateBundle.exec varEnv |> extractLosses
-
-            member this.Step smpl = 
-                let varEnv = VarEnv.joinMany [spec.VarEnvForSample smpl; spec.Pars.VarEnv; stateEnv]
-                let res = optLossStateBndl |> EvalUpdateBundle.exec varEnv
-                lazy (extractLosses res)
-
-            member this.LearningRate
-                with set lr = opt.Cfg <- opt.Cfg.SetLearningRate lr
-
-            member this.PrintInfo () = printfn "%A" spec.Pars
-
-            member this.InitModel () = spec.Pars.Init()
-            member this.LoadModel hdf prefix = spec.Pars.Load (hdf, prefix)
-            member this.SaveModel hdf prefix = spec.Pars.Save (hdf, prefix)
-            member this.ModelParameters
-                with get () = spec.Pars
-                and set (value) = spec.Pars.CopyFrom value
-
-            member this.ModelState
-                with get () = spec.State |> Option.map fst
-                and set (value) = 
-                    match spec.State, value with
-                    | Some (statePars, _), Some value -> statePars.CopyFrom value
-                    | None, None -> ()
-                    | _ -> failwith "Trainable state mismatch."
-            member this.ResetModelState () = 
-                match spec.State with
-                | Some (statePars, _) -> statePars.Init()
-                | None -> ()
-
-            member this.InitOptState () = 
-                opt.State <- opt.State.Initial()
-            member this.LoadOptState hdf prefix = 
-                let state = opt.State
-                state.Load (hdf, prefix)
-                opt.State <- state
-            member this.SaveOptState hdf prefix = 
-                opt.State.Save (hdf, prefix)
-        }
-
-    ///// Constructs an ITrainable<_> for the given stateful model using the specified loss
-    ///// expressions, state update expression and optimizer.
-    //let newStatefulTrainable modelInstance losses nextState varEnvBuilder optNew optCfg =
-    //    newTrainable modelInstance losses (Some nextState) varEnvBuilder optNew optCfg
-
-    ///// Constructs an ITrainable<_> for the given model instance, loss expressions and optimizer.
-    //let trainableFromLossExprs modelInstance losses varEnvBuilder optNew optCfg =
-    //    newTrainable modelInstance losses None (fun _ -> varEnvBuilder) optNew optCfg
-
-    ///// Constructs an ITrainable<_> for the given model instance, loss expression and optimizer.
-    //let trainableFromLossExpr modelInstance loss varEnvBuilder optNew optCfg =     
-    //    trainableFromLossExprs modelInstance [loss] varEnvBuilder optNew optCfg
-
-
-    /// Current training state for checkpoints.
-    type private TrainState = {
-        History:            TrainingLog.Entry list
-        BestEntry:          TrainingLog.Entry option
-        LearningRates:      float list
-        Duration:           TimeSpan
-        Faith:              Faith
+    /// extracts losses from evaluated expression values
+    let extractLosses (res: ExprVals) = {
+        Primary = res.Get primaryLoss |> Tensor.value
+        Custom = customLoss |> Map.map (fun _ expr -> res.Get expr |> Tensor.value)
     }
+   
+    /// Losses of given sample.
+    member this.Losses smpl = 
+        let varEnv = VarEnv.joinMany [varEnvForSmpl smpl; pars.VarEnv; stateEnv]
+        lossStateBndl |> EvalUpdateBundle.exec varEnv |> extractLosses
 
-    /// Trains a model instance using the given loss and optimization functions on the given dataset.
-    /// Returns the training history.
-    let train (trainable: ITrainable<'Smpl>) (dataset: TrnValTst<'Smpl>) (cfg: Cfg) =
+    /// Perform an optimization step and return the losses.
+    member this.Step smpl = 
+        let varEnv = VarEnv.joinMany [varEnvForSmpl smpl; pars.VarEnv; stateEnv]
+        let res = optLossStateBndl |> EvalUpdateBundle.exec varEnv
+        lazy (extractLosses res)
+
+    /// Sets the learning rate.
+    member this.LearningRate
+        with set lr = opt.Cfg <- opt.Cfg.SetLearningRate lr
+
+    /// Initializes all parameters of the model.
+    member this.InitPars () = pars.Init()
+
+    /// Load model parameters from specified file.
+    member this.LoadPars hdf prefix = pars.Load (hdf, prefix)
+
+    /// Save model parameters to specified file.
+    member this.SavePars hdf prefix = pars.Save (hdf, prefix)
+
+    /// All model parameter values.
+    member this.Pars
+        with get () = pars
+        and set (value) = pars.CopyFrom value
+
+    /// All model state values. (for example the latent state of an RNN)
+    member this.State
+        with get () = state |> Option.map fst
+        and set (value) = 
+            match state, value with
+            | Some (statePars, _), Some value -> statePars.CopyFrom value
+            | None, None -> ()
+            | _ -> failwith "Trainable state mismatch."
+
+    /// Initializes all model state values.
+    member this.InitState () = 
+        match state with
+        | Some (statePars, _) -> statePars.Init()
+        | None -> ()
+
+    /// Initialize optimizer state.
+    member this.InitOptState () = 
+        opt.State <- opt.State.Initial()
+
+    /// Load optimizer state from specified file.
+    member this.LoadOptState hdf prefix = 
+        let state = opt.State
+        state.Load (hdf, prefix)
+        opt.State <- state
+
+    /// Save optimizer state to specified file.
+    member this.SaveOptState hdf prefix = 
+        opt.State.Save (hdf, prefix)
+
+    override this.ToString () = sprintf "%A" this.Pars
+
+    /// Trains the model on the given dataset and returns the training history.
+    member this.Train (dataset: TrnValTst<'Smpl>) (cfg: Cfg) =
         // checkpoint data
         let mutable checkpointRequested = false
-        use ctrlCHandler = Console.CancelKeyPress.Subscribe (fun evt ->            
+        use _ctrlCHandler = Console.CancelKeyPress.Subscribe (fun evt ->            
             match cfg.CheckpointFile with
             | Some _ when evt.SpecialKey = ConsoleSpecialKey.ControlBreak ->
                 checkpointRequested <- true
@@ -428,9 +405,9 @@ module Train =
 
         // initialize model parameters
         printfn "Initializing model parameters for training"
-        trainable.InitModel ()
-        trainable.InitOptState ()
-        trainable.PrintInfo ()
+        this.InitPars ()
+        this.InitOptState ()
+        printfn "%A" this
 
         // dumping helpers
         let origDumpPrefix = Dump.prefix
@@ -445,10 +422,10 @@ module Train =
             if not Console.IsInputRedirected then printf "%6d \r" iter
 
             // execute training and calculate training loss
-            trainable.LearningRate <- learningRate
-            trainable.ResetModelState ()
+            this.LearningRate <- learningRate
+            this.InitState ()
             setDumpPrefix iter "trn"
-            let trnLosses = trnBatches |> Seq.map trainable.Step |> Seq.toList
+            let trnLosses = trnBatches |> Seq.map this.Step |> Seq.toList
 
             // record loss if needed
             let recordBecauseCP = 
@@ -459,26 +436,26 @@ module Train =
 
                 // compute validation & test losses
                 let multiTrnLosses = trnLosses |> List.map (fun v -> v.Force()) |> Losses.average
-                trainable.ResetModelState ()
+                this.InitState ()
                 setDumpPrefix iter "val"
-                let multiValLosses = valBatches |> Seq.map trainable.Losses |> Losses.average
-                trainable.ResetModelState ()
+                let multiValLosses = valBatches |> Seq.map this.Losses |> Losses.average
+                this.InitState ()
                 setDumpPrefix iter "tst"
-                let multiTstLosses = tstBatches |> Seq.map trainable.Losses |> Losses.average
+                let multiTstLosses = tstBatches |> Seq.map this.Losses |> Losses.average
 
                 // compute user qualities
-                trainable.ResetModelState ()
+                this.InitState ()
                 setDumpPrefix iter "userQuality"
                 let userQualities = cfg.UserQualityFunc iter
 
                 // log primary losses and user quality
                 let entry = {
-                    TrainingLog.Iter          = iter
-                    TrainingLog.Loss          = {Trn=multiTrnLosses; Val=multiValLosses; Tst=multiTstLosses}
-                    TrainingLog.Quality       = userQualities
-                    TrainingLog.LearningRate  = learningRate
+                    Epoch.Iter          = iter
+                    Epoch.Loss          = {Trn=multiTrnLosses; Val=multiValLosses; Tst=multiTstLosses}
+                    Epoch.Quality       = userQualities
+                    Epoch.LearningRate  = learningRate
                 }
-                let log = log |> TrainingLog.record entry trainable.ModelParameters
+                let log = log |> TrainingLog.record entry this.Pars
                 cfg.LossRecordFunc entry
 
                 // display primary and secondary losses
@@ -498,62 +475,62 @@ module Train =
                 printfn "   "
 
                 // check termination criteria
-                let mutable faith = Continue
+                let mutable reason = Continue
 
                 match cfg.TargetLoss with
                 | Some targetLoss when entry.Loss.Val.Primary <= targetLoss -> 
                     printfn "Target loss reached"
-                    faith <- TargetLossReached
+                    reason <- TargetLossReached
                 | _ -> ()
 
                 match cfg.Termination with
                 | ItersWithoutImprovement fiwi when 
                         TrainingLog.itersWithoutImprovement log > fiwi -> 
                     printfn "Trained for %d iterations without improvement" (TrainingLog.itersWithoutImprovement log)
-                    faith <- NoImprovement
+                    reason <- NoImprovement
                 | IterGain ig when
                         float iter > ig * float (TrainingLog.bestIter log) -> 
                     printfn "Trained for IterGain * %d = %d iterations" (TrainingLog.bestIter log) iter
-                    faith <- NoImprovement
+                    reason <- NoImprovement
                 | _ -> ()
 
                 match cfg.MinIters with
                 | Some minIters when iter < minIters -> 
-                    if faith <> Continue then
+                    if reason <> Continue then
                         printfn "But continuing since minimum number of iterations %d is not yet reached"
                             minIters
-                    faith <- Continue
+                    reason <- Continue
                 | _ -> ()
                 match cfg.MaxIters with
                 | Some maxIters when iter >= maxIters -> 
                     printfn "Maximum number of iterations reached"
-                    faith <- IterLimitReached
+                    reason <- IterLimitReached
                 | _ -> ()
 
                 let isNan x = Double.IsInfinity x || Double.IsNaN x
                 if isNan entry.Loss.Trn.Primary || isNan entry.Loss.Val.Primary || isNan entry.Loss.Tst.Primary then
-                    faith <- NaNEncountered
+                    reason <- NaNEncountered
 
                 // process user input
                 match Util.getKey () with
                 | Some 'q' ->
                     printfn "Termination by user"
-                    faith <- UserTerminated
+                    reason <- UserTerminated
                 | Some 'd' ->
                     printfn "Learning rate decrease by user"
-                    faith <- NoImprovement
+                    reason <- NoImprovement
                 | _ -> ()
 
                 // process checkpoint request
                 match cfg.CheckpointInterval with
-                | Some interval when iter % interval = 0 && faith = Continue -> 
-                    faith <- CheckpointIntervalReached
+                | Some interval when iter % interval = 0 && reason = Continue -> 
+                    reason <- CheckpointIntervalReached
                 | _ -> ()
-                if checkpointRequested then faith <- CheckpointRequested
+                if checkpointRequested then reason <- CheckpointRequested
 
-                match faith with
+                match reason with
                 | Continue -> doTrain (iter + 1) learningRate log
-                | _ -> log, faith
+                | _ -> log, reason
             else
                 doTrain (iter + 1) learningRate log
 
@@ -569,9 +546,9 @@ module Train =
                 if faith <> CheckpointRequested then
                     // restore best parameter values
                     match log.Best with
-                    | Some (_, bestPv) -> trainable.ModelParameters <- bestPv
+                    | Some (_, bestPv) -> this.Pars <- bestPv
                     | None -> ()
-                    trainable.InitOptState ()
+                    this.InitOptState ()
 
                 match faith with
                 | NoImprovement 
@@ -597,7 +574,7 @@ module Train =
                     Some (checkpointFilename None)
                 else None
             | None, _ -> None
-        let log, learningRates, duration, faith =
+        let log, learningRates, duration, reason =
             match cpLoadFilename with
             | Some filename ->
                 printfn "Loading checkpoint from %s" filename
@@ -606,13 +583,13 @@ module Train =
                 let best =
                     match state.BestEntry with
                     | Some bestEntry ->
-                        trainable.LoadModel cp "BestModel"
-                        Some (bestEntry, trainable.ModelParameters |> ParSetInst.copy)
+                        this.LoadPars cp "BestModel"
+                        Some (bestEntry, this.Pars |> ParSetInst.copy)
                     | None -> None
                 let log = {TrainingLog.create cfg.MinImprovement cfg.BestOn with 
                             Best=best; History=state.History}
-                trainable.LoadOptState cp "OptState"
-                trainable.LoadModel cp "Model"               
+                this.LoadOptState cp "OptState"
+                this.LoadPars cp "Model"               
                 log, state.LearningRates, state.Duration, state.Faith
             | _ ->
                 TrainingLog.create cfg.MinImprovement cfg.BestOn, cfg.LearningRates, TimeSpan.Zero, Continue
@@ -638,15 +615,15 @@ module Train =
                     // write to temporary file
                     let cpTmpFilename = cpFilename + ".tmp"
                     using (HDF5.OpenWrite cpTmpFilename) (fun cp ->
-                        trainable.SaveOptState cp "OptState"
-                        trainable.SaveModel cp "Model"
+                        this.SaveOptState cp "OptState"
+                        this.SavePars cp "Model"
                         let bestEntry =
                             match log.Best with
                             | Some (bestEntry, bestPars) ->
-                                let curPars = trainable.ModelParameters |> ParSetInst.copy
-                                trainable.ModelParameters <- bestPars
-                                trainable.SaveModel cp "BestModel"
-                                trainable.ModelParameters <- curPars
+                                let curPars = this.Pars |> ParSetInst.copy
+                                this.Pars <- bestPars
+                                this.SavePars cp "BestModel"
+                                this.Pars <- curPars
                                 Some bestEntry
                             | None -> None
                         let trainState = {
@@ -677,15 +654,15 @@ module Train =
                 // training already finished in loaded checkpoint
                 log, learningRates, duration, faith
         
-        let faith =
-            if cfg.PerformTraining then faith
+        let reason =
+            if cfg.PerformTraining then reason
             else UserTerminated
 
-        let log, learningRates, duration, faith = checkpointLoop log learningRates duration faith
+        let log, learningRates, duration, reason = checkpointLoop log learningRates duration reason
         match TrainingLog.best log with
         | Some (bestEntry, _) ->
             printfn "Training completed after %d iterations in %A because %A with best losses:" 
-                    bestEntry.Iter duration faith
+                    bestEntry.Iter duration reason
             printfn "  trn=%7.4f  val=%7.4f  tst=%7.4f   " 
                     bestEntry.Loss.Trn.Primary bestEntry.Loss.Val.Primary bestEntry.Loss.Tst.Primary
         | None ->
@@ -697,7 +674,7 @@ module Train =
         {
             History             = List.rev log.History
             Best                = log |> TrainingLog.best |> Option.map fst
-            TerminationReason   = faith
+            TermReason          = reason
             Duration            = duration
         }
         
