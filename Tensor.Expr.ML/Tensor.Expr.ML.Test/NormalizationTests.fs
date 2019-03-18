@@ -2,16 +2,21 @@
 
 open Xunit
 open FsUnit.Xunit
+open Xunit.Abstractions
 open System.IO
 
-open Tensor.Utils
+open DeepNet.Utils
 open Tensor
-open Datasets
+open Tensor.Algorithm
+open Tensor.Expr.ML
+
 
 type TestSample = {Data: Tensor<double>}
 
-type CurveNormalizationTests () =
-    let dataFile = NPZFile.Open (Util.assemblyDirectory + "/TestData/PCA.npz")
+type CurveNormalizationTests (output: ITestOutputHelper) =
+    let printfn format = Printf.kprintf (fun msg -> output.WriteLine(msg)) format 
+
+    let dataFile = NPZFile.Open (Util.assemblyDir + "/TestData/PCA.npz")
     let data : Tensor<double> = dataFile.Get "data"
     let refPCAWhitenedFull : Tensor<double> = dataFile.Get "pca_whitened_full"
     let refPCAWhitened10 : Tensor<double> = dataFile.Get "pca_whitened_10"
@@ -33,8 +38,8 @@ type CurveNormalizationTests () =
         HostTensor.write hdf "refPCAWhitenedFull" refPCAWhitenedFull
 
         // PCA axes are not sign unique.
-        Tensor.almostEqualWithTol (dataset.All.Data, reversed.All.Data, absTol=1e-5, relTol=1e-4) |> should equal true
-        Tensor.almostEqualWithTol (abs normalized.All.Data, abs refPCAWhitenedFull, absTol=1e-5, relTol=1e-4) |> should equal true
+        Tensor.almostEqual (dataset.All.Data, reversed.All.Data, absTol=1e-5, relTol=1e-4) |> should equal true
+        Tensor.almostEqual (abs normalized.All.Data, abs refPCAWhitenedFull, absTol=1e-5, relTol=1e-4) |> should equal true
         
     [<Fact>]
     member this.``PCA Whitening 10`` () =
@@ -50,7 +55,7 @@ type CurveNormalizationTests () =
 
         // PCA axes are not sign unique.
         //ArrayND.almostEqualWithTol 1e-5 1e-4 dataset.All.Data reversed.All.Data |> ArrayND.value |> should equal true
-        Tensor.almostEqualWithTol (abs normalized.All.Data, abs refPCAWhitened10, absTol=1e-5, relTol=1e-4) |> should equal true
+        Tensor.almostEqual (abs normalized.All.Data, abs refPCAWhitened10, absTol=1e-5, relTol=1e-4) |> should equal true
 
     [<Fact>]
     member this.``ZCA Whitening`` () =
@@ -64,8 +69,8 @@ type CurveNormalizationTests () =
         HostTensor.write hdf "reversed" reversed.All.Data 
         HostTensor.write hdf "refZCAWhitened10" refZCAWhitened
 
-        Tensor.almostEqualWithTol (dataset.All.Data, reversed.All.Data, absTol=1e-5, relTol=1e-4) |> should equal true
-        Tensor.almostEqualWithTol (normalized.All.Data, refZCAWhitened, absTol=1e-5, relTol=1e-4) |> should equal true
+        Tensor.almostEqual (dataset.All.Data, reversed.All.Data, absTol=1e-5, relTol=1e-4) |> should equal true
+        Tensor.almostEqual (normalized.All.Data, refZCAWhitened, absTol=1e-5, relTol=1e-4) |> should equal true
 
     [<Fact>]
     member this.``Rescaling`` () =
@@ -76,9 +81,9 @@ type CurveNormalizationTests () =
         let min = Tensor.minTensor normalized.All.Data 
         let max = Tensor.maxTensor normalized.All.Data 
         
-        Tensor.almostEqualWithTol (min, HostTensor.scalar 0.0, absTol=1e-5, relTol=1e-4) |> should equal true
-        Tensor.almostEqualWithTol (max, HostTensor.scalar 1.0, absTol=1e-5, relTol=1e-4) |> should equal true
-        Tensor.almostEqualWithTol (dataset.All.Data, reversed.All.Data, absTol=1e-5, relTol=1e-4) |> should equal true
+        Tensor.almostEqual (min, HostTensor.scalar 0.0, absTol=1e-5, relTol=1e-4) |> should equal true
+        Tensor.almostEqual (max, HostTensor.scalar 1.0, absTol=1e-5, relTol=1e-4) |> should equal true
+        Tensor.almostEqual (dataset.All.Data, reversed.All.Data, absTol=1e-5, relTol=1e-4) |> should equal true
 
     [<Fact>]
     member this.``Standardization`` () =
@@ -93,9 +98,9 @@ type CurveNormalizationTests () =
         printfn "means=\n%A" means.Full
         printfn "stdevs=\n%A" stdevs.Full
 
-        Tensor.almostEqualWithTol (means, Tensor.zerosLike means, absTol=1e-3, relTol=1e-4) |> should equal true
-        Tensor.almostEqualWithTol (stdevs, Tensor.onesLike stdevs, absTol=1e-3, relTol=1e-4) |> should equal true
-        Tensor.almostEqualWithTol (dataset.All.Data, reversed.All.Data, absTol=1e-3, relTol=1e-4) |> should equal true
+        Tensor.almostEqual (means, Tensor.zerosLike means, absTol=1e-3, relTol=1e-4) |> should equal true
+        Tensor.almostEqual (stdevs, Tensor.onesLike stdevs, absTol=1e-3, relTol=1e-4) |> should equal true
+        Tensor.almostEqual (dataset.All.Data, reversed.All.Data, absTol=1e-3, relTol=1e-4) |> should equal true
 
     [<Fact>]
     member this.``ScaleToUnitLength`` () =
@@ -108,5 +113,5 @@ type CurveNormalizationTests () =
         printfn "after standardization:"
         printfn "lengths=\n%A" lengths.Full
 
-        Tensor.almostEqualWithTol (lengths, Tensor.onesLike lengths, absTol=1e-3, relTol=1e-4) |> should equal true
-        Tensor.almostEqualWithTol (dataset.All.Data, reversed.All.Data, absTol=1e-3, relTol=1e-4) |> should equal true
+        Tensor.almostEqual (lengths, Tensor.onesLike lengths, absTol=1e-3, relTol=1e-4) |> should equal true
+        Tensor.almostEqual (dataset.All.Data, reversed.All.Data, absTol=1e-3, relTol=1e-4) |> should equal true

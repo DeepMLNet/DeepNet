@@ -17,25 +17,21 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="..\..\Utils\Utils.fs" Link="Utils.fs" />
-    <Compile Include="..\..\Utils\TestUtils.fs" Link="TestUtils.fs" />
+    <Compile Include="..\..\Utils\Utils.fs" Link="Utils/Utils.fs" />
+    <Compile Include="..\..\Utils\TestUtils.fs" Link="Utils/TestUtils.fs" />
     <Compile Include="DatasetTests.fs" />
-    <None Include="NormalizationTests.fs" />
-    <None Include="MNISTTests.fs" />
+    <Compile Include="NormalizationTests.fs" />
     <None Include="NeuralNetOnMNIST.fs" />
-    <Content Include="TestData\abalone.csv">
+    <Content Include="TestData\*.csv">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="TestData\SPECT.csv">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="TestData\imports-85.csv">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="TestData\PCA.npz">
+    <Content Include="TestData\*.npz">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="TestData\curve\smpl??.npz">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="TestData\MNIST\*.gz">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

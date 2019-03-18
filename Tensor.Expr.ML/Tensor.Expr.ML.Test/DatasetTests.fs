@@ -137,3 +137,25 @@ type SequenceDataset (output: ITestOutputHelper) =
             printfn "%A" sb.SeqData
         printfn ""
 
+
+
+type MnistDataset (output: ITestOutputHelper) =
+    let printfn format = Printf.kprintf (fun msg -> output.WriteLine(msg)) format 
+
+    let mnistPath = dataDir + "MNIST/"
+
+    [<Fact>]
+    let ``Load MNIST`` () =
+        let mnist = Loader.Mnist.loadRaw mnistPath
+        printfn "MNIST shape: %A" (Tensor.shape mnist.TrnImgs)
+
+    [<Fact>]
+    let ``Save MNIST as HDF5`` () =
+        let mnist = Loader.Mnist.loadRaw mnistPath
+
+        use hdf = HDF5.OpenWrite "MNIST-TestWrite.h5"
+        HostTensor.write hdf "TrnImgs" mnist.TrnImgs
+        HostTensor.write hdf "TrnLbls" mnist.TrnLbls
+        HostTensor.write hdf "TstImgs" mnist.TstImgs
+        HostTensor.write hdf "TstLbls" mnist.TstLbls
+
