@@ -252,10 +252,10 @@ type Trainable<'Smpl> ( /// Primary loss function. It is minimized during traini
                         /// Parameter set instance that contains the model parameters.
                         /// Optimization takes place w.r.t. these parameters.
                         pars: ParSetInst,
-                        /// Function that takes a sample (mini-batch) and returns the corresponding VarEnv.
-                        varEnvForSmpl: 'Smpl -> VarEnv,
                         /// Optimizer configuration.
                         optCfg: IOptimizerCfg,
+                        /// Function that takes a sample (mini-batch) and returns the corresponding VarEnv.
+                        varEnvForSmpl: 'Smpl -> VarEnv,
                         /// Optional model state that should persist between samples and its assoicated
                         /// update expression. (For example the latent state of an RNN).
                         ?state: ParSetInst * EvalUpdateBundle,
@@ -445,7 +445,7 @@ type Trainable<'Smpl> ( /// Primary loss function. It is minimized during traini
 
                 // compute user qualities
                 this.InitState ()
-                setDumpPrefix iter "userQuality"
+                setDumpPrefix iter "quality"
                 let userQualities = cfg.UserQualityFunc iter
 
                 // log primary losses and user quality

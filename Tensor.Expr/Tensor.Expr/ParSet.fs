@@ -30,6 +30,9 @@ type ParSet = private {
     /// Variables that are placeholders for parameters.
     member this.Vars = this._Vars
 
+    override this.ToString () =
+        sprintf "ParSet %A" (Set.toList this._VarNames)
+
     /// Create new parameter group using the specified storage path.
     static member empty : ParSet = {
         _Vars = List.empty
@@ -181,6 +184,16 @@ and ParSetInst = private {
 
     /// Tensor containing all parameters for a type/device combination.
     member this.TypeDeviceValues = this.TypeDeviceGroups |> Map.map (fun _ (var, value) -> value)
+
+    /// Total number of values in this parameter set instance.
+    member this.NElems =
+        this.TypeDeviceGroups
+        |> Map.toSeq
+        |> Seq.sumBy (fun (_, (_, value)) -> value.NElems)
+
+    override this.ToString () =
+        sprintf "ParSetInst for %A with %d total values stored at \"%A\"" 
+            this.ParSet this.NElems this.StorePath
 
     /// Initializes all parameters.
     member this.Init () =

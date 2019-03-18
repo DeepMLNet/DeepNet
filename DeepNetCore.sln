@@ -36,7 +36,7 @@ Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Derivatives", "Experiments\
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "SimplePerceptron", "Experiments\SimplePerceptron\SimplePerceptron.fsproj", "{692B247C-07EB-4DA4-84AC-4BADE90A9B81}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "GenericTraining", "Experiments\GenericTraining\GenericTraining.fsproj", "{054D01EC-52B6-422E-8242-43AAA0428AE9}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "GenericTraining", "Experiments\GenericTraining\GenericTraining.fsproj", "{054D01EC-52B6-422E-8242-43AAA0428AE9}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -112,8 +112,8 @@ Global
 		{054D01EC-52B6-422E-8242-43AAA0428AE9}.Debug|x64.Build.0 = Debug|x64
 		{054D01EC-52B6-422E-8242-43AAA0428AE9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{054D01EC-52B6-422E-8242-43AAA0428AE9}.Release|Any CPU.Build.0 = Release|Any CPU
-		{054D01EC-52B6-422E-8242-43AAA0428AE9}.Release|x64.ActiveCfg = Release|Any CPU
-		{054D01EC-52B6-422E-8242-43AAA0428AE9}.Release|x64.Build.0 = Release|Any CPU
+		{054D01EC-52B6-422E-8242-43AAA0428AE9}.Release|x64.ActiveCfg = Release|x64
+		{054D01EC-52B6-422E-8242-43AAA0428AE9}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

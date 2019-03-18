@@ -112,12 +112,22 @@ type Dataset<'S> (fieldStorages: ITensor list,
     /// If the shape of a field varies over the samples it is padded (with zeros) to the largest 
     /// shape in the sample sequence.
     /// The given sequence is enumerated only one time and the data is copied once.
-    static member ofSamples samples =
+    static member ofSamples (samples: 'S seq) =
         Dataset.Create (samples, false)
 
     /// Constructs a sequence dataset from a sequence of samples of record type 'S.
-    static member ofSeqSamples seqSamples =
+    static member ofSeqSamples (seqSamples: 'S seq) =
         Dataset.Create (seqSamples, true)
+
+    /// Constructs a dataset from the specified data.
+    /// Each field in 'S must be of type Tensor<_>. The first dimension
+    /// corresponds to the sample index and must be equal for all fields.
+    static member ofData (data: 'S) = 
+        let fieldStorages = 
+            FSharpValue.GetRecordFields data 
+            |> Seq.map (fun f -> f :?> ITensor)
+            |> List.ofSeq
+        Dataset (fieldStorages, false)
 
     /// Returns a record of type 'S containing the sample with the given index.
     member this.Item 

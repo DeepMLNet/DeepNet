@@ -67,6 +67,11 @@ type VarEnv = VarEnv of Map<VarName, ITensor> with
         (VarEnv.empty, entries)
         ||> Seq.fold (fun ve (var, value) -> ve |> VarEnv.addBaseVar var value)
     
+    /// Constructs a VarEnv from a sequence of variable, value tuples.
+    static member ofSeq (entries: (Var<'T> * Tensor<'T>) seq) =
+        entries
+        |> Seq.map (fun (var, value) -> var.Untyped, value :> ITensor)
+        |> VarEnv.ofSeq
 
     ///// gets the type names of the variable value arrays
     //let valueTypeNames (varEnv: VarEnv) =

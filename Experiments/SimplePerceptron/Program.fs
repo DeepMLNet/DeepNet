@@ -5,7 +5,8 @@ open Tensor.Expr.ML
 open Tensor.Backend
 
 
-let simplePerceptron () =
+[<EntryPoint>]
+let main argv =
     let rng = System.Random 1
         
     // make training data
@@ -70,12 +71,4 @@ let simplePerceptron () =
         let results = minLossStep |> EvalUpdateBundle.exec varEnv
         printf "step %d loss value: %f             \r" i (results.Get loss).Value
     printfn ""
-
-
-
-
-
-[<EntryPoint>]
-let main argv =
-    simplePerceptron()
     0

@@ -1,9 +1,18 @@
 ﻿open Tensor
 open Tensor.Expr
-open Tensor.Expr.ML.Opt
 open Tensor.Expr.ML
+open Tensor.Expr.ML.Opt
+open Tensor.Expr.ML.Train
 open Tensor.Backend
 
+
+
+type Data = {
+    // [smpl, feature]
+    Inp: Tensor<float32>
+    // [smpl, target]
+    Trgt: Tensor<float32>
+}
 
 
 [<EntryPoint>]
@@ -12,14 +21,19 @@ let main argv =
     
     // make training data
     let x = HostTensor.linspace -2.0f 2.0f 100L
-    let y1 = 3.0f + 7.0f * x ** 2.0f
-    let y2 = 1.0f + 2.0f * x ** 3.0f + 4.0f * x ** 4.0f
-    let y = Tensor.concat 1 [y1.[*, NewAxis]; y2.[*, NewAxis]]
-    printfn "x: %A" x
-    printfn "y: %A" y
     let exps = HostTensor.arange 0.0f 1.0f 10.0f
-    let f = x.[*, NewAxis] ** exps.[NewAxis, *]
-    printfn "f: %A" f.Shape
+    let inp = x.[*, NewAxis] ** exps.[NewAxis, *]
+    let trgt1 = 3.0f + 7.0f * x ** 2.0f
+    let trgt2 = 1.0f + 2.0f * x ** 3.0f + 4.0f * x ** 4.0f
+    let trgt = Tensor.concat 1 [trgt1.[*, NewAxis]; trgt2.[*, NewAxis]]
+    
+    // create dataset
+    let data = {Trgt=trgt; Inp=inp}
+    printfn "data: trgt: %A   inp: %A" data.Trgt.Shape data.Inp.Shape
+    let dataset = Dataset.ofData data
+    printfn "dataset: %A" dataset
+    let datasetParts = TrnValTst.ofDataset dataset
+    printfn "dataset parts: %A" datasetParts
 
     // context
     let ctx = Context.root HostTensor.Dev
@@ -38,40 +52,31 @@ let main argv =
     let pars = NeuralLayer.pars ctx rng hyperPars
     let pred = NeuralLayer.pred pars input
     let loss = LossLayer.loss LossLayer.MSE pred target
+    let loss = loss |> Expr<float>.convert
     printfn "loss: %s\n" (loss.ToString())
 
     // parameter set
     let parSet = ParSet.fromExpr ContextPath.root loss
     let sizeEnv = Map [
-        nFeatures, Size.fix f.Shape.[1]
-        nOutputs, Size.fix y.Shape.[1]
+        nFeatures, Size.fix inp.Shape.[1]
+        nOutputs, Size.fix trgt.Shape.[1]
     ]
     let parSetInst = ParSet.inst ContextPath.root sizeEnv parSet
-    let loss = parSetInst.Use loss 
-    printfn "with ParSet: %s\n" (loss.ToString())
 
-    // use optimizer
-    let optCfg = Adam.Cfg.standard
-
-
-    let opt = Adam.make (optCfg, loss, parSetInst)
-    let minStep = opt.Step
-    let minLossStep = minStep |> EvalUpdateBundle.addExpr loss
-    printfn "Minimiziation step: %A\n" minStep
-
-    // evaluate using training data
-    let varEnv = 
-        VarEnv.empty
-        |> VarEnv.add inputVar f
-        |> VarEnv.add targetVar y
-        |> parSetInst.Use
-    let lossVal = loss |> Expr.eval varEnv
-    printfn "loss value: %A" lossVal
-
-    // perform training step
-    printfn "training..."
-    for i in 1..200 do
-        let results = minLossStep |> EvalUpdateBundle.exec varEnv
-        printf "step %d loss value: %f             \r" i (results.Get loss).Value
-    printfn ""
+    // train
+    printfn "Training..."
+    let trainable = 
+        Trainable (
+            primaryLoss=loss, 
+            pars=parSetInst, 
+            optCfg=Adam.Cfg.standard,
+            varEnvForSmpl=fun (smpl: Data) -> 
+                VarEnv.ofSeq [inputVar, smpl.Inp; targetVar, smpl.Trgt])
+    let cfg = {
+        Cfg.standard with
+            Termination = Forever
+            MaxIters = Some 2000
+    }
+    let res = trainable.Train datasetParts cfg
+    printfn "Result:\n%A" res
     0
