@@ -23,7 +23,23 @@ type PartVals<'T> = {
 type Losses = {
     Primary: float
     Custom: Map<string, float>
-}
+} with
+
+    static member (+) (a: Losses, b: Losses) = {
+        Primary = a.Primary + b.Primary
+        Custom = a.Custom |> Map.map (fun key av -> av + b.Custom.[key])
+    }
+
+    static member (/) (a: Losses, n: int) = {
+        Primary = a.Primary / float n
+        Custom = a.Custom |> Map.map (fun _ av -> av / float n)
+    }
+
+    static member average (ls: Losses seq) =
+        let ls = Seq.cache ls
+        let sum = ls |> Seq.reduce (+)
+        sum / Seq.length ls
+            
 
 /// Training, validation and test losses.
 type PartLosses = PartVals<Losses>
@@ -429,9 +445,9 @@ module Train =
             if not Console.IsInputRedirected then printf "%6d \r" iter
 
             // execute training and calculate training loss
+            trainable.LearningRate <- learningRate
             trainable.ResetModelState ()
             setDumpPrefix iter "trn"
-            // TODO: set learning rate
             let trnLosses = trnBatches |> Seq.map trainable.Step |> Seq.toList
 
             // record loss if needed
@@ -442,21 +458,13 @@ module Train =
             if iter % cfg.LossRecordInterval = 0 || recordBecauseCP then
 
                 // compute validation & test losses
-                let multiAvg lls =
-                    let mutable n = 1
-                    lls
-                    |> Seq.reduce (fun ll1 ll2 ->
-                        n <- n + 1
-                        List.zip ll1 ll2
-                        |> List.map (fun (l1, l2) -> l1 + l2))
-                    |> List.map (fun l -> l / float n)
-                let multiTrnLosses = trnLosses |> List.map (fun v -> v.Force()) |> multiAvg
+                let multiTrnLosses = trnLosses |> List.map (fun v -> v.Force()) |> Losses.average
                 trainable.ResetModelState ()
                 setDumpPrefix iter "val"
-                let multiValLosses = valBatches |> Seq.map trainable.Losses |> multiAvg
+                let multiValLosses = valBatches |> Seq.map trainable.Losses |> Losses.average
                 trainable.ResetModelState ()
                 setDumpPrefix iter "tst"
-                let multiTstLosses = tstBatches |> Seq.map trainable.Losses |> multiAvg
+                let multiTstLosses = tstBatches |> Seq.map trainable.Losses |> Losses.average
 
                 // compute user qualities
                 trainable.ResetModelState ()
@@ -466,41 +474,34 @@ module Train =
                 // log primary losses and user quality
                 let entry = {
                     TrainingLog.Iter          = iter
-                    TrainingLog.TrnLoss       = multiTrnLosses.Head
-                    TrainingLog.ValLoss       = multiValLosses.Head
-                    TrainingLog.TstLoss       = multiTstLosses.Head
-                    TrainingLog.MultiTrnLoss  = multiTrnLosses
-                    TrainingLog.MultiValLoss  = multiValLosses
-                    TrainingLog.MultiTstLoss  = multiTstLosses
-                    TrainingLog.UserQualities = userQualities
+                    TrainingLog.Loss          = {Trn=multiTrnLosses; Val=multiValLosses; Tst=multiTstLosses}
+                    TrainingLog.Quality       = userQualities
                     TrainingLog.LearningRate  = learningRate
                 }
                 let log = log |> TrainingLog.record entry trainable.ModelParameters
                 cfg.LossRecordFunc entry
 
                 // display primary and secondary losses
-                printf "%6d:  trn=%7.4f  val=%7.4f  tst=%7.4f   " iter entry.TrnLoss entry.ValLoss entry.TstLoss
-                match multiTrnLosses, multiValLosses, multiTstLosses with
-                | [_], [_], [_] -> printf ""
-                | _::secTrnLosses, _::secValLosses, _::secTstLosses ->
+                printf "%6d:  trn=%7.4f  val=%7.4f  tst=%7.4f   " 
+                    iter entry.Loss.Trn.Primary entry.Loss.Val.Primary entry.Loss.Tst.Primary
+                if not entry.Loss.Trn.Custom.IsEmpty then
                     printf "("
-                    for secTrnLoss, secValLoss, secTstLoss in 
-                            List.zip3 secTrnLosses secValLosses secTstLosses do
-                        printf "trn=%7.4f  val=%7.4f  tst=%7.4f; " secTrnLoss secValLoss secTstLoss
+                    for KeyValue(name, trn) in entry.Loss.Trn.Custom do
+                        printf "%s: trn=%7.4f  val=%7.4f  tst=%7.4f; " 
+                            name trn entry.Loss.Val.Custom.[name] entry.Loss.Tst.Custom.[name]
                     printf ")"
-                | _ -> failwith "inconsistent losses"
 
                 // display user qualities
-                for KeyValue(name, qual) in entry.UserQualities do
+                for KeyValue(name, qual) in entry.Quality do
                     printf "[%s:  trn=%7.4f  val=%7.4f  tst=%7.4f] " 
-                           name qual.TrnQuality qual.ValQuality qual.TstQuality
+                           name qual.Trn qual.Val qual.Tst
                 printfn "   "
 
                 // check termination criteria
                 let mutable faith = Continue
 
                 match cfg.TargetLoss with
-                | Some targetLoss when entry.ValLoss <= targetLoss -> 
+                | Some targetLoss when entry.Loss.Val.Primary <= targetLoss -> 
                     printfn "Target loss reached"
                     faith <- TargetLossReached
                 | _ -> ()
@@ -530,7 +531,7 @@ module Train =
                 | _ -> ()
 
                 let isNan x = Double.IsInfinity x || Double.IsNaN x
-                if isNan entry.TrnLoss || isNan entry.ValLoss || isNan entry.TstLoss then
+                if isNan entry.Loss.Trn.Primary || isNan entry.Loss.Val.Primary || isNan entry.Loss.Tst.Primary then
                     faith <- NaNEncountered
 
                 // process user input
@@ -606,7 +607,7 @@ module Train =
                     match state.BestEntry with
                     | Some bestEntry ->
                         trainable.LoadModel cp "BestModel"
-                        Some (bestEntry, trainable.ModelParameters |> Tensor.copy)
+                        Some (bestEntry, trainable.ModelParameters |> ParSetInst.copy)
                     | None -> None
                 let log = {TrainingLog.create cfg.MinImprovement cfg.BestOn with 
                             Best=best; History=state.History}
@@ -642,7 +643,7 @@ module Train =
                         let bestEntry =
                             match log.Best with
                             | Some (bestEntry, bestPars) ->
-                                let curPars = trainable.ModelParameters |> Tensor.copy
+                                let curPars = trainable.ModelParameters |> ParSetInst.copy
                                 trainable.ModelParameters <- bestPars
                                 trainable.SaveModel cp "BestModel"
                                 trainable.ModelParameters <- curPars
@@ -686,7 +687,7 @@ module Train =
             printfn "Training completed after %d iterations in %A because %A with best losses:" 
                     bestEntry.Iter duration faith
             printfn "  trn=%7.4f  val=%7.4f  tst=%7.4f   " 
-                    bestEntry.TrnLoss bestEntry.ValLoss bestEntry.TstLoss
+                    bestEntry.Loss.Trn.Primary bestEntry.Loss.Val.Primary bestEntry.Loss.Tst.Primary
         | None ->
             printfn "No training was performed."
 

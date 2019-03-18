@@ -1,6 +1,6 @@
 ﻿open Tensor
 open Tensor.Expr
-open Tensor.Expr.Opt
+open Tensor.Expr.ML.Opt
 open Tensor.Expr.ML
 open Tensor.Backend
 
