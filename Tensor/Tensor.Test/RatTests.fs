@@ -11,8 +11,27 @@ open DeepNet.Utils
 
 
 type RatTests (output: ITestOutputHelper) =
-
     let printfn format = Printf.kprintf (fun msg -> output.WriteLine(msg)) format 
+
+    [<Fact>]
+    let ``a + b - b = a`` () =
+        let a = Rat (2, 3)
+        let b = Rat (7, 8)
+        printfn "a=%A b=%A" a b 
+
+        let c = a + b
+        printfn "c=%A" c
+
+        let d = c - b
+        printfn "d=%A" d
+
+        printfn "d.Num=%A  d.Dnm=%A" d.Num d.Dnm
+        printfn "a.Num=%A  a.Dnm=%A" a.Num a.Dnm
+        printfn "a.Num=d.Num: %A   a.Dnm=d.Dnm: %A" (a.Num = d.Num) (a.Dnm = d.Dnm)
+        printfn "a.IsNaN: %A    d.IsNaN: %A" a.IsNaN d.IsNaN
+
+        printfn "d=a: %A" (d = a)
+        d |> should equal a
 
 
     [<Fact>]
@@ -31,6 +50,9 @@ type RatTests (output: ITestOutputHelper) =
         printfn "a*b=%A" (a*b)
         printfn "a/b=%A" (a/b)
         printfn "b mod a=%A" (b%a)
+        printfn ""
+        printfn "a+b-b=%A" (a+b-b)
+        printfn "a+b-b = a = %A" ((a+b-b) = a)
 
         n |> should equal Rat.Zero
         a + b - b |> should equal a

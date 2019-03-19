@@ -89,7 +89,7 @@ type CudaTests (output: ITestOutputHelper) =
 
         printfn "Waiting for threads..."
         for t in threads do
-            t.Join (3000) |> should equal true
+            t.Join (30000) |> should equal true
 
     [<CudaFact>]
     let ``Single matrix dot`` () =
