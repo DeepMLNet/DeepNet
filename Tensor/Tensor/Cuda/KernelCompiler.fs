@@ -90,9 +90,17 @@ module internal KernelCompiler =
     let private removeCompileDir compileDir =
         Directory.Delete(compileDir, true)     
 
+    /// nvcc arch code
+    let private nvccArch (ctx: CudaContext) =
+        let deviceInfo = ctx.GetDeviceInfo()
+        sprintf "compute_%d%d" deviceInfo.ComputeCapability.Major deviceInfo.ComputeCapability.Minor
+
     /// Compiles the given CUDA device code into a CUDA module, loads and jits it and returns
     /// ManagedCuda.CudaKernel objects for the specified kernel names.
-    let load modCode krnlNames =
+    let load (ctx: CudaContext) modCode krnlNames =
+        use _ctx = Cuda.activate ctx
+
+        // perform compilation to PTX
         let compileDir, modPath, headerHashes = prepareCompileDir modCode
 
         use cmplr = new NVRTC.CudaRuntimeCompiler(modCode, modPath) 
@@ -100,7 +108,7 @@ module internal KernelCompiler =
             yield "--std=c++11"
             yield "-DWIN32_LEAN_AND_MEAN"
             yield "-Xcudafe"; yield "--diag_suppress=declared_but_not_referenced"
-            yield sprintf "--gpu-architecture=%s" Cuda.nvccArch
+            yield sprintf "--gpu-architecture=%s" (nvccArch ctx)
             if Cfg.FastKernelMath then yield "--use_fast_math"
             if Cfg.RestrictKernels then yield "--restrict"
             if Cfg.DebugCompile then yield "--device-debug"
@@ -131,7 +139,8 @@ module internal KernelCompiler =
 
         if not Cfg.DebugCompile then 
             removeCompileDir compileDir
-      
+
+        // perform loading of PTX      
         use jitOpts = new CudaJitOptionCollection()
         use jitInfoBuffer = new CudaJOInfoLogBuffer(10000)
         jitOpts.Add(jitInfoBuffer)
@@ -140,7 +149,7 @@ module internal KernelCompiler =
         use jitLogVerbose = new CudaJOLogVerbose(true)
         jitOpts.Add(jitLogVerbose)
 
-        let cuMod = Cuda.context.LoadModulePTX(ptx, jitOpts)
+        let cuMod = ctx.LoadModulePTX(ptx, jitOpts)
 
         jitOpts.UpdateValues()
         if Cfg.DebugCompile then
@@ -152,13 +161,14 @@ module internal KernelCompiler =
         let krnls =
             (Map.empty, krnlNames)
             ||> Seq.fold (fun krnls name -> 
-                krnls |> Map.add name (CudaKernel(name, cuMod, Cuda.context))) 
+                krnls |> Map.add name (CudaKernel(name, cuMod, ctx))) 
 
         krnls, cuMod
 
     /// unloads previously loaded CUDA kernel code
-    let unload cuMod =
-        Cuda.context.UnloadModule(cuMod)
+    let unload (ctx: CudaContext) cuMod =
+        use _ctx = Cuda.activate ctx
+        ctx.UnloadModule(cuMod)
 
     
 
@@ -197,7 +207,7 @@ module internal KernelArgType =
 
 
 /// A CUDA module built from source containing kernel functions.
-type internal CudaModule () =
+type internal CudaModule (ctx: CudaContext) =
 
     let wrapperCodes = Dictionary<string, string> ()
     let mutable kernels : Map<string, CudaKernel> option = None
@@ -229,9 +239,10 @@ type internal CudaModule () =
         (fun (stream: CUstream, workDim: Cuda.WorkDim, [<ParamArray>] argVals: obj[]) ->
             match kernels with
             | Some kernels ->
+                use _ctx = Cuda.activate ctx
                 let kernel = kernels.[mangledName]
                 let maxBlockSize = kernel.GetOccupancyMaxPotentialBlockSize().blockSize
-                let launchDim = Cuda.computeLaunchDim workDim maxBlockSize
+                let launchDim = Cuda.computeLaunchDim ctx workDim maxBlockSize
                 kernel.BlockDimensions <- Cuda.toDim3 launchDim.Block
                 kernel.GridDimensions <- Cuda.toDim3 launchDim.Grid
                 kernel.DynamicSharedMemory <- 0u
@@ -260,14 +271,14 @@ type internal CudaModule () =
             let wrapperNames = 
                 wrapperCodes
                 |> Seq.map (fun (KeyValue(name, _)) -> name)
-            let krnls, m = KernelCompiler.load code wrapperNames
+            let krnls, m = KernelCompiler.load ctx code wrapperNames
             kernels <- Some krnls
             cuMod <- Some m
             
     override this.Finalize() =
         match cuMod with
         | Some cm ->
-            try KernelCompiler.unload cm
+            try KernelCompiler.unload ctx cm
             with _ -> ()
             cuMod <- None
         | None -> ()

@@ -20,8 +20,8 @@ open KernelHelpers
 
 
 /// CUDA kernels for the CUDA tensor backend
-type internal TensorKernels private (dataType: Type, nDims: int) as this =
-    inherit CudaModule()
+type internal TensorKernels private (ctx: CudaContext, dataType: Type, nDims: int) as this =
+    inherit CudaModule(ctx)
 
     static let instances = InstanceCache TensorKernels   
     static let headers = ["Elemwise.cuh"; "Reduction.cuh"]
@@ -296,12 +296,12 @@ type internal TensorKernels private (dataType: Type, nDims: int) as this =
     member this.FindLastAxis (value: obj) (stream, trgt: NativeTensor, src: NativeTensor) =         
         findLastAxis (stream, workDimForElemwise trgt, [|value; box trgt; box src|])        
 
-    static member Get (dataType, nDims) = instances.Get (dataType, nDims)
+    static member Get (ctx, dataType, nDims) = instances.Get (ctx, dataType, nDims)
 
 
 
-type internal TensorGatherScatterKernels private (dataType: Type, nTrgtDims: int, nSrcDims: int) as this =
-    inherit CudaModule()
+type internal TensorGatherScatterKernels private (ctx: CudaContext, dataType: Type, nTrgtDims: int, nSrcDims: int) as this =
+    inherit CudaModule(ctx)
     static let instances = InstanceCache TensorGatherScatterKernels 
     static let headers = ["GatherScatter.cuh"]
 
@@ -312,9 +312,11 @@ type internal TensorGatherScatterKernels private (dataType: Type, nTrgtDims: int
     let ptrArg = ArgTypeScalar typeof<nativeint>
     let boolArg = ArgTypeScalar typeof<bool>
 
+    do ctx.PushContext()
     let error = new CudaDeviceVariable<int32> (SizeT 1)
     do error.Memset (0u)
     let errorPtr = Cuda.getIntPtr error.DevicePointer
+    do ctx.PopContext()
 
     let gather = this.GetKernel "Gather" [trgtTensor; srcIdxs; srcTensor; ptrArg; boolArg]
     let scatter = this.GetKernel "Scatter" [trgtTensor; trgtIdxs; srcTensor; ptrArg; boolArg]
@@ -335,20 +337,21 @@ type internal TensorGatherScatterKernels private (dataType: Type, nTrgtDims: int
 
     member this.CheckError (stream) =
         if Cfg.Stacktrace then
+            use _ctx = Cuda.activate ctx
             if stream <> CUstream.NullStream then
-                Cuda.context.Synchronize()
+                ctx.Synchronize()
             let hasError = ref 0
             error.CopyToHost (hasError)
             if !hasError <> 0 then
                 raise (IndexOutOfRangeException "invalid index during gather or scatter")
 
-    static member Get (dataType, nTrgtDims, nSrcDims) = 
-        instances.Get (dataType, nTrgtDims, nSrcDims)
+    static member Get (ctx, dataType, nTrgtDims, nSrcDims) = 
+        instances.Get (ctx, dataType, nTrgtDims, nSrcDims)
 
 
 
-type internal TensorConvertKernels private (trgtDataType: Type, srcDataType: Type, nDims: int) as this =
-    inherit CudaModule()
+type internal TensorConvertKernels private (ctx: CudaContext, trgtDataType: Type, srcDataType: Type, nDims: int) as this =
+    inherit CudaModule(ctx)
     static let instances = InstanceCache TensorConvertKernels 
     static let headers = ["Elemwise.cuh"]
 
@@ -362,19 +365,21 @@ type internal TensorConvertKernels private (trgtDataType: Type, srcDataType: Typ
     member this.Convert (stream, trgt: NativeTensor, src: NativeTensor) =         
         convert (stream, workDimForElemwise trgt, [|box trgt; box src|])
 
-    static member Get (trgtDataType, srcDataType, nDims) = 
-        instances.Get (trgtDataType, srcDataType, nDims)
+    static member Get (ctx, trgtDataType, srcDataType, nDims) = 
+        instances.Get (ctx, trgtDataType, srcDataType, nDims)
 
 
 
-type internal BlasSupportKernels private () as this =
-    inherit CudaModule()
-    static let mutable instance = None 
+type internal BlasSupportKernels private (ctx: CudaContext) as this =
+    inherit CudaModule(ctx)
+    static let instances = InstanceCache BlasSupportKernels 
     static let headers = ["BlasSupport.cuh"]
 
+    do ctx.PushContext()
     let error = new CudaDeviceVariable<int32> (SizeT 1)
     do error.Memset (0u)
     let errorPtr = Cuda.getIntPtr error.DevicePointer
+    do ctx.PopContext()
 
     let checkBlasInfo = 
         this.GetKernel "CheckBlasInfo" 
@@ -391,18 +396,13 @@ type internal BlasSupportKernels private () as this =
         checkBlasInfo (stream, workDim, [|box infoPtr; box batchSize; box errorPtr; box trapOnError|])
 
         if Cfg.Stacktrace then
-            if stream <> CUstream.NullStream then Cuda.context.Synchronize()
+            use _ctx = Cuda.activate ctx
+            if stream <> CUstream.NullStream then ctx.Synchronize()
             let hasError = ref 0
             error.CopyToHost (hasError)
             !hasError = 0 
         else
             true
 
-    static member Get () = 
-        match instance with
-        | Some instance -> instance
-        | None ->
-            let inst = BlasSupportKernels()
-            instance <- Some inst
-            inst
-      
+    static member Get (ctx) = instances.Get (ctx) 
+

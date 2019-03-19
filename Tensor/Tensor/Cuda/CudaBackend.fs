@@ -6,6 +6,7 @@ open System.Runtime.InteropServices
 
 open ManagedCuda
 open ManagedCuda.BasicTypes
+open ManagedCuda.CudaBlas
 
 open Tensor
 open Tensor.Backend
@@ -16,27 +17,27 @@ open DeepNet.Utils
 
 
 
-/// CUDA initialization helper.
-/// We check that CUDA context access is possible before calling other CUDA functions to avoid
-/// exceptions being thrown from static initializers.
-module private CudaInit =
+///// CUDA initialization helper.
+///// We check that CUDA context access is possible before calling other CUDA functions to avoid
+///// exceptions being thrown from static initializers.
+//module private CudaInit =
 
-    /// the CUDA context we are using
-    let mutable private initialized = false
+//    /// the CUDA context we are using
+//    let mutable private initialized = false
 
-    /// Checks if CUDA context access is possible.
-    /// If not, a CudaError is thrown.
-    let check () =
-        if not initialized then
-            // First try to obtain a CudaContext.
-            try new CudaContext(createNew=false) |> ignore
-            with e ->
-                let msg = sprintf "Cannot create CUDA context: %s" e.Message
-                raise (CudaException msg)
-            // If this succeeds, initialize the Cuda module.
-            Cuda.context.Context |> ignore
-            Cuda.blas.CublasHandle |> ignore
-            initialized <- true
+//    /// Checks if CUDA context access is possible.
+//    /// If not, a CudaError is thrown.
+//    let check () =
+//        if not initialized then
+//            // First try to obtain a CudaContext.
+//            try new CudaContext(createNew=false) |> ignore
+//            with e ->
+//                let msg = sprintf "Cannot create CUDA context: %s" e.Message
+//                raise (CudaException msg)
+//            // If this succeeds, initialize the Cuda module.
+//            Cuda.context.Context |> ignore
+//            Cuda.blas.CublasHandle |> ignore
+//            initialized <- true
 
 
 
@@ -50,16 +51,19 @@ type ITensorCudaStorage =
 
 /// Tensor storage on a CUDA device.
 type TensorCudaStorage<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
-                    (data: CudaDeviceVariable<'T>) =
+                    (data: CudaDeviceVariable<'T>, dev: TensorCudaDevice) =
 
-    new (nElems: int64) =
-        CudaInit.check ()
+    new (nElems: int64, dev: TensorCudaDevice) =
         // CUDA cannot allocate memory of size zero
         let nElems = if nElems > 0L then nElems else 1L
-        TensorCudaStorage<'T> (Cuda.newDevVar nElems)
+        let devVar = Cuda.newDevVar dev.Context nElems
+        TensorCudaStorage<'T> (devVar, dev)
      
     /// data device variable
     member this.Data = data
+
+    /// data device
+    member this.Dev = dev
 
     /// data size in elements
     member this.DataSize = int64 data.Size
@@ -72,11 +76,14 @@ type TensorCudaStorage<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sy
         new CudaDeviceVariable<byte> (data.DevicePointer, data.SizeInBytes)        
 
     override this.Finalize() = 
-        if data <> null then data.Dispose()
+        if data <> null then 
+            use _dev = dev.Use()
+            data.Dispose()
 
     /// data item access
     member this.Item 
         with get (addr: int64) =
+            use _dev = this.Dev.Use()
             if typeof<'T> = typeof<bool> then
                 let hostBuf : byte ref = ref 0uy
                 this.ByteData.CopyToHost(hostBuf, SizeT (addr * sizeof64<byte>))
@@ -87,6 +94,7 @@ type TensorCudaStorage<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sy
                 !hostBuf
                 
         and set (addr: int64) (value: 'T) = 
+            use _dev = this.Dev.Use()
             if typeof<'T> = typeof<bool> then
                 let byteVal = if (box value :?> bool) then 1uy else 0uy
                 this.ByteData.CopyToDevice(byteVal, SizeT (addr * sizeof64<byte>))
@@ -96,8 +104,8 @@ type TensorCudaStorage<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sy
     interface ITensorStorage<'T> with
         member this.Backend layout = 
             TensorCudaBackend<'T> (layout, this) :> ITensorBackend<_>
-        member this.Dev =
-            TensorCudaDevice.Instance :> ITensorDevice
+        member this.Dev = 
+            dev :> ITensorDevice
 
     interface ITensorCudaStorage with
         member this.ByteData = this.ByteData
@@ -121,28 +129,28 @@ and ITensorCudaBackend =
 and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
                     (layout: TensorLayout, storage: TensorCudaStorage<'T>) =
 
-    let kernels = TensorKernels.Get (typeof<'T>, layout.NDims)
-    let blasSupportKernels = BlasSupportKernels.Get ()
+    let kernels = TensorKernels.Get (storage.Dev.Context, typeof<'T>, layout.NDims)
+    let blasSupportKernels = BlasSupportKernels.Get (storage.Dev.Context)
 
     let unsup op =
         let msg = 
-            sprintf "the CUDA tensor backend currently does not support the %s operation" op
+            sprintf "The CUDA tensor backend currently does not support the %s operation." op
         raise (NotSupportedException msg)
 
     let callUnary fn trgt src1 : unit =
         let trgt, src1 = TensorCudaBackend<_>.ElemwiseNativeTensor (trgt, src1)
         fn (Cfg.Stream, trgt, src1)
-        Cuda.keepAliveMany Cfg.Stream [trgt; src1]
+        Cuda.keepAliveMany storage.Dev.Context Cfg.Stream [trgt; src1]
 
     let callBinary fn trgt src1 src2 : unit =
         let trgt, src1, src2 = TensorCudaBackend<_>.ElemwiseNativeTensor (trgt, src1, src2)
         fn (Cfg.Stream, trgt, src1, src2)
-        Cuda.keepAliveMany Cfg.Stream [trgt; src1; src2]
+        Cuda.keepAliveMany storage.Dev.Context Cfg.Stream [trgt; src1; src2]
 
     let callTenary fn trgt src1 src2 src3 : unit =
         let trgt, src1, src2, src3 = TensorCudaBackend<_>.ElemwiseNativeTensor (trgt, src1, src2, src3)
         fn (Cfg.Stream, trgt, src1, src2, src3)
-        Cuda.keepAliveMany Cfg.Stream [trgt; src1; src2; src3]
+        Cuda.keepAliveMany storage.Dev.Context Cfg.Stream [trgt; src1; src2; src3]
 
     /// device pointer to first element of this tensor
     member this.DevicePtr : nativeint =
@@ -205,6 +213,8 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
             and set idx value = storage.[layout |> TensorLayout.addr (idx |> List.ofArray)] <- value
            
         member this.Transfer (trgt, src) =
+            use _dev = storage.Dev.Use()
+
             /// gets CUDA registered or pinned memory
             let getMem (storage: TensorHostStorage<'T>) = 
                 try
@@ -230,8 +240,8 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
                     else
                         srcRegMem.AsyncCopyToDevice(CUdeviceptr (SizeT trgtMemOffsetPtr), Cfg.Stream)
                    
-                    Cuda.callback Cfg.Stream (fun () -> srcMemHnd.Dispose())
-                    Cuda.keepAliveMany Cfg.Stream [trgtStorage; srcStorage]
+                    Cuda.callback storage.Dev.Context Cfg.Stream (fun () -> srcMemHnd.Dispose())
+                    Cuda.keepAliveMany storage.Dev.Context Cfg.Stream [trgtStorage; srcStorage]
                     true
 
                 // transfer from CUDA to host
@@ -248,8 +258,8 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
                     else
                         trgtRegMem.AsyncCopyFromDevice(CUdeviceptr (SizeT srcMemOffsetPtr), Cfg.Stream)
                    
-                    Cuda.callback Cfg.Stream (fun () -> trgtMemHnd.Dispose())
-                    Cuda.keepAliveMany Cfg.Stream [trgtStorage; srcStorage]
+                    Cuda.callback storage.Dev.Context Cfg.Stream (fun () -> trgtMemHnd.Dispose())
+                    Cuda.keepAliveMany storage.Dev.Context Cfg.Stream [trgtStorage; srcStorage]
                     true
                 | _ -> false
 
@@ -273,14 +283,15 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         member this.FillConst (value, trgt) = 
             let trgt = TensorCudaBackend<_>.ElemwiseNativeTensor (trgt)
             kernels.FillConst (Cfg.Stream, box value, trgt)
-            Cuda.keepAlive Cfg.Stream trgt
+            Cuda.keepAlive storage.Dev.Context Cfg.Stream trgt
 
         member this.FillIncrementing (start, incr, trgt) = 
             let trgt = TensorCudaBackend<_>.ElemwiseNativeTensor (trgt)
             kernels.FillIncrementing (Cfg.Stream, box start, box incr, trgt)
-            Cuda.keepAlive Cfg.Stream trgt            
+            Cuda.keepAlive storage.Dev.Context Cfg.Stream trgt            
 
         member this.Copy(trgt, src) = 
+            use _dev = storage.Dev.Use()
             if TensorLayout.hasContiguousMemory trgt.Layout && 
                TensorLayout.hasContiguousMemory src.Layout &&
                trgt.Layout.Stride = src.Layout.Stride then
@@ -292,15 +303,15 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
                                                     SizeT (sizeof64<'T> * trgt.Layout.Offset),
                                                     SizeT (sizeof64<'T> * src.NElems),
                                                     Cfg.Stream)
-                Cuda.keepAliveMany Cfg.Stream [trgtStorage; srcStorage]
+                Cuda.keepAliveMany storage.Dev.Context Cfg.Stream [trgtStorage; srcStorage]
             else
                 // call copy kernel
                 let trgt, src = TensorCudaBackend<_>.GetNativeTensor (trgt, src)
                 kernels.Copy(Cfg.Stream, trgt, src)
-                Cuda.keepAliveMany Cfg.Stream [trgt; src]
+                Cuda.keepAliveMany storage.Dev.Context Cfg.Stream [trgt; src]
 
         member this.Convert(trgt: ITensorFrontend<'T>, src: ITensorFrontend<'S>) =
-            let convKernels = TensorConvertKernels.Get (typeof<'T>, typeof<'S>, trgt.NDims)
+            let convKernels = TensorConvertKernels.Get (storage.Dev.Context, typeof<'T>, typeof<'S>, trgt.NDims)
             callUnary convKernels.Convert trgt src
 
         member this.UnaryPlus(trgt, src1)   = callUnary kernels.UnaryPlus trgt src1
@@ -361,17 +372,17 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         member this.FindLastAxis(value, trgt, src1) = callUnary (kernels.FindLastAxis value) trgt src1        
 
         member this.Gather(trgt, srcIdxs, src) = 
-            let gsKernels = TensorGatherScatterKernels.Get (typeof<'T>, trgt.NDims, src.NDims)
+            let gsKernels = TensorGatherScatterKernels.Get (storage.Dev.Context, typeof<'T>, trgt.NDims, src.NDims)
             let srcIdxs = {
                 NDims = trgt.NDims
                 Idxs  = srcIdxs |> List.map (Option.map (TensorCudaBackend<_>.GetNativeTensor))
             }
             let trgt, src = TensorCudaBackend<_>.GetNativeTensor (trgt, src)
             gsKernels.Gather (Cfg.Stream, trgt, srcIdxs, src)
-            Cuda.keepAliveMany Cfg.Stream [trgt; srcIdxs; src]
+            Cuda.keepAliveMany storage.Dev.Context Cfg.Stream [trgt; srcIdxs; src]
 
         member this.Scatter(trgt, trgtIdxs, src) = 
-            let gsKernels = TensorGatherScatterKernels.Get (typeof<'T>, trgt.NDims, src.NDims)
+            let gsKernels = TensorGatherScatterKernels.Get (storage.Dev.Context, typeof<'T>, trgt.NDims, src.NDims)
             let trgtIdxs = {
                 NDims = src.NDims
                 Idxs  = trgtIdxs |> List.map (Option.map (TensorCudaBackend<_>.GetNativeTensor))
@@ -379,108 +390,112 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
             let trgt, src = TensorCudaBackend<_>.GetNativeTensor (trgt, src)
             kernels.FillConst (Cfg.Stream, box (conv<'T> 0), trgt)
             gsKernels.Scatter (Cfg.Stream, trgt, trgtIdxs, src)
-            Cuda.keepAliveMany Cfg.Stream [trgt; trgtIdxs; src]
+            Cuda.keepAliveMany storage.Dev.Context Cfg.Stream [trgt; trgtIdxs; src]
 
         member this.VecVecDot (trgt, a, b) =
+            use dev: TensorCudaDeviceGuard = storage.Dev.Use()
+            dev.Blas.Stream <- Cfg.Stream
             use x = BLAS.GetVector (a, isSource=true, isTarget=false)
             use y = BLAS.GetVector (b, isSource=true, isTarget=false)
             use t = BLAS.GetScalar (trgt)
             CUBLAS.Invoke<'T, unit>
-                (Cfg.Stream,
-                 singleFn=(fun () -> Cuda.blas.Dot (x.CPtr<single>(a.NElems), x.CInc, 
-                                                    y.CPtr(a.NElems), y.CInc, t.CPtr())),
-                 doubleFn=(fun () -> Cuda.blas.Dot (x.CPtr<double>(a.NElems), x.CInc, 
-                                                    y.CPtr(a.NElems), y.CInc, t.CPtr())))
-            Cuda.keepAliveMany Cfg.Stream [x; y; t]
+                (singleFn=(fun () -> dev.Blas.Dot (x.CPtr<single>(dev.Context, a.NElems), x.CInc, 
+                                                   y.CPtr(dev.Context, a.NElems), y.CInc, t.CPtr(dev.Context))),
+                 doubleFn=(fun () -> dev.Blas.Dot (x.CPtr<double>(dev.Context, a.NElems), x.CInc, 
+                                                   y.CPtr(dev.Context, a.NElems), y.CInc, t.CPtr(dev.Context))))
+            Cuda.keepAliveMany storage.Dev.Context Cfg.Stream [x; y; t]
 
         member this.MatVecDot (trgt, a, b) =
+            use dev = storage.Dev.Use()
+            dev.Blas.Stream <- Cfg.Stream
             use a = BLAS.GetMatrix (a, isSource=true, isTarget=false, canTranspose=true)
             use x = BLAS.GetVector (b, isSource=true, isTarget=false)
             use y = BLAS.GetVector (trgt, isSource=false, isTarget=true)
             CUBLAS.Invoke<'T, unit>
-                (Cfg.Stream,
-                 singleFn=(fun () -> Cuda.blas.Gemv (a.CTrans, a.CRows, a.CCols, 1.0f,
-                                                     a.CPtr(), a.CLd, x.CPtr(), x.CInc,
-                                                     0.0f, y.CPtr(), y.CInc)),
-                 doubleFn=(fun () -> Cuda.blas.Gemv (a.CTrans, a.CRows, a.CCols, 1.0,
-                                                     a.CPtr(), a.CLd, x.CPtr(), x.CInc,
-                                                     0.0, y.CPtr(), y.CInc)))  
+                (singleFn=(fun () -> dev.Blas.Gemv (a.CTrans, a.CRows, a.CCols, 1.0f,
+                                                    a.CPtr(dev.Context), a.CLd, x.CPtr(dev.Context), x.CInc,
+                                                    0.0f, y.CPtr(dev.Context), y.CInc)),
+                 doubleFn=(fun () -> dev.Blas.Gemv (a.CTrans, a.CRows, a.CCols, 1.0,
+                                                    a.CPtr(dev.Context), a.CLd, x.CPtr(dev.Context), x.CInc,
+                                                    0.0, y.CPtr(dev.Context), y.CInc)))  
             y.FetchResult()
-            Cuda.keepAliveMany Cfg.Stream [a; x; y]
+            Cuda.keepAliveMany storage.Dev.Context Cfg.Stream [a; x; y]
 
         member this.MatMatDot (trgt, a, b) =
-            Cuda.blas.Stream <- Cfg.Stream
+            use dev = storage.Dev.Use()
+            dev.Blas.Stream <- Cfg.Stream
             use a = BLAS.GetMatrix (a, isSource=true, isTarget=false, canTranspose=true)
             use b = BLAS.GetMatrix (b, isSource=true, isTarget=false, canTranspose=true)
             use c = BLAS.GetMatrix (trgt, isSource=false, isTarget=true, canTranspose=false)
             CUBLAS.Invoke<'T, unit>
-                (Cfg.Stream,
-                 singleFn=(fun () -> Cuda.blas.Gemm (a.CTrans, b.CTrans, a.COpRows, b.COpCols, a.COpCols, 
-                                                     1.0f, a.CPtr(), a.CLd, b.CPtr(), b.CLd,
-                                                     0.0f, c.CPtr(), c.CLd)),
-                 doubleFn=(fun () -> Cuda.blas.Gemm (a.CTrans, b.CTrans, a.COpRows, b.COpCols, a.COpCols, 
-                                                     1.0, a.CPtr(), a.CLd, b.CPtr(), b.CLd,
-                                                     0.0, c.CPtr(), c.CLd)))                                                      
+                (singleFn=(fun () -> dev.Blas.Gemm (a.CTrans, b.CTrans, a.COpRows, b.COpCols, a.COpCols, 
+                                                    1.0f, a.CPtr(dev.Context), a.CLd, b.CPtr(dev.Context), b.CLd,
+                                                    0.0f, c.CPtr(dev.Context), c.CLd)),
+                 doubleFn=(fun () -> dev.Blas.Gemm (a.CTrans, b.CTrans, a.COpRows, b.COpCols, a.COpCols, 
+                                                    1.0, a.CPtr(dev.Context), a.CLd, b.CPtr(dev.Context), b.CLd,
+                                                    0.0, c.CPtr(dev.Context), c.CLd)))                                                      
             c.FetchResult()
-            Cuda.keepAliveMany Cfg.Stream [a; b; c]
+            Cuda.keepAliveMany storage.Dev.Context Cfg.Stream [a; b; c]
 
         member this.BatchedMatMatDot (trgt, a, b) =
+            use dev = storage.Dev.Use()
+            dev.Blas.Stream <- Cfg.Stream
             use a = BLAS.GetMatrix (a, isSource=true, isTarget=false, canTranspose=true)
             use b = BLAS.GetMatrix (b, isSource=true, isTarget=false, canTranspose=true)
             use c = BLAS.GetMatrix (trgt, isSource=false, isTarget=true, canTranspose=false)
-            let aPtrs, aDispose = a.CPtrs Cfg.Stream
-            let bPtrs, bDispose = b.CPtrs Cfg.Stream
-            let cPtrs, cDispose = c.CPtrs Cfg.Stream
+            let aPtrs, aDispose = a.CPtrs (dev.Context, Cfg.Stream)
+            let bPtrs, bDispose = b.CPtrs (dev.Context, Cfg.Stream)
+            let cPtrs, cDispose = c.CPtrs (dev.Context, Cfg.Stream)
             CUBLAS.Invoke<'T, unit>
-                (Cfg.Stream,
-                 singleFn=(fun () -> Cuda.blas.GemmBatched (a.CTrans, b.CTrans, 
-                                                            a.COpRows, b.COpCols, a.COpCols, 1.0f,
-                                                            aPtrs, a.CLd, bPtrs, b.CLd,
-                                                            0.0f, cPtrs, c.CLd,
-                                                            a.CBatchSize)),
-                 doubleFn=(fun () -> Cuda.blas.GemmBatched (a.CTrans, b.CTrans, 
-                                                            a.COpRows, b.COpCols, a.COpCols, 1.0,
-                                                            aPtrs, a.CLd, bPtrs, b.CLd,
-                                                            0.0, cPtrs, c.CLd,
-                                                            a.CBatchSize)))
+                (singleFn=(fun () -> dev.Blas.GemmBatched (a.CTrans, b.CTrans, 
+                                                           a.COpRows, b.COpCols, a.COpCols, 1.0f,
+                                                           aPtrs, a.CLd, bPtrs, b.CLd,
+                                                           0.0f, cPtrs, c.CLd,
+                                                           a.CBatchSize)),
+                 doubleFn=(fun () -> dev.Blas.GemmBatched (a.CTrans, b.CTrans, 
+                                                           a.COpRows, b.COpCols, a.COpCols, 1.0,
+                                                           aPtrs, a.CLd, bPtrs, b.CLd,
+                                                           0.0, cPtrs, c.CLd,
+                                                           a.CBatchSize)))
             aDispose()
             bDispose()
             cDispose()
             c.FetchResult()
-            Cuda.keepAliveMany Cfg.Stream [a; b; c]
+            Cuda.keepAliveMany storage.Dev.Context Cfg.Stream [a; b; c]
 
         member this.BatchedInvert (trgt, src) =
+            use dev = storage.Dev.Use()
+            dev.Blas.Stream <- Cfg.Stream
+
             let size = trgt.Shape.[trgt.NDims-2]
 
             let lu = src.Copy(order=BLAS.MatrixOrder trgt.NDims)
             use a = BLAS.GetMatrix (lu, isSource=true, isTarget=false, canTranspose=false)
             use c = BLAS.GetMatrix (trgt, isSource=false, isTarget=true, canTranspose=false)
-            let aPtrs, aDispose = a.CPtrs Cfg.Stream
-            let cPtrs, cDispose = c.CPtrs Cfg.Stream
+            let aPtrs, aDispose = a.CPtrs (storage.Dev.Context, Cfg.Stream)
+            let cPtrs, cDispose = c.CPtrs (storage.Dev.Context, Cfg.Stream)
 
             // compute LU factorization
             let ipiv = new CudaDeviceVariable<int> (SizeT (size * a.BatchSize))
             let info = new CudaDeviceVariable<int> (SizeT a.BatchSize)
             CUBLAS.Invoke<'T, unit> 
-                (Cfg.Stream,
-                 singleFn=(fun () -> Cuda.blas.GetrfBatchedS (a.CRows, aPtrs, a.CLd, ipiv, info, a.CBatchSize)),
-                 doubleFn=(fun () -> Cuda.blas.GetrfBatchedD (a.CRows, aPtrs, a.CLd, ipiv, info, a.CBatchSize)))
+                (singleFn=(fun () -> dev.Blas.GetrfBatchedS (a.CRows, aPtrs, a.CLd, ipiv, info, a.CBatchSize)),
+                 doubleFn=(fun () -> dev.Blas.GetrfBatchedD (a.CRows, aPtrs, a.CLd, ipiv, info, a.CBatchSize)))
             if not (blasSupportKernels.CheckBlasInfo (Cfg.Stream, info)) then
                 raise (SingularMatrixException "cannot invert singular matrix")
 
             // compute matrix inverse
             CUBLAS.Invoke<'T, unit> 
-                (Cfg.Stream,
-                 singleFn=(fun () -> Cuda.blas.GetriBatchedS (a.CRows, aPtrs, a.CLd, ipiv, cPtrs, c.CLd, info, a.CBatchSize)),
-                 doubleFn=(fun () -> Cuda.blas.GetriBatchedD (a.CRows, aPtrs, a.CLd, ipiv, cPtrs, c.CLd, info, a.CBatchSize)))
+                (singleFn=(fun () -> dev.Blas.GetriBatchedS (a.CRows, aPtrs, a.CLd, ipiv, cPtrs, c.CLd, info, a.CBatchSize)),
+                 doubleFn=(fun () -> dev.Blas.GetriBatchedD (a.CRows, aPtrs, a.CLd, ipiv, cPtrs, c.CLd, info, a.CBatchSize)))
             if not (blasSupportKernels.CheckBlasInfo (Cfg.Stream, info)) then
                 raise (SingularMatrixException "cannot invert singular matrix")
 
             aDispose()
             cDispose()
             c.FetchResult()
-            Cuda.keepAliveMany Cfg.Stream [a; c]
-            Cuda.callback Cfg.Stream (fun () ->
+            Cuda.keepAliveMany storage.Dev.Context Cfg.Stream [a; c]
+            Cuda.callback storage.Dev.Context Cfg.Stream (fun () ->
                 ipiv.Dispose()
                 info.Dispose())                
 
@@ -494,16 +509,80 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
 
 
 
-/// Creates Tensors on a CUDA device.
-and TensorCudaDevice private () =
+/// A CUDA context for use with the tensor library.
+and TensorCudaDevice (context: CudaContext, owner: bool) =
     inherit BaseTensorDevice()
-    static member Instance = TensorCudaDevice ()
     
-    override this.Id = "Cuda"
+    /// cuBLAS handle for each thread using this context
+    let blas = new ThreadLocal<CudaBlas> ((fun () -> 
+        use _ctx = Cuda.activate context
+        new CudaBlas()), true)
+
+    override this.Finalize() =
+        // Release all cuBLAS handles.
+        (
+            use _ctx = Cuda.activate context
+            for b in blas.Values do
+                b.Dispose()
+        )
+
+        // Dispose context if we own it.
+        if owner then
+            context.Dispose()
+
+    /// Associated CUDA context.
+    member this.Context = context
+
+    /// cuBLAS instance that is unique to this CUDA context and calling thread.
+    /// It will be disposed when this context is finalized.
+    member this.Blas = blas.Value
+
+    /// Native CUDA context pointer.
+    member this.ContextPtr = this.Context.Context.Pointer
+
+    /// Push this CUDA context on the context stack and pop it
+    /// when the returned object gets disposed.
+    member this.Use () = new TensorCudaDeviceGuard (this)
+
+    override this.Id = 
+        sprintf "Cuda context=%d" this.ContextPtr
+
     override this.Create nElems = 
-        CudaInit.check ()
         // We use reflection to drop the constraints on 'T.
         let ts = typedefof<TensorCudaStorage<_>>.MakeGenericType (typeof<'T>)
-        Activator.CreateInstance(ts, nElems) :?> ITensorStorage<'T>
+        Activator.CreateInstance(ts, nElems, this) :?> ITensorStorage<'T>
+
     override this.Zeroed = false
 
+    // comparision functions
+    interface IEquatable<TensorCudaDevice> with
+        member this.Equals other =
+            this.ContextPtr = other.ContextPtr
+    override this.Equals other =
+        match other with
+        | :? TensorCudaDevice as other -> 
+            (this :> IEquatable<TensorCudaDevice>).Equals other
+        | _ -> false
+    override this.GetHashCode () =
+        if IntPtr.Size = 4 then this.ContextPtr
+        else this.ContextPtr &&& 0x00000000ffffffffn 
+        |> int
+
+
+/// Makes the Cuda context active until this object is disposed.
+and TensorCudaDeviceGuard internal (dev: TensorCudaDevice) =
+    do dev.Context.PushContext()
+    interface IDisposable with
+        member this.Dispose() =
+            dev.Context.PopContext()
+
+    /// Associated CUDA context.
+    member this.Context: CudaContext = dev.Context
+
+    /// cuBLAS instance that is unique to this CUDA context and calling thread.
+    member this.Blas: CudaBlas = dev.Blas
+
+
+
+
+    

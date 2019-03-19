@@ -5,6 +5,7 @@
 open Xunit
 open Xunit.Abstractions
 open FsUnit.Xunit
+open System.Threading
 
 open Tensor.Utils
 open Tensor
@@ -14,16 +15,29 @@ open Tensor
 type CudaFactAttribute() as this =
     inherit FactAttribute()
     do
-        try 
-            use dummy = new ManagedCuda.CudaContext(createNew=false)
-            ()
-        with err ->
-            this.Skip <- err.Message
+        if CudaDev.count = 0 then
+            this.Skip <- "CudaDev.count = 0"
 
 
 type CudaTests (output: ITestOutputHelper) =
-
     let printfn format = Printf.kprintf (fun msg -> output.WriteLine(msg)) format 
+
+    [<CudaFact>]
+    let ``Device info`` () =
+        for i, info in Seq.indexed CudaDev.info do
+            printfn "Cuda device %d: %A" i info.DeviceName
+
+    [<CudaFact>]
+    let ``Tensor device for each GPU`` () =
+        for i in 0 .. CudaDev.count-1 do
+            printfn "Getting tensor device for GPU %d" i
+            let dev = CudaDev.get i
+            printfn "Done: %A" dev
+
+    [<CudaFact>]
+    let ``Create`` () =
+        let a = CudaTensor.ones<single> [5L; 5L]
+        printfn "a=\n%A" a
 
     [<CudaFact>]
     let ``Tensor transfer to Cuda``() =   
@@ -49,6 +63,33 @@ type CudaTests (output: ITestOutputHelper) =
         printfn "back:\n%A" back
 
         Tensor.almostEqual (data, back)  |> should equal true
+
+    [<CudaFact>]
+    let ``Multi-threaded Cuda``() =
+        let repetitions = 5
+        let nThreads = 5
+
+        let threadFn i () = 
+            Thread.Sleep(100)
+            for r in 1..repetitions do
+                printfn "Thread %d repetition %d" i r
+                let a: Tensor<float32> = CudaTensor.zeros [100L]
+                let b = CudaTensor.ones [100L]
+                let c = a + b
+                Tensor.almostEqual (b, c) |> should equal true
+            printfn "Thread %d done" i
+         
+        printfn "Starting threads..."
+        let threads = [
+            for i in 1..nThreads do
+                let thread = Thread (threadFn i)
+                thread.Start()
+                yield thread
+        ]
+
+        printfn "Waiting for threads..."
+        for t in threads do
+            t.Join (3000) |> should equal true
 
     [<CudaFact>]
     let ``Single matrix dot`` () =
