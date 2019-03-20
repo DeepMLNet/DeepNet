@@ -85,7 +85,7 @@ type Rat =
 
     /// True if this is not-a-number.
     member a.IsNaN =
-        a.Num = bigint.Zero && a.Dnm = bigint.Zero
+        a.Num = bigint.Zero && a.DnmMinusOne = bigint.MinusOne
 
     /// True if this is a finite number (not infinity and not NaN).
     member a.IsFinite =
@@ -166,37 +166,37 @@ type Rat =
     static member op_Implicit(v: int64) = Rat (v)
     static member op_Implicit(v: uint64) = Rat (v)
 
-
     // equation and comparison
     // NaN never equals NaN, but comparing NaN to NaN puts them in the same sort place.
+    member a.Equals (b: Rat) = 
+        a.Num.Equals b.Num && a.DnmMinusOne.Equals b.DnmMinusOne
     interface IEquatable<Rat> with
-        member a.Equals b = 
-            if a.IsNaN || b.IsNaN then false
-            else a.Num = b.Num && a.Dnm = b.Dnm
+        member a.Equals b = a.Equals b
     override a.Equals b =
         match b with
-        | :? Rat as b -> (a :> IEquatable<_>).Equals b
-        | _ -> failwith "can only equate to another Rat"
-
+        | :? Rat as b -> a.Equals b
+        | _ -> false
+                        
+    member a.CompareTo (b: Rat) = 
+        if   a.IsNaN && b.IsNaN then 0
+        elif a.IsNaN then -1
+        elif b.IsNaN then 1
+        elif a.IsNegInf && b.IsNegInf then 0
+        elif a.IsNegInf then -1
+        elif b.IsNegInf then 1
+        elif a.IsPosInf && b.IsPosInf then 0
+        elif a.IsPosInf then 1
+        elif b.IsPosInf then -1
+        else compare (a.Num * b.Dnm) (b.Num * a.Dnm)
     interface IComparable<Rat> with
-        member a.CompareTo b = 
-            if   a.IsNaN && b.IsNaN then 0
-            elif a.IsNaN then -1
-            elif b.IsNaN then 1
-            elif a.IsNegInf && b.IsNegInf then 0
-            elif a.IsNegInf then -1
-            elif b.IsNegInf then 1
-            elif a.IsPosInf && b.IsPosInf then 0
-            elif a.IsPosInf then 1
-            elif b.IsPosInf then -1
-            else compare (a.Num * b.Dnm) (b.Num * a.Dnm)
+        member a.CompareTo b = a.CompareTo b
     interface IComparable with
         member a.CompareTo b =
             match b with
-            | :? Rat as b -> (a :> IComparable<Rat>).CompareTo b
+            | :? Rat as b -> a.CompareTo b
             | _ -> failwith "can only compare to another Rat"
 
-    override a.GetHashCode() = hash (a.Num, a.Dnm)
+    override a.GetHashCode() = hash (a.Num, a.DnmMinusOne)
 
     /// Pretty string representation.
     member a.Pretty = 

@@ -30,8 +30,14 @@ type RatTests (output: ITestOutputHelper) =
         printfn "a.Num=d.Num: %A   a.Dnm=d.Dnm: %A" (a.Num = d.Num) (a.Dnm = d.Dnm)
         printfn "a.IsNaN: %A    d.IsNaN: %A" a.IsNaN d.IsNaN
 
-        printfn "d=a: %A" (d = a)
-        d |> should equal a
+        let e = (d = a)
+        printfn "d=a: %A" e
+
+        let e3 = d.Equals a
+        printfn "equal d=a: %A" e3
+
+        e |> should equal true
+        e3 |> should equal true
 
 
     [<Fact>]
