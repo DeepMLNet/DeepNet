@@ -3,6 +3,7 @@
 open System
 open System.Threading
 open System.Runtime.InteropServices
+open MBrace.FsPickler
 
 open ManagedCuda
 open ManagedCuda.BasicTypes
@@ -15,31 +16,7 @@ open Tensor.Cuda.CudaBLASExtensions
 open Tensor.Utils
 open DeepNet.Utils
 
-
-
-///// CUDA initialization helper.
-///// We check that CUDA context access is possible before calling other CUDA functions to avoid
-///// exceptions being thrown from static initializers.
-//module private CudaInit =
-
-//    /// the CUDA context we are using
-//    let mutable private initialized = false
-
-//    /// Checks if CUDA context access is possible.
-//    /// If not, a CudaError is thrown.
-//    let check () =
-//        if not initialized then
-//            // First try to obtain a CudaContext.
-//            try new CudaContext(createNew=false) |> ignore
-//            with e ->
-//                let msg = sprintf "Cannot create CUDA context: %s" e.Message
-//                raise (CudaException msg)
-//            // If this succeeds, initialize the Cuda module.
-//            Cuda.context.Context |> ignore
-//            Cuda.blas.CublasHandle |> ignore
-//            initialized <- true
-
-
+ 
 
 /// type neutral interface to a CudaStorageT
 type ITensorCudaStorage =
@@ -50,6 +27,7 @@ type ITensorCudaStorage =
 
 
 /// Tensor storage on a CUDA device.
+[<CustomPickler>]
 type TensorCudaStorage<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
                     (data: CudaDeviceVariable<'T>, dev: TensorCudaDevice) =
 
@@ -116,6 +94,24 @@ type TensorCudaStorage<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sy
         member this.Pin () =
             let d = { new IDisposable with member this.Dispose() = () }
             d, Cuda.getIntPtr this.Data.DevicePointer
+
+    static member CreatePickler (resolver: IPicklerResolver) =
+        let xp = resolver.Resolve<'T []> ()
+        let dp = resolver.Resolve<TensorCudaDevice> ()
+        let writer (ws: WriteState) (storage: TensorCudaStorage<'T>) =
+            use _dev = storage.Dev.Use()
+            let hostData: 'T [] = Array.zeroCreate (int storage.DataSize)
+            storage.Data.CopyToHost (hostData)
+            xp.Write ws "Data" hostData
+            dp.Write ws "Dev" storage.Dev
+        let reader (rs: ReadState) =
+            let hostData = xp.Read rs "Data"
+            let dev = dp.Read rs "Dev"
+            let storage = TensorCudaStorage<'T> (hostData.LongLength, dev)
+            use _dev = storage.Dev.Use()
+            storage.Data.CopyToDevice (hostData)
+            storage
+        Pickler.FromPrimitives(reader, writer)
 
 
 
@@ -508,9 +504,15 @@ and TensorCudaBackend<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sys
         member this.TrueIndices(trgt, src) = unsup "TrueIndices"
 
 
+/// Unique identification of a CUDA-capable GPU.
+and TensorCudaDeviceId = {
+    PciBusId: int
+    PciDeviceId: int
+    PciDomainId: int
+}
 
-/// A CUDA context for use with the tensor library.
-and TensorCudaDevice (context: CudaContext, owner: bool) =
+/// <summary>Provides access to nVidia CUDA GPUs.</summary>
+and [<CustomPickler>] TensorCudaDevice (context: CudaContext, owner: bool) =
     inherit BaseTensorDevice()
     
     /// cuBLAS handle for each thread using this context
@@ -518,17 +520,27 @@ and TensorCudaDevice (context: CudaContext, owner: bool) =
         use _ctx = Cuda.activate context
         new CudaBlas()), true)
 
-    override this.Finalize() =
-        // Release all cuBLAS handles.
-        (
-            use _ctx = Cuda.activate context
-            for b in blas.Values do
-                b.Dispose()
-        )
+    static let mutable devices: WeakReference<TensorCudaDevice> option [] = 
+        Array.create TensorCudaDevice.count None
 
-        // Dispose context if we own it.
-        if owner then
-            context.Dispose()
+    /// <summary>TensorCudaDevices for each CUDA-capable device.</summary>
+    static member private Devices = devices
+
+    override this.Finalize() =
+        try
+            // Release all cuBLAS handles.
+            (
+                use _ctx = Cuda.activate context      
+                for b in blas.Values do
+                    b.Dispose()
+            )
+
+            // Dispose context if we own it.
+            if owner then
+                context.Dispose()
+        with ex ->
+            // ignore errors during disposing
+            ()
 
     /// Associated CUDA context.
     member this.Context = context
@@ -544,8 +556,19 @@ and TensorCudaDevice (context: CudaContext, owner: bool) =
     /// when the returned object gets disposed.
     member this.Use () = new TensorCudaDeviceGuard (this)
 
+    static member private idOfProps (info: CudaDeviceProperties) =
+         {
+            PciBusId = info.PciBusId
+            PciDeviceId = info.PciDeviceId
+            PciDomainId = info.PCIDomainID
+        }   
+
     override this.Id = 
-        sprintf "Cuda context=%d" this.ContextPtr
+        sprintf "Cuda%d" this.ContextPtr
+
+    /// Returns the unique id of the GPU this tensor device is using.
+    member this.DeviceId =
+        Cuda.deviceInfo this.Context |> TensorCudaDevice.idOfProps
 
     override this.Create nElems = 
         // We use reflection to drop the constraints on 'T.
@@ -568,7 +591,78 @@ and TensorCudaDevice (context: CudaContext, owner: bool) =
         else this.ContextPtr &&& 0x00000000ffffffffn 
         |> int
 
+    /// <summary>Returns a tensor device for the specified CudaContext.</summary>
+    /// <returns>A tensor device associated with the specified CUDA context.</returns>
+    static member forContext (ctx: CudaContext) =
+        TensorCudaDevice (ctx, false) :> ITensorDevice
 
+    /// <summary>Number of CUDA-capable devices.</summary>
+    static member count = 
+        try CudaContext.GetDeviceCount()
+        with _ -> 0
+
+    /// <summary>Device properties for all available CUDA-capable devices.</summary>
+    static member info = [
+        for i in 0..TensorCudaDevice.count-1 do
+            yield CudaContext.GetDeviceInfo i
+    ]
+
+    /// <summary>Returns a tensor device for the specified CUDA-capable device.</summary>
+    /// <param name="idx">The index of the CUDA device.</param>
+    /// <remarks>
+    /// <p>This method creates a private CudaContext for the library's use.</p>
+    /// <p>All requests for the same device will share the same CudaContext.</p>
+    /// </remarks>
+    /// <returns>A tensor device for the specified CUDA device.</returns>
+    static member byIndex idx =
+        if idx < 0 || idx >= TensorCudaDevice.count then
+            failwithf "Cannot use CUDA device %d because only %d devices are available."
+                idx TensorCudaDevice.count
+        lock TensorCudaDevice.Devices (fun () ->
+            let dev = 
+                match TensorCudaDevice.Devices.[idx] with
+                | Some weakDev ->
+                    match weakDev.TryGetTarget () with
+                    | true, dev -> Some dev
+                    | _ -> None
+                | None -> None
+            match dev with
+            | Some dev -> dev
+            | None ->
+                let ctx = new CudaContext (idx)
+                ctx.PopContext()
+                let dev = TensorCudaDevice (ctx, true)
+                TensorCudaDevice.Devices.[idx] <- Some (WeakReference<_> dev)
+                dev)
+        :> ITensorDevice
+
+    /// <summary>Returns a tensor device for the specified CUDA-capable device.</summary>
+    /// <param name="id">The identification of the CUDA device.</param>
+    /// <remarks>
+    /// <p>This method creates a private CudaContext for the library's use.</p>
+    /// <p>All requests for the same device will share the same CudaContext.</p>
+    /// </remarks>
+    /// <returns>A tensor device for the specified CUDA device.</returns>
+    static member byDeviceId (id: TensorCudaDeviceId) =
+        let idx = 
+            TensorCudaDevice.info 
+            |> List.tryFindIndex (fun prop -> TensorCudaDevice.idOfProps prop = id)
+        match idx with
+        | Some idx -> TensorCudaDevice.byIndex idx
+        | None -> 
+            failwithf "No CUDA-capable GPU with id %A is available." id
+
+    static member CreatePickler (resolver: IPicklerResolver) =
+        let xp = resolver.Resolve<TensorCudaDeviceId> ()
+        let writer (ws: WriteState) (dev: TensorCudaDevice) =
+            xp.Write ws "DeviceId" dev.DeviceId
+        let reader (rs: ReadState) =
+            let deviceId = xp.Read rs "DeviceId"
+            TensorCudaDevice.byDeviceId deviceId :?> TensorCudaDevice
+        Pickler.FromPrimitives(reader, writer)
+
+
+    
 /// Makes the Cuda context active until this object is disposed.
 and TensorCudaDeviceGuard internal (dev: TensorCudaDevice) =
     do dev.Context.PushContext()
@@ -584,5 +678,3 @@ and TensorCudaDeviceGuard internal (dev: TensorCudaDevice) =
 
 
 
-
-    

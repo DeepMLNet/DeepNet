@@ -17,57 +17,6 @@ open DeepNet.Utils
 
 
 
-/// <summary>Provides access to nVidia CUDA GPUs.</summary>
-module CudaDev =
-
-    /// <summary>Number of CUDA-capable devices.</summary>
-    let count = 
-        try CudaContext.GetDeviceCount()
-        with _ -> 0
-
-    /// <summary>Device properties for all available CUDA-capable devices.</summary>
-    let info = [
-        for i in 0..count-1 do
-            yield CudaContext.GetDeviceInfo i
-    ]
-    
-    /// <summary>TensorCudaDevices for each CUDA-capable device.</summary>
-    let private devices: WeakReference<TensorCudaDevice> option [] = Array.create count None
-
-    /// <summary>Returns a tensor device for the specified CUDA-capable device.</summary>
-    /// <param name="id">The index of the CUDA device.</param>
-    /// <remarks>
-    /// <p>This method creates a private CudaContext for library's use.</p>
-    /// </remarks>
-    /// <returns>A tensor device for the specified CUDA device.</returns>
-    let get id =
-        if id < 0 || id >= count then
-            failwithf "Cannot use CUDA device %d because only %d devices are available."
-                id count
-        lock devices (fun () ->
-            let dev = 
-                match devices.[id] with
-                | Some weakDev ->
-                    match weakDev.TryGetTarget () with
-                    | true, dev -> Some dev
-                    | _ -> None
-                | None -> None
-            match dev with
-            | Some dev -> dev
-            | None ->
-                let ctx = new CudaContext (id)
-                ctx.PopContext()
-                let dev = TensorCudaDevice (ctx, true)
-                devices.[id] <- Some (WeakReference<_> dev)
-                dev)
-        :> ITensorDevice
-
-    /// <summary>Returns a tensor device for the specified CudaContext.</summary>
-    /// <returns>A tensor device associated with the specified CUDA context.</returns>
-    let forContext (ctx: CudaContext) =
-        TensorCudaDevice (ctx, false) :> ITensorDevice
-
-
 
 /// <summary>Functions for creating and operating on tensors stored on a nVidia CUDA GPU.</summary>
 /// <remarks>
@@ -87,8 +36,15 @@ module CudaTensor =
     /// <seealso cref="Tensor`1.Dev"/>
     /// <seealso cref="CudaDev"/>
     let Dev = 
-        if CudaDev.count > 0 then CudaDev.get 0 
+        if TensorCudaDevice.count > 0 then TensorCudaDevice.byIndex 0 
         else failwith "No CUDA-capable device is available."
+
+    /// <summary>Tensor device using the specified CUDA GPU as data storage.</summary>
+    /// <param name="idx">The index of the CUDA device.</param>
+    /// <seealso cref="Tensor`1.Dev"/>
+    /// <seealso cref="CudaDev"/>
+    let DevIdx idx =
+        TensorCudaDevice.byIndex idx
 
     /// <summary>Transfers a tensor to the CUDA device.</summary>
     /// <typeparam name="'T">The data type of the tensor.</typeparam>    

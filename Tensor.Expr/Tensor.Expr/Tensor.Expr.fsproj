@@ -11,6 +11,7 @@
     <Compile Include="../../Utils/NativeLib.fs" Link="Utils/NativeLib.fs" />
     <Compile Include="../../Utils/DiskMap.fs" Link="Utils/DiskMap.fs" />
     <Compile Include="../../Tensor/Tensor/Cuda/CudaUtils.fs" Link="Utils/CudaUtils.fs" />
+    <Compile Include="../../Utils/OrdRef.fs" Link="Utils/OrdRef.fs"/>
     <Compile Include="Debug.fs" />
     <Compile Include="Size/Frac.fs" />
     <Compile Include="Size/Size.fs" />
@@ -77,6 +78,9 @@
     <None Include="Old\CudaExec.fs" />
     <None Include="Old\CudaEval.fs" />
     <None Include="Old\VarEnvReg.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="FsPickler" Version="5.2.0" />
   </ItemGroup>
   <Import Project="../../Common.targets" />
 </Project>

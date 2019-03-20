@@ -69,11 +69,11 @@ module internal NativeTensor =
     let private typeCache = Dictionary<string, Type> ()
 
     let getType (dataType: Type) (nDims: int) =
-        let typeName = sprintf "Tensor_%s_%d" dataType.Name nDims
-        match typeCache.TryFind typeName with
-        | Some typ -> typ
-        | None ->
-            lock DynamicTypes.modBuilder (fun () ->
+        lock DynamicTypes.modBuilder (fun () ->
+            let typeName = sprintf "Tensor_%s_%d" dataType.Name nDims
+            match typeCache.TryFind typeName with
+            | Some typ -> typ
+            | None ->
                 // define new value type with attribute [<Struct; StructLayout(LayoutKind.Sequential)>]
                 let mb = DynamicTypes.modBuilder
                 let tb = mb.DefineType(typeName, 
@@ -92,7 +92,7 @@ module internal NativeTensor =
                 let typ = tb.CreateTypeInfo().AsType()
                 typeCache.[typeName] <- typ
                 typ
-            )
+        )
 
     /// C++ Tensor<T, nDims> struct ready for marshaling
     let marshal (nt: NativeTensor) =          
@@ -143,11 +143,11 @@ module internal NativeIdxTensors =
     let private typeCache = Dictionary<string, Type> ()
 
     let private getType (nDims: int) (nIdxs: int) =
-        let typeName = sprintf "IdxTensors_%d_%d" nDims nIdxs
-        match typeCache.TryFind typeName with
-        | Some typ -> typ
-        | None ->
-            lock DynamicTypes.modBuilder (fun () ->
+        lock DynamicTypes.modBuilder (fun () ->
+            let typeName = sprintf "IdxTensors_%d_%d" nDims nIdxs
+            match typeCache.TryFind typeName with
+            | Some typ -> typ
+            | None ->
                 // define new value type with attribute [<Struct; StructLayout(LayoutKind.Sequential)>]
                 let mb = DynamicTypes.modBuilder
                 let tb = mb.DefineType(typeName, 
@@ -165,7 +165,7 @@ module internal NativeIdxTensors =
                 let typ = tb.CreateTypeInfo().AsType()
                 typeCache.[typeName] <- typ
                 typ
-            )
+        )
 
     /// C++ IdxTensors<nDims, nIdxs> struct ready for marshalling
     let marshal (nit: NativeIdxTensors) =          

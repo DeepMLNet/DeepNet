@@ -4,6 +4,7 @@ open System
 open System.Collections
 open System.Collections.Generic
 open System.Diagnostics
+open MBrace.FsPickler
 
 open Tensor.Utils
 open Tensor.Backend
@@ -414,7 +415,7 @@ module ITensor =
 /// In most cases, it is not necessary to use the implicit constructor.</para>
 /// </remarks> 
 /// <seealso cref="ITensor"/> 
-type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pretty}")>] 
+type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pretty}"); CustomPickler>] 
         Tensor<'T> (layout: TensorLayout, storage: ITensorStorage<'T>) =
 
     do TensorLayout.check layout
@@ -4108,6 +4109,19 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     override this.GetHashCode () =
         hash (this.Storage, this.Layout)
 
+    /// <summary>Custom pickler for serialization and deserialization.</summary>
+    static member CreatePickler (resolver: IPicklerResolver) =
+        let lp = resolver.Resolve<TensorLayout> ()
+        let sp = resolver.Resolve<ITensorStorage<'T>> ()
+        let writer (ws: WriteState) (tensor: Tensor<'T>) =
+            lp.Write ws "Layout" tensor.Layout
+            sp.Write ws "Storage" tensor.Storage
+        let reader (rs: ReadState) =
+            let layout = lp.Read rs "Layout"
+            let storage = sp.Read rs "Storage"
+            Tensor<'T> (layout, storage)
+        Pickler.FromPrimitives(reader, writer)
+
     /// <summary>Type-neutral function for creating a new, uninitialized tensor with a new storage.</summary>
     /// <param name="shape">The shape of the tensor to create.</param>
     /// <param name="dataType">The data type of the tensor to create.</param>
@@ -4958,7 +4972,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     static member diff (a: Tensor<'T>) =
         if a.NDims < 1 then invalidArg "a" "Need at least a vector to calculate diff."
         Tensor.diffAxis (a.NDims-1) a
-        
+
 
 
 /// See Tensor<'T>.

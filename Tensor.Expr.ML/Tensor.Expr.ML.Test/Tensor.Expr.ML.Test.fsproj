@@ -22,6 +22,7 @@
     <Compile Include="DatasetTests.fs" />
     <Compile Include="NormalizationTests.fs" />
     <Compile Include="NeuralNetOnMNIST.fs" />
+    <Compile Include="SerializationTests.fs" />
     <Content Include="TestData\*.csv">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

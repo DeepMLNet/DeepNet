@@ -59,12 +59,13 @@
     <PackageReference Include="ManagedCuda-NVRTC.NETStandard" Version="9.1.300" />
     <PackageReference Include="System.Numerics.Vectors" Version="4.4.0" />
     <PackageReference Include="System.Reflection.Emit" Version="4.3.0" />
+    <PackageReference Include="FSPickler" Version="5.2" />
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="../../Utils/Utils.fs" />
-    <Compile Include="../../Utils/DiskMap.fs" />
-    <Compile Include="../../Utils/NativeLib.fs" />
+    <Compile Include="../../Utils/Utils.fs" Link="Utils/Utils.fs"/>
+    <Compile Include="../../Utils/DiskMap.fs" Link="Utils/DiskMap.fs"/>
+    <Compile Include="../../Utils/NativeLib.fs" Link="Utils/NativeLib.fs"/>
     <Compile Include="HDF5.fs" />
     <Compile Include="Sgn.fs" />
     <Compile Include="ScalarPrimitives.fs" />

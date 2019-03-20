@@ -1,10 +1,13 @@
 ﻿namespace rec Tensor.Expr.Ops
 
 open System
-open Tensor.Expr
+open MBrace.FsPickler
+
 open DeepNet.Utils
+open Tensor.Expr
 open Tensor
 open Tensor.Backend
+
 
 
 /// A channel name (one output of an expression/op with multiple outputs).
@@ -197,7 +200,7 @@ module private BaseExprTools =
 /// BaseExpr is reference-unique, i.e. all expressions that are structurally equal 
 /// are also reference equal.
 /// No conatined variables must have the same name but different types or shapes.
-[<StructuredFormatDisplay("{Pretty}")>]
+[<StructuredFormatDisplay("{Pretty}"); CustomPickler>]
 type BaseExpr private (op: IOp) =   
     do op.Check()
 
@@ -359,6 +362,15 @@ type BaseExpr private (op: IOp) =
 
     override this.Finalize () =
         uniqueExprs.Finalized this
+
+    static member CreatePickler (resolver : IPicklerResolver) =
+        let xp = resolver.Resolve<IOp> ()
+        let writer (ws : WriteState) (baseExpr: BaseExpr) =
+            xp.Write ws "op" baseExpr.Op
+        let reader (rs : ReadState) =
+            let op = xp.Read rs "op"
+            BaseExpr.ofOp op
+        Pickler.FromPrimitives(reader, writer)
 
     /// Converts expression to string with specified approximate maximum length.
     member this.ToString maxLength =     

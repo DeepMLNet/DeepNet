@@ -9,14 +9,15 @@ open System.Threading
 
 open Tensor.Utils
 open Tensor
+open Tensor.Cuda
 
 
 /// Test that only runs when CUDA is available.
 type CudaFactAttribute() as this =
     inherit FactAttribute()
     do
-        if CudaDev.count = 0 then
-            this.Skip <- "CudaDev.count = 0"
+        if TensorCudaDevice.count = 0 then
+            this.Skip <- "TensorCudaDevice.count = 0"
 
 
 type CudaTests (output: ITestOutputHelper) =
@@ -24,14 +25,14 @@ type CudaTests (output: ITestOutputHelper) =
 
     [<CudaFact>]
     let ``Device info`` () =
-        for i, info in Seq.indexed CudaDev.info do
+        for i, info in Seq.indexed TensorCudaDevice.info do
             printfn "Cuda device %d: %A" i info.DeviceName
 
     [<CudaFact>]
     let ``Tensor device for each GPU`` () =
-        for i in 0 .. CudaDev.count-1 do
+        for i in 0 .. TensorCudaDevice.count-1 do
             printfn "Getting tensor device for GPU %d" i
-            let dev = CudaDev.get i
+            let dev = TensorCudaDevice.byIndex i
             printfn "Done: %A" dev
 
     [<CudaFact>]
