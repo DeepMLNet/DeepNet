@@ -20,6 +20,12 @@ type Ch =
     /// N-th channel.
     | N of int
 
+    override this.ToString() =
+        match this with
+        | Default -> "Default"
+        | Custom name -> sprintf "Custom:%s" name
+        | N idx -> sprintf "%d" idx      
+
 
 /// An argument name.
 [<RequireQualifiedAccess>]
@@ -47,6 +53,18 @@ type TraceCustomData =
     | String of string
     | Tensor of ITensor
     | DateTime of DateTime
+
+    /// The contained value.
+    member this.Value =
+        match this with
+        | Bool value -> box value
+        | Int value -> box value
+        | Int64 value -> box value
+        | Single value -> box value
+        | Double value -> box value
+        | String value -> box value
+        | Tensor value -> box value
+        | DateTime value -> box value
 
 
 /// A trace event.

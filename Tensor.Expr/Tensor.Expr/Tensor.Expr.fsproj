@@ -11,7 +11,7 @@
     <Compile Include="../../Utils/NativeLib.fs" Link="Utils/NativeLib.fs" />
     <Compile Include="../../Utils/DiskMap.fs" Link="Utils/DiskMap.fs" />
     <Compile Include="../../Tensor/Tensor/Cuda/CudaUtils.fs" Link="Utils/CudaUtils.fs" />
-    <Compile Include="../../Utils/OrdRef.fs" Link="Utils/OrdRef.fs"/>
+    <Compile Include="../../Utils/OrdRef.fs" Link="Utils/OrdRef.fs" />
     <Compile Include="Debug.fs" />
     <Compile Include="Size/Frac.fs" />
     <Compile Include="Size/Size.fs" />
@@ -53,7 +53,8 @@
     <Compile Include="Deriv\Binary.fs" />
     <Compile Include="Deriv\Nary.fs" />
     <Compile Include="Deriv\Loop.fs" />
-    <Compile Include="TextTracer.fs" />
+    <Compile Include="Trace/TextTracer.fs" />
+    <Compile Include="Trace/HDF5Tracer.fs" />
     <Compile Include="EvalUpdateBundle.fs" />
     <Compile Include="ParSet.fs" />
     <Compile Include="ExprFunc.fs" />
@@ -81,6 +82,7 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="FsPickler" Version="5.2.0" />
+    <PackageReference Include="FsPickler.Json" Version="5.2.0" />
   </ItemGroup>
   <Import Project="../../Common.targets" />
 </Project>
