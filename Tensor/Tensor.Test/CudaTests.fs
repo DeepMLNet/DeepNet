@@ -12,14 +12,6 @@ open Tensor
 open Tensor.Cuda
 
 
-/// Test that only runs when CUDA is available.
-type CudaFactAttribute() as this =
-    inherit FactAttribute()
-    do
-        if TensorCudaDevice.count = 0 then
-            this.Skip <- "TensorCudaDevice.count = 0"
-
-
 type CudaTests (output: ITestOutputHelper) =
     let printfn format = Printf.kprintf (fun msg -> output.WriteLine(msg)) format 
 
