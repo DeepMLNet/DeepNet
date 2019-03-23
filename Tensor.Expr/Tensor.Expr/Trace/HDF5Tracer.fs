@@ -87,3 +87,28 @@ type HDF5Tracer (hdf: HDF5, ?prefix: string) =
             subtracer :> _
                
 
+
+/// Reads a trace captured by `HDF5Tracer` from a HDF5 file.              
+type HDF5Trace (hdf: HDF5, ?prefix: string) =
+    let prefix = defaultArg prefix "/"
+
+    let exprMap : Map<int, BaseExpr> =
+        let serializer = FsPickler.CreateJsonSerializer()
+        let exprMapJson = hdf.GetAttribute (prefix, "ExprMap")
+        serializer.UnPickleOfString exprMapJson
+
+    let idMap: Map<BaseExpr, int> =
+        exprMap
+        |> Map.toSeq
+        |> Seq.map (fun (id, expr) -> expr, id)
+        |> Map.ofSeq
+
+    /// The expression that was traced.
+    member this.BaseExpr =
+        let id = hdf.GetAttribute (prefix, "Expr")
+        exprMap.[id]
+
+    member this.Value (expr: BaseExpr) =
+        let id = idMap.[expr]
+        let exprPath = sprintf "%s/%d" prefix id
+        ()
