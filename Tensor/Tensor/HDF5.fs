@@ -175,6 +175,8 @@ type HDF5 private (path: string, mode: HDF5Mode) =
     /// <returns><c>true</c> if the path exists; <c>false</c> otherwise.</returns>
     member this.Exists (name: string) =
         checkDisposed ()
+        if String.IsNullOrEmpty name then
+            invalidArg "name" "HDF5 path must not be empty."
         let rec exists prefix dirs =
             match dirs with
             | [] -> true
@@ -305,6 +307,8 @@ type HDF5 private (path: string, mode: HDF5Mode) =
         checkDisposed ()
         if not (this.Exists name) then
             invalidOp "HDF5 object %s does not exist in file %s." name path
+        if String.IsNullOrEmpty atrName then
+            invalidArg "atrName" "Attribute name must not be null or empty."
 
         let valType = value.GetType()
         let hdfValType, data, dataLength =
@@ -316,6 +320,10 @@ type HDF5 private (path: string, mode: HDF5Mode) =
             elif valType.IsArray then 
                 let ary = box value :?> Array
                 hdfTypeInst (valType.GetElementType()), ary, uint64 ary.LongLength
+            elif valType = typeof<DateTime> then
+                let ary = Array.CreateInstance(typeof<int64>, 1)
+                ary.SetValue ((box value :?> DateTime).ToBinary(), 0)
+                hdfTypeInst typeof<int64>, ary, 1UL
             else 
                 let ary = Array.CreateInstance(valType, 1)
                 ary.SetValue (value, 0)
@@ -346,12 +354,15 @@ type HDF5 private (path: string, mode: HDF5Mode) =
         checkDisposed ()
         if not (this.Exists name) then
             invalidOp "HDF5 object %s does not exist in file %s." name path
+        if String.IsNullOrEmpty atrName then
+            invalidArg "atrName" "Attribute name must not be null or empty."
         if not (H5A.exists_by_name (fileHnd, name, atrName) > 0) then
             invalidOp "HDF5 attribute %s does not exist on object %s in file %s." atrName name path
 
         let elementType =
             if typeof<'T> = typeof<string> then typeof<byte>
             elif typeof<'T>.IsArray then typeof<'T>.GetElementType()
+            elif typeof<'T> = typeof<DateTime> then typeof<int64>
             else typeof<'T>
 
         let atrHnd = H5A.open_by_name (fileHnd, name, atrName) |> check
@@ -392,6 +403,8 @@ type HDF5 private (path: string, mode: HDF5Mode) =
             System.Text.Encoding.UTF8.GetString (data :?> byte[]) |> box :?> 'T
         elif typeof<'T>.IsArray then
             box data :?> 'T
+        elif typeof<'T> = typeof<DateTime> then
+            data.GetValue(0) :?> int64 |> DateTime.FromBinary |> box :?> 'T
         else
             data.GetValue(0) :?> 'T
 
