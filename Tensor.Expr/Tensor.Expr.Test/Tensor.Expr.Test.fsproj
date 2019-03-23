@@ -7,10 +7,12 @@
     <Platforms>x64</Platforms>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="..\..\Utils\CudaTestUtils.fs" Link="CudaTestUtils.fs" />
     <Compile Include="..\..\Utils\TestUtils.fs" Link="TestUtils.fs" />
     <Compile Include="BaseExprTests.fs" />
     <Compile Include="DerivCheck.fs" />
     <Compile Include="ExprTests.fs" />
+    <Compile Include="TracerTests.fs" />
     <None Include="OpTests.fs" />
     <None Include="CompilerPipeline.fs" />
     <None Include="DerivTests.fs" />

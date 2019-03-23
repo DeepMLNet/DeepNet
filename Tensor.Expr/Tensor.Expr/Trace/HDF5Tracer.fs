@@ -10,7 +10,7 @@ open Tensor
 
 /// Traces an expression evaluation to a HDF5 file.
 type HDF5Tracer (hdf: HDF5, ?prefix: string) =
-    let prefix = defaultArg prefix ""
+    let prefix = defaultArg prefix "/"
 
     let exprId = Dictionary<BaseExpr, int> ()
     let mutable nextExprId = 0
@@ -50,11 +50,13 @@ type HDF5Tracer (hdf: HDF5, ?prefix: string) =
             hdf.SetAttribute (path, attr, msg)
         | TraceEvent.EvalValue vals -> 
             for KeyValue(ch, value) in vals do
+                let devId = value.Dev.Id
                 let value =
                     if value.Dev = HostTensor.Dev then value
                     else ITensor.transfer HostTensor.Dev value
                 let valPath = sprintf "%s/Ch/%s" path (ch.ToString())
-                value |> HostTensor.write hdf valPath                
+                value |> HostTensor.write hdf valPath
+                hdf.SetAttribute (valPath, "DevId", devId)
         | TraceEvent.EvalStart startTime -> 
             hdf.SetAttribute (path, "EvalStart", startTime)
         | TraceEvent.EvalEnd endTime -> 
@@ -70,7 +72,7 @@ type HDF5Tracer (hdf: HDF5, ?prefix: string) =
             let exprPath = sprintf "%s/%d" path id
             writeEvent exprPath exprEvent
         | TraceEvent.Subtrace _ -> 
-            failwith "Subtract event not expected."
+            failwith "Subtrace event not expected."
 
               
     interface ITracer with
