@@ -26,7 +26,7 @@ type internal CopyDelegate<'T>   = delegate of DataAndLayout<'T> * DataAndLayout
 
 /// Vectorized (SIMD) operations on host tensors.
 type internal VectorOps() =
-    static let MethodDelegates = Dictionary<string * Type list, Delegate> ()
+    static let MethodDelegates = ConcurrentDictionary<string * Type list, Delegate> ()
 
     static let vecTypes = [|typeof<byte>; typeof<sbyte>; typeof<int16>; typeof<uint16>;
                             typeof<int32>; typeof<uint32>; typeof<int64>; typeof<uint64>;
@@ -242,15 +242,12 @@ type internal VectorOps() =
 
     static member inline private Method<'D when 'D :> Delegate> (name: string) : 'D = 
         let dt = typeof<'D>.GenericTypeArguments
-        let dtl = dt |> List.ofArray
-        match MethodDelegates.TryFind (name, dtl) with
-        | Some del -> del :?> 'D
-        | None -> 
+        let dtl = List.ofArray dt 
+        let del = MethodDelegates.GetOrAdd ((name, dtl), fun _ ->
             let mi = typeof<VectorOps>.GetMethod (name, BindingFlags.Static ||| BindingFlags.NonPublic)
             let mi = mi.MakeGenericMethod(dt)
-            let del = mi.CreateDelegate(typeof<'D>) 
-            MethodDelegates.[(name, dtl)] <- del
-            del :?> 'D
+            mi.CreateDelegate(typeof<'D>))
+        del :?> 'D
 
     static member Fill (value: 'T, trgt: DataAndLayout<'T>) =
         VectorOps.Method<FillDelegate<'T>>("FillImpl").Invoke (value, trgt) 
