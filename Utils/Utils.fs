@@ -589,16 +589,28 @@ module internal String =
                 | _ -> s + "..."
             )
 
-/// Integer extensions            
-module internal Int32 =
+    // active pattern parsing
+    let private tryParseWith tryParseFunc = 
+        tryParseFunc >> function
+            | true, v    -> Some v
+            | false, _   -> None
 
-    /// Parses an integer.
-    let tryParse (s: string) : Int32 option =
-        let mutable result: Int32 = 0
-        if Int32.TryParse(s, ref result) then
-            Some result
-        else
-            None
+    /// Matches a DateTime.
+    let (|DateTime|_|) = tryParseWith System.DateTime.TryParse
+    /// Matches an int32.
+    let (|Int|_|)      = tryParseWith System.Int32.TryParse
+    /// Matches an int64.
+    let (|Int64|_|)    = tryParseWith System.Int64.TryParse
+    /// Matches a single.
+    let (|Single|_|)   = tryParseWith System.Single.TryParse
+    /// Matches a double.
+    let (|Double|_|)   = tryParseWith System.Double.TryParse
+    
+    /// Matches a string with the given prefix.
+    let (|Prefixed|_|) (prefix: string) (str: string) =
+        if str.StartsWith prefix then Some str.[prefix.Length..]
+        else None
+
 
 
 /// Exception helpers
@@ -690,6 +702,4 @@ type ConcurrentWeakDict<'K, 'V> when 'K: equality and 'V: not struct
             )
         if deadCount > deadLimit then
             lock mutex (fun () -> clean ())
-
-
 

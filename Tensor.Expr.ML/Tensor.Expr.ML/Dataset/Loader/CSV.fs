@@ -5,28 +5,10 @@ open System.IO.Compression
 open System.Net
 open FSharp.Data
 
+open DeepNet.Utils
 open Tensor
 open Tensor.Expr.ML
 
-
-module private TryParser =
-    // convenient, functional TryParse wrappers returning option<'a>
-    let tryParseWith tryParseFunc = 
-        tryParseFunc >> function
-            | true, v    -> Some v
-            | false, _   -> None
-
-    let parseDate   = tryParseWith System.DateTime.TryParse
-    let parseInt    = tryParseWith System.Int32.TryParse
-    let parseSingle = tryParseWith System.Single.TryParse
-    let parseDouble = tryParseWith System.Double.TryParse
-    // etc.
-
-    // active patterns for try-parsing strings
-    let (|Date|_|)   = parseDate
-    let (|Int|_|)    = parseInt
-    let (|Single|_|) = parseSingle
-    let (|Double|_|) = parseDouble
 
 
 module Csv =
@@ -95,9 +77,9 @@ module Csv =
             |> Array.map (fun col ->
                 let col = col.Trim()
                 match col, intTreatment with
-                | TryParser.Int _, IntAsNumerical -> Numerical
-                | TryParser.Int n, IntAsCategorical -> Categorical (Set [n.ToString()])
-                | TryParser.Double d, _ -> Numerical
+                | String.Int _, IntAsNumerical -> Numerical
+                | String.Int n, IntAsCategorical -> Categorical (Set [n.ToString()])
+                | String.Double d, _ -> Numerical
                 | _ when col = "?" -> Unknown
                 | _ -> Categorical (Set [col]))
             |> Array.toList)
@@ -112,7 +94,7 @@ module Csv =
                     | Numerical, Numerical -> Numerical
                     | Categorical cs, Numerical | Numerical, Categorical cs when
                         intTreatment = IntAsCategorical && 
-                        cs |> Set.forall (function TryParser.Int _ -> true | _ -> false) -> Numerical                        
+                        cs |> Set.forall (function String.Int _ -> true | _ -> false) -> Numerical                        
                     | Unknown, other | other, Unknown -> other
                     | _ -> failwithf "inconsistent column type in row %d, column %d (zero-based): %A and %A" 
                                      rowIdx2 colIdx c1 c2)
@@ -130,7 +112,7 @@ module Csv =
                 match typ with
                 | _ when col = "?" -> Missing
                 | Categorical _ -> Category col
-                | Numerical -> Number (TryParser.parseDouble col).Value
+                | Numerical -> Number (System.Double.Parse col)
                 | Unknown -> failwith "a column had only missing values")
             |> Seq.toList
         )

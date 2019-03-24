@@ -42,6 +42,9 @@ module private HDF5Support =
         | :? int64 as rv ->
             if rv < 0L then raiseErr()
             else retVal        
+        | :? nativeint as rv ->
+            if rv < 0n then raiseErr()
+            else retVal
         | rv -> 
             failwithf "Internal error: unknown HDF5 return type: %A" (rv.GetType())
 
@@ -91,6 +94,15 @@ type private HDF5Mode =
     | HDF5Read
     /// (over-)write HDF5 file
     | HDF5Overwrite
+
+
+/// An entry in an HDF5 group.
+[<RequireQualifiedAccess>]
+type HDF5Entry =
+    /// A dataset entry.
+    | Dataset of string
+    /// A group entry.
+    | Group of string
 
 
 /// <summary>An object representing an HDF5 file.</summary>
@@ -182,10 +194,65 @@ type HDF5 private (path: string, mode: HDF5Mode) =
             | [] -> true
             | dir::dirs ->
                 let nextPrefix = prefix @ [dir]
-                if H5L.exists (fileHnd, HDF5.CombinePath nextPrefix) |> check <= 0 then false
+                if H5L.exists (fileHnd, HDF5.CombinePath nextPrefix) |> check <= 0 then
+                    false
                 else
                     exists nextPrefix dirs
         exists [] (HDF5.SplitPath name) 
+
+    /// <summary>Get the object type of the specified path.</summary>
+    /// <param name="name">HDF5 object path.</param>
+    /// <returns>HDF5 object type.</returns>
+    member this.ObjectType (name: string) =
+        checkDisposed ()
+        if not (this.Exists name) then
+            invalidArg "name" "HDF5 path %s does not exist in file %s." name path
+
+        let hnd = H5O.``open``(fileHnd, name) |> check
+        let typeId = H5I.get_type(hnd)
+        H5O.close (hnd) |> check |> ignore
+        typeId
+
+    /// <summary>Returns all group and dataset entries under the specified group.</summary>
+    /// <param name="name">HDF5 group path.</param>
+    /// <returns>A list of entries (using relative names) in the specfied group.</returns>
+    /// <remarks>Currently only group and dataset entries are returned.</remarks>
+    member this.Entries (name: string) =
+        checkDisposed ()
+        if not (this.Exists name) then
+            invalidArg "name" "HDF5 path %s does not exist in file %s." name path
+        if this.ObjectType name <> H5I.type_t.GROUP then
+            invalidArg "name" "HDF5 path %s in file %s is not a group." name path
+
+        // get number of links in group
+        let mutable grpInfo = H5G.info_t ()
+        H5G.get_info_by_name (fileHnd, name, &grpInfo) |> check |> ignore
+
+        // get links
+        [
+            for n in 0UL .. grpInfo.nlinks - 1UL do
+                // get name
+                let length = 
+                    H5L.get_name_by_idx (fileHnd, name, H5.index_t.NAME, H5.iter_order_t.NATIVE, n, 
+                                         null, 0n) |> check
+                let sb = Text.StringBuilder (int length + 1)
+                H5L.get_name_by_idx (fileHnd, name, H5.index_t.NAME, H5.iter_order_t.NATIVE, n, 
+                                     sb, nativeint sb.Capacity) |> check |> ignore
+                let entryName = sb.ToString()
+
+                // determine type
+                let hnd = 
+                    H5O.open_by_idx(fileHnd, name, H5.index_t.NAME, H5.iter_order_t.NATIVE, n)
+                    |> check 
+                let typeId = H5I.get_type(hnd)
+                H5O.close (hnd) |> check |> ignore
+
+                match typeId with
+                | H5I.type_t.DATASET -> yield HDF5Entry.Dataset entryName
+                | H5I.type_t.GROUP -> yield HDF5Entry.Group entryName
+                | _ -> ()   
+        ]
+
 
     /// <summary>Creates the given group path.</summary>
     /// <param name="path">HDF5 group path to create.</param>
