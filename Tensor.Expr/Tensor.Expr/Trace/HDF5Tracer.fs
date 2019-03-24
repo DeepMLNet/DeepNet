@@ -103,12 +103,35 @@ type HDF5Trace (hdf: HDF5, ?prefix: string) =
         |> Seq.map (fun (id, expr) -> expr, id)
         |> Map.ofSeq
 
+    let getId expr =
+        match idMap |> Map.tryFind expr with
+        | Some id -> id
+        | None -> failwith "The specified expression is not contained in the trace."
+
+    let getChVals (path: string) =
+        let chBasePath = sprintf "%s/Ch" path
+        hdf.Entries chBasePath
+        |> Seq.choose (function
+                       | HDF5Entry.Dataset chStr ->
+                           let chPath = sprintf "%s/%s" chBasePath chStr
+                           match Ch.tryParse chStr with
+                           | Some ch -> Some (ch, HostTensor.readUntyped hdf chPath)
+                           | None -> None
+                       | _ -> None)
+        |> Map.ofSeq
+
     /// The expression that was traced.
     member this.BaseExpr =
         let id = hdf.GetAttribute (prefix, "Expr")
         exprMap.[id]
 
-    member this.Value (expr: BaseExpr) =
-        let id = idMap.[expr]
-        let exprPath = sprintf "%s/%d" prefix id
+    /// Gets the evaluated channel values of the specified (sub-)expression.
+    member this.ChVals (expr: BaseExpr) =
+        let exprPath = sprintf "%s/%d" prefix (getId expr)
+        getChVals exprPath
+
+    /// The subtraces contained in this trace.
+    member this.Subtraces =
         ()
+
+        

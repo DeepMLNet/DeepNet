@@ -24,7 +24,14 @@ type Ch =
         match this with
         | Default -> "Default"
         | Custom name -> sprintf "Custom:%s" name
-        | N idx -> sprintf "%d" idx      
+        | N idx -> sprintf "%d" idx     
+        
+    static member tryParse (str: string) =
+        match str with
+        | "Default" -> Some Default
+        | String.Prefixed "Custom:" ch -> Some (Custom ch)
+        | String.Int n -> Some (N n)
+        | _ -> None
 
 
 /// An argument name.
