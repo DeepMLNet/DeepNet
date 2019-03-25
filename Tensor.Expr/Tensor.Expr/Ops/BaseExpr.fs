@@ -346,7 +346,7 @@ type BaseExpr private (op: IOp) =
                 |> subExpr.Op.ReplaceArgs 
                 |> fn
                 |> BaseExpr.ofOp)
-        mapStep expr
+        mapStep expr       
 
     /// Substitutes the symbolic sizes within the expression tree.
     static member substSymSizes (env: SizeEnv) (expr: BaseExpr) =
@@ -361,6 +361,21 @@ type BaseExpr private (op: IOp) =
                 | Some replExpr -> replExpr.Op 
                 | None -> op
             | _ -> op)
+
+    /// Deterministically assigns a numeric id to each expression within the expression tree.
+    /// The order is based on argument names.
+    static member enumerate (expr: BaseExpr) = 
+        let ids = Dictionary<BaseExpr, int> ()
+        let mutable nextId = 0
+        let rec enumerate (expr: BaseExpr) =
+            if not (ids.ContainsKey expr) then
+                ids.[expr] <- nextId
+                nextId <- nextId + 1
+                let args = expr.Args |> Map.toList |> List.sortBy fst
+                for (_arg, argExprCh) in args do
+                    enumerate argExprCh.Expr
+        enumerate expr
+        ids |> Map.ofDictionary
  
     /// Access to specified channel of this expression.
     member this.Item

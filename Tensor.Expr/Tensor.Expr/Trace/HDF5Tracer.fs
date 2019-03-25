@@ -111,6 +111,20 @@ type ExprTraceData = {
     member this.ChVals = this.Ch |> Map.map (fun _ v -> v())
 
 
+/// A difference between two traces.
+type TraceDiff = {
+    /// Expression from trace A that has a value that differs.
+    AExpr: BaseExpr
+    /// Expression from trace B that has a value that differs.
+    BExpr: BaseExpr
+    /// The channel that has a value that differs.
+    Ch: Ch
+    /// The value from trace A.
+    AValue: ITensor
+    /// The value from trace B.
+    BValue: ITensor
+}
+
 
 /// Reads a trace captured by `HDF5Tracer` from a HDF5 file.              
 type HDF5Trace (hdf: HDF5, ?prefix: string) =
@@ -209,4 +223,47 @@ type HDF5Trace (hdf: HDF5, ?prefix: string) =
     member this.Subtraces =
         failwith "TODO"
 
-        
+    /// Compares two traces and returns all subexpressions that have different values.
+    /// Subexpressions are matched by their position within the expression tree.
+    static member diff (a: HDF5Trace, b: HDF5Trace, ?isEqual: ITensor -> ITensor -> bool) =
+        let isEqual = defaultArg isEqual (fun a b -> a.AlmostEqual b)
+
+        // enumerate expression trees
+        let aIds = BaseExpr.enumerate a.Root
+        let bIds = BaseExpr.enumerate b.Root
+        let bExprs = 
+            bIds 
+            |> Map.toSeq 
+            |> Seq.map (fun (expr, id) -> id, expr) 
+            |> Map.ofSeq
+        if Map.count aIds <> Map.count bIds then
+            failwithf "Expression tree of this trace has %d expressions but \
+                       expression tree of other trace has %d expressions."
+                (Map.count aIds) (Map.count bIds)
+
+        // compare each subexpression value
+        seq {
+            for KeyValue(aExpr, id) in aIds do
+                let aData = a.[aExpr]
+                let bExpr = bExprs.[id]
+                let bData = b.[bExpr]
+
+                // compare each channel
+                for KeyValue(ch, aVal) in aData.Ch do
+                    let aVal = aVal()
+                    let bVal =
+                        match bData.Ch |> Map.tryFind ch with
+                        | Some bVal -> bVal()
+                        | None -> 
+                            failwithf "Channel %A is missing for expression %A \
+                                       (this trace) respectively %A (other trace)."
+                                ch aExpr bExpr
+                    if not (isEqual aVal bVal) then
+                        yield {
+                            AExpr = aExpr
+                            BExpr = bExpr
+                            Ch = ch
+                            AValue = aVal
+                            BValue = bVal
+                        }
+        }                
