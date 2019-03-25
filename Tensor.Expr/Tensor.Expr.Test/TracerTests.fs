@@ -39,26 +39,43 @@ type TracerTestVals (dev: ITensorDevice) =
 type HDF5TracerTests (output: ITestOutputHelper) =
     let printfn format = Printf.kprintf (fun msg -> output.WriteLine(msg)) format 
 
-    let getTracer (dev: ITensorDevice) name =
+    let performTraceTest (dev: ITensorDevice) name expr varEnv =
         let devStr =
             match dev with
             | :? TensorHostDevice -> "host"
             | :? TensorCudaDevice -> "cuda"
             | _ -> dev.Id
-        let hdf = HDF5.OpenWrite (sprintf "%s_%s.h5" name devStr)
-        HDF5Tracer (hdf)
+        let hdfName = sprintf "%s_%s.h5" name devStr
+
+        // write trace
+        printfn "Writing trace %s on %A" name dev
+        (
+            use hdf = HDF5.OpenWrite hdfName
+            let tracer = HDF5Tracer hdf    
+            let evalEnv: Ops.EvalEnv = {VarEnv=varEnv; Tracer=tracer}
+            expr |> UExpr.evalWithEnv evalEnv |> ignore
+        )
+
+        // read trace
+        printfn "Reading trace"
+        (
+            use hdf = HDF5.OpenRead hdfName
+            let trace = HDF5Trace hdf
+            printfn "Root expression: %A" trace.Root
+            let data = trace.[trace.Root]
+            printfn "Trace data for root:\n%A" data
+            printfn "Channel values:\n%A" data.ChVals
+        )
 
     let simpleExpr dev =
         let v = TracerTestVals dev
         let expr = Expr v.A + Expr v.B
-        let evalEnv: Ops.EvalEnv = {VarEnv=v.VarEnv; Tracer=getTracer dev "simpleExpr"}
-        expr.Untyped |> UExpr.evalWithEnv evalEnv
+        performTraceTest dev "simpleExpr" expr.Untyped v.VarEnv
 
     let exprWithData dev =
         let v = TracerTestVals dev
         let expr = 10.0 * Expr v.Data + 5.0
-        let evalEnv: Ops.EvalEnv = {VarEnv=v.VarEnv; Tracer=getTracer dev "exprWithData"}
-        expr.Untyped |> UExpr.evalWithEnv evalEnv        
+        performTraceTest dev "exprWithData" expr.Untyped v.VarEnv  
 
     [<Fact>]
     let ``CPU: simpleExpr`` () =
