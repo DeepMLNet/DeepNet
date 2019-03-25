@@ -66,7 +66,7 @@ type HDF5Tracer (hdf: HDF5, ?prefix: string) =
         | TraceEvent.LoopIter iter -> 
             hdf.SetAttribute (path, "LoopIter", iter)
         | TraceEvent.Custom (key, data) -> 
-            hdf.SetAttribute (path, key, data.Value)
+            hdf.SetAttribute (path, sprintf "Custom:%s" key, data.Value)
         | TraceEvent.ForExpr (expr, exprEvent) ->
             let id = getExprId expr
             let exprPath = sprintf "%s/%d" path id
@@ -86,6 +86,29 @@ type HDF5Tracer (hdf: HDF5, ?prefix: string) =
             nextSubtraceId <- nextSubtraceId + 1
             subtracer :> _
                
+
+/// Trace data for an expression.
+type ExprTraceData = {
+    /// Expression.
+    Expr: BaseExpr
+    /// Evaluation start time.
+    EvalStart: DateTime
+    /// Evaluation end time.
+    EvalEnd: DateTime
+    /// Messages.
+    Msg: string list
+    /// Custom trace data.
+    Custom: Map<string, TraceCustomData>
+    /// Channel value reader functions.
+    Ch: Map<Ch, unit -> ITensor>
+} with
+
+    /// Evaluation duration. 
+    member this.EvalDuration = this.EvalEnd - this.EvalStart
+
+    /// Channel values.
+    member this.ChVals = this.Ch |> Map.map (fun _ v -> v())
+
 
 
 /// Reads a trace captured by `HDF5Tracer` from a HDF5 file.              
@@ -108,30 +131,81 @@ type HDF5Trace (hdf: HDF5, ?prefix: string) =
         | Some id -> id
         | None -> failwith "The specified expression is not contained in the trace."
 
-    let getChVals (path: string) =
-        let chBasePath = sprintf "%s/Ch" path
-        hdf.Entries chBasePath
-        |> Seq.choose (function
-                       | HDF5Entry.Dataset chStr ->
-                           let chPath = sprintf "%s/%s" chBasePath chStr
-                           match Ch.tryParse chStr with
-                           | Some ch -> Some (ch, HostTensor.readUntyped hdf chPath)
-                           | None -> None
-                       | _ -> None)
-        |> Map.ofSeq
-
     /// The expression that was traced.
-    member this.BaseExpr =
+    member this.Root =
         let id = hdf.GetAttribute (prefix, "Expr")
         exprMap.[id]
+   
+    /// Gets the trace data for the specified (sub-)expression.
+    member this.TryGet (expr: BaseExpr) =
+        match idMap |> Map.tryFind expr with
+        | Some id ->
+            let exprPath = sprintf "%s/%d" prefix id
+            let atrs = hdf.Attributes exprPath
 
-    /// Gets the evaluated channel values of the specified (sub-)expression.
-    member this.ChVals (expr: BaseExpr) =
-        let exprPath = sprintf "%s/%d" prefix (getId expr)
-        getChVals exprPath
+            // get messages
+            let msgs: string list =
+                atrs 
+                |> Map.toList
+                |> List.choose (fun (name, typ) ->
+                    match name with
+                    | String.Prefixed "Msg" (String.Int n) when typ = typeof<string> ->
+                        Some (n, hdf.GetAttribute (exprPath, name))
+                    | _ -> None)
+                |> List.sortBy fst
+                |> List.map snd
+
+            // get custom attributes
+            let custom =
+                atrs
+                |> Map.toSeq
+                |> Seq.choose (fun (name, typ) ->
+                    match name with
+                    | String.Prefixed "Custom:" key ->
+                        let inline get () = hdf.GetAttribute (exprPath, name)
+                        if typ = typeof<bool> then Some (key, TraceCustomData.Bool (get()))
+                        elif typ = typeof<int> then Some (key, TraceCustomData.Int (get()))
+                        elif typ = typeof<int64> then Some (key, TraceCustomData.Int64 (get()))
+                        elif typ = typeof<single> then Some (key, TraceCustomData.Single (get()))
+                        elif typ = typeof<double> then Some (key, TraceCustomData.Double (get()))
+                        elif typ = typeof<string> then Some (key, TraceCustomData.String (get()))
+                        elif typ = typeof<DateTime> then Some (key, TraceCustomData.DateTime (get()))
+                        else None
+                    | _ -> None)
+                |> Map.ofSeq
+
+            // get channels
+            let chs =
+                hdf.Entries (sprintf "%s/Ch" exprPath)
+                |> Seq.choose (function
+                               | HDF5Entry.Dataset chStr ->
+                                   let chPath = sprintf "%s/Ch/%s" exprPath chStr
+                                   match Ch.tryParse chStr with
+                                   | Some ch -> Some (ch, fun () -> HostTensor.readUntyped hdf chPath)
+                                   | None -> None
+                               | _ -> None)
+                |> Map.ofSeq
+
+            Some {
+                Expr = expr
+                EvalStart = hdf.GetAttribute (exprPath, "EvalStart")
+                EvalEnd = hdf.GetAttribute (exprPath, "EvalEnd")
+                Msg = msgs
+                Custom = custom
+                Ch = chs
+            }
+        | None -> None  
+             
+    /// Gets the trace data for the specified (sub-)expression.
+    member this.Item
+        with get (expr: BaseExpr) =
+            match this.TryGet expr with
+            | Some data -> data
+            | None ->
+                failwith "The specified expression is not contained in the trace."         
 
     /// The subtraces contained in this trace.
     member this.Subtraces =
-        ()
+        failwith "TODO"
 
         
