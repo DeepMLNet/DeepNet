@@ -49,3 +49,33 @@ type HDF5Tests (output: ITestOutputHelper) =
             Set groupEntries |> should equal (Set [HDF5Entry.Dataset "a"; HDF5Entry.Dataset "b"])
         )    
 
+    [<Fact>]
+    let ``Attributes`` () =
+        let tensor = HostTensor.counting 123L
+        (
+            use f = HDF5.OpenWrite "write_test.h5"
+            HostTensor.write f "/tensor" tensor
+            f.SetAttribute ("/tensor", "str", "strValue")
+            f.SetAttribute ("/tensor", "int", 123)
+            f.SetAttribute ("/tensor", "float", 123.0)
+        )
+
+        (
+            use f = HDF5.OpenRead "write_test.h5"
+
+            let strValue: string = f.GetAttribute ("/tensor", "str") 
+            strValue |> should equal "strValue"
+            let intValue: int = f.GetAttribute ("/tensor", "int") 
+            intValue |> should equal 123
+            let floatValue: float = f.GetAttribute ("/tensor", "float") 
+            floatValue |> should equal 123.0
+
+            let atrs = f.Attributes "/tensor"
+            printfn "Attributes of /tensor: %A" atrs
+            let atrsExpected = Map [
+                "str", typeof<string>
+                "int", typeof<int>
+                "float", typeof<float>
+            ]
+            atrs |> should equal atrsExpected
+        )

@@ -74,9 +74,13 @@ module private HDF5Support =
     let hdfType<'T> =  
         hdfTypeInst typeof<'T>
 
+    let tryNetType t =
+        hdfTypeTable 
+        |> List.tryPick (fun (nt, ht) -> 
+            if H5T.equal(ht, t) > 0 then Some nt else None) 
+
     let netType t =     
-        match hdfTypeTable |> List.tryPick (fun (nt, ht) -> 
-            if H5T.equal(ht, t) > 0 then Some nt else None) with
+        match tryNetType t with
         | Some nt -> nt
         | None -> invalidOp "Unsupported HDF5 type: %A" t
 
@@ -416,7 +420,7 @@ type HDF5 private (path: string, mode: HDF5Mode) =
     /// <param name="name">HDF5 path to operate on.</param>
     /// <param name="atrName">Name of the attribute.</param>
     /// <returns>Value of the attribute.</returns>    
-    /// <seealso cref="SetAttribute``1"/><seealso cref="GetRecord``1"/>
+    /// <seealso cref="SetAttribute``1"/><seealso cref="GetRecord``1"/><seealso cref="Attributes"/>
     member this.GetAttribute (name: string, atrName: string) : 'T =
         checkDisposed ()
         if not (this.Exists name) then
@@ -474,6 +478,49 @@ type HDF5 private (path: string, mode: HDF5Mode) =
             data.GetValue(0) :?> int64 |> DateTime.FromBinary |> box :?> 'T
         else
             data.GetValue(0) :?> 'T
+
+    /// <summary>Gets the names and type of all attributes associated with an HDF5 object.</summary>
+    /// <param name="name">HDF5 path to operate on.</param>
+    /// <returns>A map of all attributes and their data type.</returns>    
+    /// <remarks>Attributes with unsupported data types are skipped.</remarks>
+    /// <seealso cref="GetAttribute``1"/>
+    member this.Attributes (name: string) : Map<string, Type> =
+        checkDisposed ()
+        if not (this.Exists name) then
+            invalidOp "HDF5 object %s does not exist in file %s." name path       
+
+        // get number of attributes
+        let mutable objInfo = H5O.info_t ()
+        H5O.get_info_by_name (fileHnd, name, &objInfo) |> check |> ignore
+
+        seq {
+            for n in 0UL .. objInfo.num_attrs - 1UL do
+                // open attribute
+                let atrHnd = 
+                    H5A.open_by_idx (fileHnd, name, H5.index_t.NAME, H5.iter_order_t.NATIVE, n)
+                    |> check
+
+                // get name
+                let sbNull: Text.StringBuilder = null
+                let length = H5A.get_name (atrHnd, 0n, sbNull) |> check
+                let sb = Text.StringBuilder (int length + 1)
+                H5A.get_name (atrHnd, nativeint sb.Capacity, sb) |> check |> ignore
+                let name = sb.ToString()
+
+                // get data type
+                let typeHnd = H5A.get_type (atrHnd) |> check
+                let dataType =
+                    if H5T.get_class (typeHnd) = H5T.class_t.STRING then Some typeof<string>
+                    else tryNetType typeHnd
+                H5T.close (typeHnd) |> check |> ignore
+
+                // close attribute
+                H5A.close (atrHnd) |> check |> ignore
+
+                match dataType with
+                | Some typ -> yield name, typ
+                | None -> ()
+        } |> Map.ofSeq
 
     /// <summary>Set attribute values on an HDF5 object using the provided record.</summary>
     /// <typeparam name="'R">Type of the F# record. It must contain only field of primitive data types.</typeparam>
