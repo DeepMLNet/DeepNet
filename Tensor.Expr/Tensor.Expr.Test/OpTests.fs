@@ -62,34 +62,40 @@ type OpTests (output: ITestOutputHelper) =
             let res = expr |> Expr.eval varEnv
             printfn "res=%A" res)
 
+    let checkFiniteOpTest (ctx: Context) diagVal offDiagVal =
+        let a = Var<single> (ctx / "a", [Size.fix 3L; Size.fix 3L])
+        let b = Var<single> (ctx / "b", [Size.fix 3L; Size.fix 3L])
+        let expr = Expr a / Expr b |> Expr.checkFinite "a / b"
 
+        let av = HostTensor.ones<single> [3L; 3L] |> Tensor.transfer ctx.Dev
+        let dv = diagVal * HostTensor.ones<single> [3L] |> Tensor.transfer ctx.Dev
+        let bv = offDiagVal * HostTensor.ones<single> [3L; 3L] |> Tensor.transfer ctx.Dev
 
-    //let checkFiniteOpTest diagVal offDiagVal =
-    //    let a = Expr.var<single> "a" [SizeSpec.fix 3L; SizeSpec.fix 3L]
-    //    let b = Expr.var<single> "b" [SizeSpec.fix 3L; SizeSpec.fix 3L]
-    //    let expr = a / b |> Expr.checkFinite "a / b"
-    //    let fn = Func.make<single> DevCuda.DefaultFactory expr |> arg2 a b
-    //    let av = CudaTensor.ones<single> [3L; 3L]
-    //    let dv = diagVal * HostTensor.ones<single> [3L] |> CudaTensor.transfer
-    //    let bv = offDiagVal * HostTensor.ones<single> [3L; 3L] |> CudaTensor.transfer
-    //    (Tensor.diag bv).[*] <- dv
-    //    printfn "a=\n%A" av
-    //    printfn "b=\n%A" bv
-    //    let iav = fn av bv
-    //    printfn "a / b=\n%A" iav
+        (Tensor.diag bv).[*] <- dv
+        printfn "a=\n%A" av
+        printfn "b=\n%A" bv
 
-    //[<Fact>]
-    
-    //let ``Check finite on CUDA failing`` () =
-    //    SymTensor.Compiler.Cuda.Debug.TerminateWhenNonFinite <- false
-    //    printfn "failing:"
-    //    checkFiniteOpTest 1.0f 0.0f
+        let varEnv = VarEnv.ofSeq [a, av; b, bv]
+        let iav = expr |> Expr.eval varEnv
+        printfn "a / b=\n%A" iav
 
-    //[<Fact>]
-    
-    //let ``Check finite on CUDA passing`` () =
-    //    printfn "passing:"
-    //    checkFiniteOpTest 1.0f 0.5f
+    [<Fact>]
+    let ``Check finite failing`` () =
+        runOnAllDevs output (fun ctx ->
+            printfn "failing:"
+            try
+                checkFiniteOpTest ctx 1.0f 0.0f
+                failwith "no exception encountered"
+            with :? Ops.NonFiniteValueException as ex ->
+                printfn "Exception: %A" ex
+        )
+
+    [<Fact>]
+    let ``Check finite passing`` () =
+        runOnAllDevs output (fun ctx ->
+            printfn "passing:"
+            checkFiniteOpTest ctx 1.0f 0.5f
+        )
 
     //[<Fact>]
     //let ``ReverseAxis on host`` () =

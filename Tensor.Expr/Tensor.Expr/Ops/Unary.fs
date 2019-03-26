@@ -822,6 +822,12 @@ type Dump = {Dataset: string; X: BaseExprCh} with
             v |> Ch.only                            
 
 
+/// A non-finite value was encountered.
+exception NonFiniteValueException of msg:string with 
+    /// <summary>Detailed error message.</summary>    
+    override __.Message = __.msg
+
+
 /// If the value contains NaNs or infinities, outputs their location and 
 /// stops the computation.
 type CheckFinite = {Label: string; X: BaseExprCh} with
@@ -838,8 +844,9 @@ type CheckFinite = {Label: string; X: BaseExprCh} with
         member this.Eval env argVals = 
             let v = ArgValue.unaryX argVals
             if not (v.AllFinite ()) then
-                printfn "Infinity or NaN encountered in %s with value:\n%A" this.Label v
-                failwithf "Infinity or NaN encountered in %s." this.Label
+                let msg = 
+                    sprintf "Non-finite value encountered in %s with value:\n%A" this.Label v
+                raise (NonFiniteValueException msg)
             v |> Ch.only                            
 
 
