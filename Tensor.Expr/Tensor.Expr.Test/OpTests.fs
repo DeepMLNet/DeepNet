@@ -97,22 +97,22 @@ type OpTests (output: ITestOutputHelper) =
             checkFiniteOpTest ctx 1.0f 0.5f
         )
 
-    //[<Fact>]
-    //let ``ReverseAxis on host`` () =
-    //    let a = Expr.var<int> "a" [SizeSpec.fix 3L; SizeSpec.fix 2L]
-    //    let expr0 = Expr.reverseAxis 0 a
-    //    let expr1 = Expr.reverseAxis 1 a
-    //    let fn = Func.make2<int, int> DevHost.DefaultFactory expr0 expr1 |> arg1 a
+    [<Fact>]
+    let ``ReverseAxis`` () =
+        runOnAllDevs output (fun ctx ->
+            let a = Var<int> (ctx / "a", [Size.fix 3L; Size.fix 2L])
+            let expr0 = Expr.reverseAxis 0 (Expr a)
+            let expr1 = Expr.reverseAxis 1 (Expr a)
 
-    //    let av = [0 .. 5] |> HostTensor.ofList |> Tensor.reshape [3L; 2L]
-    //    printfn "av=\n%A" av
+            let av = [0 .. 5] |> HostTensor.ofList |> Tensor.reshape [3L; 2L] |> Tensor.transfer ctx.Dev
+            printfn "av=\n%A" av
 
-    //    let rav0, rav1 = fn av
-    //    printfn "rev 0 av=\n%A" rav0
-    //    printfn "rev 1 av=\n%A" rav1
-
-
-
+            let varEnv = VarEnv.ofSeq [a, av]
+            let rav0 = expr0 |> Expr.eval varEnv
+            let rav1 = expr1 |> Expr.eval varEnv
+            printfn "rev 0 av=\n%A" rav0
+            printfn "rev 1 av=\n%A" rav1
+        )
 
     //[<Fact>]
     //let ``Replicate`` () =
