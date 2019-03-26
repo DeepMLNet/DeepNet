@@ -43,169 +43,25 @@ type OpTests (output: ITestOutputHelper) =
             | :? TensorCudaDevice -> Cuda.Cfg.Stacktrace <- false
             | _ -> ())
 
+    [<Fact>]
+    let ``Comparison, logics, conditionals`` () =
+        runOnAllDevs output (fun ctx ->
+            let a = Var<single> (ctx / "a", [Size.fix 3L; Size.fix 3L])
+            let b = Var<single> (ctx / "b", [Size.fix 3L; Size.fix 3L])
+            let c = Var<single> (ctx / "c", [Size.fix 3L; Size.fix 3L])
+            let d = Var<single> (ctx / "d", [Size.fix 3L; Size.fix 3L])
+            let expr = Expr.ifThenElse ((Expr a <<== Expr b) &&&& (Expr b >>>> Expr c)) (Expr d) (Expr a) 
 
-    //[<Fact>]
-    //let ``Derivative of ReplicateTo on host`` () =
-    //    let a = Expr.var<single> "a" [SizeSpec.fix 2L; SizeSpec.fix 3L]
-    //    let expr0 = Expr.replicateTo 0 (SizeSpec.fix 6L) a
-    //    let expr1 = Expr.replicateTo 1 (SizeSpec.fix 7L) a
-    //    let da0 = Deriv.compute expr0 |> Deriv.ofVar a
-    //    let da1 = Deriv.compute expr1 |> Deriv.ofVar a
-    //    let fns = Func.make2<single, single> DevHost.DefaultFactory da0 da1 |> arg1 a
-    //    let av = [[1.0f; 2.0f; 3.0f]; [4.0f; 5.0f; 6.0f]] |> HostTensor.ofList2D 
-    //    let dav0, dav1 = fns av
-    //    printfn "a=\n%A" av 
-    //    printfn "d(repTo 0 7 a) / da=\n%A" dav0.Full
-    //    printfn "d(repTo 1 5 a) / da=\n%A" dav1.Full
+            let rng = System.Random (123)
+            let av = HostTensor.randomUniform rng (-1.0f, 1.0f) [3L; 3L] |> Tensor.transfer ctx.Dev
+            let bv = HostTensor.randomUniform rng (-1.0f, 1.0f) [3L; 3L] |> Tensor.transfer ctx.Dev
+            let cv = HostTensor.randomUniform rng (-1.0f, 1.0f) [3L; 3L] |> Tensor.transfer ctx.Dev
+            let dv = HostTensor.randomUniform rng (-1.0f, 1.0f) [3L; 3L] |> Tensor.transfer ctx.Dev
+            let varEnv = VarEnv.ofSeq [a, av; b, bv; c, cv; d, dv]
 
+            let res = expr |> Expr.eval varEnv
+            printfn "res=%A" res)
 
-    //let conditionalsTest (device: IDevice) =
-    //    let a = Expr.var<single> "a" [SizeSpec.fix 3L; SizeSpec.fix 3L]
-    //    let b = Expr.var<single> "b" [SizeSpec.fix 3L; SizeSpec.fix 3L]
-    //    let c = Expr.var<single> "c" [SizeSpec.fix 3L; SizeSpec.fix 3L]
-    //    let d = Expr.var<single> "d" [SizeSpec.fix 3L; SizeSpec.fix 3L]
-    //    let expr = Expr.ifThenElse ((a <<== b) &&&& (b >>>> c)) (d) (a) 
-    //    let fn = Func.make<single> device.DefaultFactory expr |> arg4 a b c d
-    //    let rng = System.Random (123)
-    //    let av = rng.UniformTensor (-1.0f, 1.0f) [3L; 3L] |> post device
-    //    let bv = rng.UniformTensor (-1.0f, 1.0f) [3L; 3L] |> post device
-    //    let cv = rng.UniformTensor (-1.0f, 1.0f) [3L; 3L] |> post device
-    //    let dv = rng.UniformTensor (-1.0f, 1.0f) [3L; 3L] |> post device
-    //    let res = fn av bv cv dv
-    //    printfn "a=\n%A" av
-    //    printfn "b=\n%A" bv
-    //    printfn "c=\n%A" cv
-    //    printfn "d=\n%A" dv
-    //    printfn "res=\n%A" res
-
-    //[<Fact>]
-    //let ``Comparison, logics, conditionals on host`` () =
-    //    conditionalsTest DevHost
-
-    //[<Fact>]
-    
-    //let ``Comparison, logics, conditionals on CUDA`` () =
-    //    SymTensor.Compiler.Cuda.Debug.DumpCode <- true
-    //    conditionalsTest DevCuda
-    
-
-    //let ``Interpolate1D: simple test`` device =
-    //    let tbl = [1.0f; 2.0f; 3.0f; 4.0f; 5.0f; 6.0f]
-    //                |> HostTensor.ofList |> post device
-    //    let minVal = 1.0
-    //    let maxVal = 6.0
-
-    //    let ip = Interpolator.create tbl [minVal] [maxVal] [Nearest] InterpolateLinearaly None
-
-    //    let nSmpls = SizeSpec.symbol "nSmpls"
-    //    let inp = Expr.var<single> "inp" [nSmpls]
-    //    let expr = Expr.interpolate1D ip inp
-    //    let fn = Func.make device.DefaultFactory expr |> arg1 inp
-
-    //    let inpVal = [-0.5f; 0.9f; 1.0f; 1.5f; 2.3f; 5.9f; 6.0f; 6.5f; 200.0f]
-    //                    |> HostTensor.ofList |> post device
-    //    let expVal = [ 1.0f; 1.0f; 1.0f; 1.5f; 2.3f; 5.9f; 6.0f; 6.0f; 6.0f]
-    //                    |> HostTensor.ofList |> post device
-    //    let resVal = fn inpVal
-
-    //    printfn "tbl=\n%A" tbl
-    //    printfn "inp=\n%A" inpVal
-    //    printfn "res=\n%A" resVal
-
-    //    let resVal = HostTensor.transfer resVal
-    //    let expVal = HostTensor.transfer expVal
-    //    Tensor.almostEqualWithTol (resVal, expVal, absTol=0.005f, relTol=1e-5f) |> should equal true
-
-    //let ``Interpolate2D: simple test`` device =
-    //    let tbl = [[1.0f; 2.0f; 3.0f]
-    //               [4.0f; 5.0f; 6.0f]
-    //               [7.0f; 8.0f; 9.0f]]
-    //              |> HostTensor.ofList2D |> post device
-    //    let minVal = [0.0; 0.0]
-    //    let maxVal = [2.0; 2.0]
-
-    //    let ip = Interpolator.create tbl minVal maxVal [Nearest; Nearest] InterpolateLinearaly None
-
-    //    let nSmpls = SizeSpec.symbol "nSmpls"
-    //    let inp1 = Expr.var<single> "inp1" [nSmpls]
-    //    let inp2 = Expr.var<single> "inp2" [nSmpls]
-    //    let expr = Expr.interpolate2D ip inp1 inp2
-    //    let fn = Func.make device.DefaultFactory expr |> arg2 inp1 inp2
-
-    //    let inpVal1 = [-0.1f; 0.0f; 0.5f; 1.5f; 2.0f; 2.3f;] |> HostTensor.ofList |> post device
-    //    let inpVal2 = [-0.1f; 0.0f; 0.8f; 4.5f; 2.0f; 2.3f;] |> HostTensor.ofList |> post device
-    //    let expVal =  [ 1.0f; 1.0f; 3.3f; 7.5f; 9.0f; 9.0f;] |> HostTensor.ofList |> post device
-    //    let resVal = fn inpVal1 inpVal2
-
-    //    printfn "tbl=\n%A" tbl
-    //    printfn "inp1=\n%A" inpVal1
-    //    printfn "inp2=\n%A" inpVal2
-    //    printfn "res=\n%A" resVal
-
-    //    let resVal = HostTensor.transfer resVal
-    //    let expVal = HostTensor.transfer expVal
-    //    Tensor.almostEqualWithTol (resVal, expVal, absTol=0.005f, relTol=1e-5f) |> should equal true
-
-    //[<Fact>]
-    //let ``Interpolate1D: simple test on host`` () =    
-    //    ``Interpolate1D: simple test`` DevHost
-
-    //[<Fact>]
-    
-    //let ``Interpolate1D: simple test on CUDA`` () =    
-    //    ``Interpolate1D: simple test`` DevCuda
-
-    //[<Fact>]
-    
-    //let ``Interpolate2D: simple test on host`` () =    
-    //    ``Interpolate2D: simple test`` DevHost
-
-    //[<Fact>]
-    
-    //let ``Interpolate2D: simple test on CUDA`` () =    
-    //    ``Interpolate2D: simple test`` DevCuda
-
-
-
-    //let ``Interpolate1D: derivative test`` device =
-    //    let tbl = [1.0f; 2.0f; 4.0f; 7.0f; 11.0f; 16.0f]
-    //                |> HostTensor.ofList |> post device
-    //    let minVal = 1.0
-    //    let maxVal = 6.0
-
-    //    let ip = Interpolator.create tbl [minVal] [maxVal] [Nearest] InterpolateLinearaly None
-
-    //    let nSmpls = SizeSpec.symbol "nSmpls"
-    //    let inp = Expr.var<single> "inp" [nSmpls]
-    //    let expr = Expr.interpolate1D ip inp
-    //    let dexpr = Deriv.compute expr
-    //    let dinp = dexpr |> Deriv.ofVar inp
-    //    let fn = Func.make device.DefaultFactory dinp |> arg1 inp
-
-    //    let inpVal = [-0.5f; 0.9f; 1.0f; 1.5f; 2.3f; 5.9f; 6.0f; 6.5f; 200.0f]
-    //                    |> HostTensor.ofList |> post device
-    //    let expVal = [ 0.0f; 0.0f; 1.0f; 1.0f; 2.0f; 5.0f; 0.0f; 0.0f; 0.0f]
-    //                    |> HostTensor.ofList |> Tensor.diagMat |> post device
-    //    let resVal = fn inpVal
-
-    //    printfn "derivative:"
-    //    printfn "tbl=\n%A" tbl
-    //    printfn "inp=\n%A" inpVal
-    //    printfn "res=\n%A" resVal
-
-    //    let resVal = HostTensor.transfer resVal
-    //    let expVal = HostTensor.transfer expVal
-    //    Tensor.almostEqualWithTol (resVal, expVal, absTol=0.005f, relTol=1e-5f) |> should equal true
-
-
-    //[<Fact>]
-    //let ``Interpolate1D: derivative test on host`` () =    
-    //    ``Interpolate1D: derivative test`` DevHost
-
-    
-    //[<Fact>]
-    //let ``Interpolate1D: derivative test on CUDA`` () =    
-    //    ``Interpolate1D: derivative test`` DevCuda
 
 
     //let checkFiniteOpTest diagVal offDiagVal =
@@ -250,6 +106,8 @@ type OpTests (output: ITestOutputHelper) =
     //    printfn "rev 1 av=\n%A" rav1
 
 
+
+
     //[<Fact>]
     //let ``Replicate`` () =
     //    let a = Expr.var<single> "a" [SizeSpec.fix 2L; SizeSpec.fix 3L]
@@ -282,6 +140,20 @@ type OpTests (output: ITestOutputHelper) =
     //    let da0 = Deriv.compute expr0 |> Deriv.ofVar a
     //    let da1 = Deriv.compute expr1 |> Deriv.ofVar a
     //    let fns = Func.make2<single, single> DevCuda.DefaultFactory da0 da1 |> arg1 a
+    //    let av = [[1.0f; 2.0f; 3.0f]; [4.0f; 5.0f; 6.0f]] |> HostTensor.ofList2D 
+    //    let dav0, dav1 = fns av
+    //    printfn "a=\n%A" av 
+    //    printfn "d(repTo 0 7 a) / da=\n%A" dav0.Full
+    //    printfn "d(repTo 1 5 a) / da=\n%A" dav1.Full
+
+    //[<Fact>]
+    //let ``Derivative of ReplicateTo on host`` () =
+    //    let a = Expr.var<single> "a" [SizeSpec.fix 2L; SizeSpec.fix 3L]
+    //    let expr0 = Expr.replicateTo 0 (SizeSpec.fix 6L) a
+    //    let expr1 = Expr.replicateTo 1 (SizeSpec.fix 7L) a
+    //    let da0 = Deriv.compute expr0 |> Deriv.ofVar a
+    //    let da1 = Deriv.compute expr1 |> Deriv.ofVar a
+    //    let fns = Func.make2<single, single> DevHost.DefaultFactory da0 da1 |> arg1 a
     //    let av = [[1.0f; 2.0f; 3.0f]; [4.0f; 5.0f; 6.0f]] |> HostTensor.ofList2D 
     //    let dav0, dav1 = fns av
     //    printfn "a=\n%A" av 

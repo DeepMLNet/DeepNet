@@ -165,7 +165,7 @@ module Interpolator =
 
 type internal IInterpolator =
     abstract Interpolate: Interpolator -> ITensor list -> ITensor
-type TInterpolator<'T> =
+type TInterpolator<'T> () =
     interface IInterpolator with
         member __.Interpolate ip es = 
             let es = es |> List.map (fun e -> e :?> Tensor<'T>)
