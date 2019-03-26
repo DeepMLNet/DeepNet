@@ -315,6 +315,8 @@ type Loop = {
             // return outputs
             channelInfos |> Map.map (fun ch ci -> ci.Target)   
 
+    interface IMultiChannelOp
+
     static member internal noLift length vars channels xs =
         BaseExpr.ofOp {Loop.Length=length; Vars=vars; Channels=channels; Xs=xs} 
 

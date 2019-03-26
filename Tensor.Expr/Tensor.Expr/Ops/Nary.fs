@@ -42,6 +42,8 @@ type Bundle = {ChExprs: Map<Ch, BaseExprCh>} with
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = 
             argVals |> Map.mapKeyValue (fun arg value -> Bundle.argToCh arg, value)
+
+    interface IMultiChannelOp
         
 
 

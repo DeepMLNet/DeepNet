@@ -181,13 +181,17 @@ module IOp =
             Operators.compare aType.FullName bType.FullName
 
 
+/// An op that can have multiple output channels.
+type IMultiChannelOp =
+    interface end
+
+
 /// An op that represents a variable.
 type IVarOp =
     /// Variable represented by this op.
     abstract Var: Var
 
-
-
+    
 /// An op that has a custom print format.
 type IOpFormat =
     /// Text to output for this op when expression is printed.
@@ -229,11 +233,17 @@ module private BaseExprTools =
 type BaseExpr private (op: IOp) =   
     do op.Check()
 
-    let _singleCh = op.Channels = Set [Ch.Default]
     let _hash = lazy (hash op)
     let _typeNames = lazy (op.TypeNames)
     let _shapes = lazy (op.Shapes)    
     let _devs = lazy (op.Devs)
+
+    let _singleCh = 
+        match op with
+        | :? IMultiChannelOp -> false
+        | _ -> true
+    do if _singleCh && not (op.Channels = Set [Ch.Default]) then
+        failwith "A single-channel op must provide only Ch.Default."
 
     let _varMap = 
         let getOp (op: IOp) =
