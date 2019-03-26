@@ -13,6 +13,7 @@
     <Compile Include="DerivCheck.fs" />
     <Compile Include="ExprTests.fs" />
     <Compile Include="TracerTests.fs" />
+    <Compile Include="TraceCompareTests.fs" />
     <Compile Include="OpTests.fs" />
     <None Include="CompilerPipeline.fs" />
     <None Include="DerivTests.fs" />

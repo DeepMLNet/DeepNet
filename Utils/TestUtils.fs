@@ -139,7 +139,11 @@ let randomTraceEval typShps exprFn (dev: ITensorDevice) (tracer: ITracer)  =
     let evalEnv = {VarEnv=varEnv; Tracer=tracer}
     expr |> MultiChannelExpr.evalWithEnv evalEnv |> ignore
    
-let requireEqualTraces output evalFn =
+let requireEqualTraces output (exprFn: Context -> UExpr * VarEnv) =
+    let evalFn dev tracer =
+        let expr, varEnv = exprFn (Context.root dev)
+        let evalEnv = {VarEnv=varEnv; Tracer=tracer}
+        expr |> UExpr.evalWithEnv evalEnv |> ignore
     compareTraces output evalFn |> should equal false
 
 
