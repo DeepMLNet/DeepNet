@@ -14,6 +14,13 @@ open Tensor.Expr.Ops
 open Tensor.Cuda
 
 
+
+let allDevs = [
+    yield "Host", HostTensor.Dev
+    if TensorCudaDevice.count > 0 then yield "Cuda", CudaTensor.Dev
+]
+
+
 let dumpExpr (output: ITestOutputHelper) (expr: UExpr) =
     let printfn format = Printf.kprintf (fun msg -> output.WriteLine(msg)) format 
     printfn "Expr: %s" (expr.ToString())
@@ -44,18 +51,14 @@ let rec exprDepth (root: BaseExpr) (part: BaseExpr) =
 let compareTraces (output: ITestOutputHelper) (fn: ITensorDevice -> ITracer -> unit) =
     let printfn format = Printf.kprintf (fun msg -> output.WriteLine(msg)) format 
 
-    let devs = [
-        yield "Host", HostTensor.Dev
-        if TensorCudaDevice.count > 0 then yield "Cuda", CudaTensor.Dev
-    ]    
-    if List.length devs < 2 then
+    if List.length allDevs < 2 then
         failwith "At least two tensor devices must be available for trace comparison."
 
     // perform traces
     let tracePath = Path.GetTempFileName()
     (
         use traceHdf = HDF5.OpenWrite tracePath
-        for devName, dev in devs do
+        for devName, dev in allDevs do
             printfn "Evaluating on %s..." devName
             let tracer = HDF5Tracer (traceHdf, devName)
             fn dev tracer
@@ -65,14 +68,14 @@ let compareTraces (output: ITestOutputHelper) (fn: ITensorDevice -> ITracer -> u
     let mutable diffsExist = false
     (
         use traceHdf = HDF5.OpenRead tracePath
-        let masterDevName, _ = List.head devs
+        let masterDevName, _ = List.head allDevs
         let masterTrace = HDF5Trace (traceHdf, masterDevName)
         let masterExpr = masterTrace.Root
         
         printfn ""
         printfn "Expression:\n%A" masterExpr
 
-        for devName, _ in List.tail devs do
+        for devName, _ in List.tail allDevs do
             let devTrace = HDF5Trace (traceHdf, devName)
             let diffs = 
                 HDF5Trace.diff (masterTrace, devTrace) |> List.ofSeq
@@ -146,7 +149,6 @@ let requireEqualTraces output (exprFn: Context -> UExpr * VarEnv) =
         expr |> UExpr.evalWithEnv evalEnv |> ignore
     compareTraces output evalFn |> should equal false
 
-
 let requireEqualTracesWithRandomData output typShps (exprFn: UExpr list -> UExpr) =
     let exprFn args =
         MultiChannelExpr.bundle (Map [Ch.Default, exprFn args]) 
@@ -167,6 +169,13 @@ let requireEqualTracesWithRandomDataAndTypesMultiChannel output typs shps (exprF
 
 let extractVar (x: UExpr) =
     x.Vars |> Set.toSeq |> Seq.exactlyOne
+
+let runOnAllDevs (output: ITestOutputHelper) (fn: Context -> unit) =
+    let printfn format = Printf.kprintf (fun msg -> output.WriteLine(msg)) format 
+    for devName, dev in allDevs do
+        printfn "Running on %s..." devName
+        fn (Context.root dev)
+    
 
 //let randomDerivativeCheckTree device tolerance shps (exprFn: ExprT list -> ExprT) =
 //    let rng = System.Random(123)
