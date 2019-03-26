@@ -76,11 +76,11 @@ and internal IdentityTyped<'T> () =
 
 
 /// Counting vector of given size
-type Arange = { Size: Size; Type: TypeName; Dev: ITensorDevice } with
+type Counting = { Size: Size; Dev: ITensorDevice } with
     interface IOp with    
         member this.Check () = ()
         member this.Channels = Ch.onlyOne
-        member this.TypeNames = this.Type |> Ch.only
+        member this.TypeNames = TypeName.ofType<int64> |> Ch.only
         member this.Devs = this.Dev |> Ch.only
         member this.Shapes = Shape.vector this.Size |> Ch.only
         member this.Args = Map.empty
@@ -88,20 +88,12 @@ type Arange = { Size: Size; Type: TypeName; Dev: ITensorDevice } with
         member this.SubstSymSizes env = {this with Size = Size.subst env this.Size} :> _
         member this.CanEvalAllSymSizes = Size.canEval this.Size
         member this.Eval env argVals = 
-            (Generic<ArangeTyped<_>, IArangeTyped> [this.Type.Type]).Eval this env  
+            Tensor.counting this.Dev (Size.eval this.Size) :> ITensor  
             |> Ch.only
 
     interface IOpFormat with
         member this.Text =
-            sprintf "0 .. %A<%A@%A>" this.Size this.Type this.Dev
-
-and internal IArangeTyped =
-    abstract Eval: this:Arange -> env:EvalEnv -> ITensor
-
-and internal ArangeTyped<'T> () =     
-    interface IArangeTyped with
-        member __.Eval this env =
-            Tensor.counting this.Dev (Size.eval this.Size) :> ITensor       
+            sprintf "0 .. %A<@%A>" this.Size this.Dev
 
 
 /// Argument (placeholder for a variable).

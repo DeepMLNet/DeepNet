@@ -549,6 +549,10 @@ type UExpr (baseExpr: BaseExpr) =
     static member identity dataType dev size =
         UExpr {Identity.Size=size; Type=TypeName.ofTypeInst dataType; Dev=dev}
 
+    /// Vector counting from zero to given size minus one.
+    static member counting dev size =
+        UExpr {Counting.Size=size; Dev=dev}
+
     /// Computes the inverse of a matrix.
     /// If the input has more than two dimensions, the inverses
     /// along the last two dimensions are returned.

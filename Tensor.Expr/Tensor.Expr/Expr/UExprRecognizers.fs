@@ -22,9 +22,9 @@ module UExpr =
         | :? Identity as this -> Some this
         | _ -> None
 
-    let (|Arange|_|) (expr: UExpr) =
+    let (|Counting|_|) (expr: UExpr) =
         match expr.Op with
-        | :? Arange as this -> Some this
+        | :? Counting as this -> Some this
         | _ -> None
 
     let (|VarArg|_|) (expr: UExpr) =

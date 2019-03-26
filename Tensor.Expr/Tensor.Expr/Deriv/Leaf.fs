@@ -24,7 +24,7 @@ type IdentityDeriv(op: Identity) =
 
 
 [<OpExtender>]
-type ArangeDeriv(op: Arange) =
+type ArangeDeriv(op: Counting) =
     interface IDerivableOp with
         member this.Deriv dOp = Map.empty
 

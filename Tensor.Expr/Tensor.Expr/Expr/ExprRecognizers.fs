@@ -23,9 +23,9 @@ module Expr =
         | :? Identity as this -> Some this
         | _ -> None
 
-    let (|Arange|_|) (expr: Expr<'T>) =
+    let (|Counting|_|) (expr: Expr<'T>) =
         match expr.Op with
-        | :? Arange as this -> Some this
+        | :? Counting as this -> Some this
         | _ -> None
 
     let (|VarArg|_|) (expr: Expr<'T>) =

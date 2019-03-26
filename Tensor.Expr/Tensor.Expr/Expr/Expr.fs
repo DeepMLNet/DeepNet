@@ -338,6 +338,10 @@ type Expr<'T> (baseExpr: BaseExpr) =
     static member identity dev size = 
         UExpr.identity typeof<'T> dev size |> Expr<'T>
 
+    /// Vector counting from zero to given size minus one.
+    static member counting dev size =
+        UExpr {Counting.Size=size; Dev=dev} |> Expr<int64>
+
     /// Computes the inverse of a matrix.
     /// If the input has more than two dimensions, the inverses
     /// along the last two dimensions are returned.
