@@ -137,15 +137,32 @@ let randomTraceEval typShps exprFn (dev: ITensorDevice) (tracer: ITracer)  =
     let varExprs = vars |> List.map UExpr
     let expr = exprFn varExprs
     let evalEnv = {VarEnv=varEnv; Tracer=tracer}
-    expr |> UExpr.evalWithEnv evalEnv |> ignore
+    expr |> MultiChannelExpr.evalWithEnv evalEnv |> ignore
    
-
 let requireEqualTraces output evalFn =
     compareTraces output evalFn |> should equal false
 
+
 let requireEqualTracesWithRandomData output typShps (exprFn: UExpr list -> UExpr) =
+    let exprFn args =
+        MultiChannelExpr.bundle (Map [Ch.Default, exprFn args]) 
     compareTraces output (randomTraceEval typShps exprFn) |> should equal false
  
+let requireEqualTracesWithRandomDataAndTypes output typs shps (exprFn: UExpr list -> UExpr) =
+    for typ in typs do
+        let typShps = shps |> List.map (fun shp -> typ, shp)
+        requireEqualTracesWithRandomData output typShps exprFn
+
+let requireEqualTracesWithRandomDataMultiChannel output typShps (exprFn: UExpr list -> MultiChannelExpr) =
+    compareTraces output (randomTraceEval typShps exprFn) |> should equal false
+ 
+let requireEqualTracesWithRandomDataAndTypesMultiChannel output typs shps (exprFn: UExpr list -> MultiChannelExpr) =
+    for typ in typs do
+        let typShps = shps |> List.map (fun shp -> typ, shp)
+        requireEqualTracesWithRandomDataMultiChannel output typShps exprFn
+
+let extractVar (x: UExpr) =
+    x.Vars |> Set.toSeq |> Seq.exactlyOne
 
 //let randomDerivativeCheckTree device tolerance shps (exprFn: ExprT list -> ExprT) =
 //    let rng = System.Random(123)
