@@ -15,6 +15,8 @@ type DerivTests (output: ITestOutputHelper) =
     let printfn format = Printf.kprintf (fun msg -> output.WriteLine(msg)) format 
     let check typShps exprFn =
         DerivCheck.random (typShps, exprFn, log=output.WriteLine)
+    let checkProduct typShps exprFn =
+        DerivCheck.random (typShps, exprFn, maxDeviation=1e-2, log=output.WriteLine)
 
     [<Fact>]
     let ``Plus`` () =
@@ -36,19 +38,19 @@ type DerivTests (output: ITestOutputHelper) =
 
     [<Fact>]
     let ``Product`` () =
-        check [typeof<float>, [3L; 3L]] (fun [a] ->
+        checkProduct [typeof<float>, [3L; 3L]] (fun [a] ->
             UExpr.product a 
         )
 
     [<Fact>]
     let ``Product Axis 1`` () =
-        check [typeof<float>, [4L; 3L; 2L]] (fun [a] ->
+        checkProduct [typeof<float>, [4L; 3L; 2L]] (fun [a] ->
             UExpr.productAxis 1 a 
         )
 
     [<Fact>]
     let ``Product Axis 2`` () =
-        check [typeof<float>, [3L; 2L]] (fun [a] ->
+        checkProduct [typeof<float>, [3L; 2L]] (fun [a] ->
             UExpr.productAxis 1 a 
         )
 
