@@ -198,6 +198,14 @@ and ParSetInst = private {
         |> Map.toSeq
         |> Seq.sumBy (fun (_, (_, value)) -> value.NElems)
 
+    /// The data for the specified parameter.
+    member this.Data (par: Var) =
+        this.ParInsts.[par.Name].Data 
+
+    /// The data for the specified parameter.
+    member this.Data (par: Var<'T>) =
+        this.Data (par.Untyped) :?> Tensor<'T>
+
     override this.ToString () =
         sprintf "ParSetInst for %A with %d total values stored at \"%A\"" 
             this.ParSet this.NElems this.StorePath
