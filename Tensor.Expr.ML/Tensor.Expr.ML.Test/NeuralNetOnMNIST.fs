@@ -1,4 +1,4 @@
-﻿module NeuralNetOnMNIST
+﻿namespace global
 
 open System.Diagnostics
 open System.IO
@@ -13,12 +13,11 @@ open Tensor.Expr.ML
 
 
 
-let dataDir = Util.assemblyDir + "/TestData/"
-let mnistPath = dataDir + "MNIST/"
-
-
 type NeuralNetOnMNIST (output: ITestOutputHelper) =
     let printfn format = Printf.kprintf (fun msg -> output.WriteLine(msg)) format 
+
+    let dataDir = Util.assemblyDir + "/TestData/"
+    let mnistPath = dataDir + "MNIST/"
 
     let build device batch = 
         let mc = Context.root device / "NeuralNetModel"

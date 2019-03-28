@@ -21,6 +21,7 @@
     <Compile Include="..\..\Utils\TestUtils.fs" Link="Utils/TestUtils.fs" />
     <Compile Include="DatasetTests.fs" />
     <Compile Include="NormalizationTests.fs" />
+    <Compile Include="LinearRegression.fs" />
     <Compile Include="NeuralNetOnMNIST.fs" />
     <Compile Include="SerializationTests.fs" />
     <Content Include="TestData\*.csv">

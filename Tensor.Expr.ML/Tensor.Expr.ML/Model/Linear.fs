@@ -18,7 +18,15 @@ module LinearRegression =
         L1Regul:    float 
         /// l2 regularization weight
         L2Regul:    float 
-    }
+    } with
+
+        /// Default hyper-parameters.
+        static member standard nInput nOutput = {
+            NInput = nInput
+            NOutput = nOutput
+            L1Regul = 0.0
+            L2Regul = 0.0
+        }
 
     /// Linear regression parameters.
     type Pars<'T> = {

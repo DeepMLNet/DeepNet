@@ -16,7 +16,6 @@
     <Compile Include="TraceCompareTests.fs" />
     <Compile Include="OpTests.fs" />
     <Compile Include="InterpolateTests.fs" />
-    <None Include="CompilerPipeline.fs" />
     <None Include="DerivTests.fs" />
     <None Include="ElemExprTests.fs" />
     <None Include="LoopTests.fs" />  
