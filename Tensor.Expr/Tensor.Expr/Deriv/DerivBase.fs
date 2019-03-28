@@ -57,13 +57,18 @@ type Deriv = private {
         let deriver = 
             match OpExtender.tryGet<IDerivableOp> expr.Op with
             | Some d -> d
-            | None -> failwithf "The op %A is not derivable." expr.Op
+            | None -> failwithf "The op %A %A is not derivable." (expr.Op.GetType()) expr.Op
         let dExpr = dExpr |> Map.map (fun _ e -> UExpr e)
         let dArgs = deriver.Deriv dExpr |> Map.map (fun _ e -> e.BaseExprCh)
         let dArgExprs =
             expr.Args
             |> Map.toSeq
-            |> Seq.map (fun (arg, expr) -> expr, dArgs.[arg])
+            |> Seq.map (fun (arg, argExpr) -> 
+                match dArgs |> Map.tryFind arg with
+                | Some dArgExpr -> argExpr, dArgExpr
+                | None -> 
+                    failwithf "The op %A %A did not provide a derivative w.r.t. its argument %A." 
+                        (expr.Op.GetType()) expr.Op arg)
             |> Map.ofSeq
         dArgExprs
 

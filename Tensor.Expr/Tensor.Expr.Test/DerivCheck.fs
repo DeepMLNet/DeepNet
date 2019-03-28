@@ -24,22 +24,25 @@ type NumDeriv =
         let xd = ITensor.copy x
         let deriv = ITensor.zeros x.DataType x.Dev (y.NElems :: x.Shape)
 
-        for xIdx in ITensor.allIdx x do
-            let xRng = xIdx |> List.map Rng.Elem
+        let isReal = deriv.DataType = typeof<single> || deriv.DataType = typeof<double>
 
-            // f (x+epsilon)
-            xd.[xRng] <- x.[xRng].Add xEpsilon    
-            let ydf = f xd |> ITensor.flatten
+        if isReal then
+            for xIdx in ITensor.allIdx x do
+                let xRng = xIdx |> List.map Rng.Elem
 
-            // f (x-epsilon)
-            xd.[xRng] <- x.[xRng].Subtract xEpsilon    
-            let ydb = f xd |> ITensor.flatten
+                // f (x+epsilon)
+                xd.[xRng] <- x.[xRng].Add xEpsilon    
+                let ydf = f xd |> ITensor.flatten
 
-            // [f (x+epsilon) - f (x-epsilon)] / (2 * epsilon) 
-            let df = (ydf.Subtract ydb).Divide y2Epsilon
-            deriv.[Rng.All :: xRng] <- df
+                // f (x-epsilon)
+                xd.[xRng] <- x.[xRng].Subtract xEpsilon    
+                let ydb = f xd |> ITensor.flatten
 
-            xd.[xRng] <- x.[xRng] 
+                // [f (x+epsilon) - f (x-epsilon)] / (2 * epsilon) 
+                let df = (ydf.Subtract ydb).Divide y2Epsilon
+                deriv.[Rng.All :: xRng] <- df
+
+                xd.[xRng] <- x.[xRng] 
 
         deriv 
 

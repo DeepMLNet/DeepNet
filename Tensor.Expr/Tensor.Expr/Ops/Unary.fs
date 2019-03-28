@@ -665,7 +665,7 @@ type Gather = {X: BaseExprCh; Indices: BaseExprCh option list} with
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = 
             let vIndices = argVals |> ArgValue.naryOptXs this.Indices.Length
-            (ArgValue.unaryX argVals).Gather vIndices  |> Ch.only
+            (ArgValue.unaryX argVals).Gather vIndices |> Ch.only
 
 
 /// Disperses elements according to the specified index tensors.

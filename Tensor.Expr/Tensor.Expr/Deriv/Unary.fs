@@ -319,8 +319,16 @@ type GatherDeriv(op: Gather) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = DerivTools.Env.make op dOp 
-            let dIndices = op.Indices |> List.map (Option.map (UExpr >> UExpr.padLeft))
-            env.DOp |> UExpr.scatter (None::dIndices) (env.FunElems :: env.Only.Shape) |> DerivTools.unary
+            let derivInds = op.Indices |> List.map (Option.map (UExpr >> UExpr.padLeft))
+            let dX = 
+                env.DOp 
+                |> UExpr.scatter (None::derivInds) (env.FunElems :: env.Only.Shape) 
+                |> DerivTools.unary
+            let dIndices = 
+                op.Indices 
+                |> List.map (Option.map (fun ind -> env.Zeros (UExpr ind))) 
+                |> DerivTools.naryOpt
+            Map.join dX dIndices
 
 
 [<OpExtender>]
@@ -328,9 +336,19 @@ type ScatterDeriv(op: Scatter) =
     interface IDerivableOp with      
         member this.Deriv dOp =
             let env = DerivTools.Env.make op dOp 
-            let dIndices = op.Indices |> List.map (Option.map (fun idx -> 
-                idx |> UExpr |> UExpr.broadcastToShape (env.FunElems :: idx.Shape)))                   
-            env.DOp |> UExpr.gather (None::dIndices) |> DerivTools.unary
+            let derivInds = 
+                op.Indices 
+                |> List.map (Option.map (fun idx -> 
+                    idx |> UExpr |> UExpr.broadcastToShape (env.FunElems :: idx.Shape)))                   
+            let dX = 
+                env.DOp 
+                |> UExpr.gather (None::derivInds) 
+                |> DerivTools.unary
+            let dIndices = 
+                op.Indices 
+                |> List.map (Option.map (fun ind -> env.Zeros (UExpr ind))) 
+                |> DerivTools.naryOpt
+            Map.join dX dIndices
 
 
 [<OpExtender>]

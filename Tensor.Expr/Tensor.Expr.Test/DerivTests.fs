@@ -149,9 +149,9 @@ type DerivTests (output: ITestOutputHelper) =
 
             let expr = Expr a |> Expr.gather [Some (Expr i0); Some (Expr i1)]
 
-            let av = HostTensor.counting 12L |> Tensor.reshape [4L; 3L] |> Tensor<float>.convert
-            let i0v = [1L; 2L; 2L] |> HostTensor.ofList |> Tensor.padLeft
-            let i1v = [0L; 0L; 1L] |> HostTensor.ofList |> Tensor.padLeft
+            let av = HostTensor.counting 12L |> Tensor.reshape [4L; 3L] |> Tensor<float>.convert |> Tensor.transfer ctx.Dev
+            let i0v = [1L; 2L; 2L] |> HostTensor.ofList |> Tensor.padLeft |> Tensor.transfer ctx.Dev
+            let i1v = [0L; 0L; 1L] |> HostTensor.ofList |> Tensor.padLeft |> Tensor.transfer ctx.Dev
             let varEnv = VarEnv.ofSeq [
                 a.Untyped, av :> ITensor
                 i0.Untyped, i0v :> ITensor
@@ -171,9 +171,9 @@ type DerivTests (output: ITestOutputHelper) =
 
             let expr = Expr a |> Expr.scatter [Some (Expr i0); Some (Expr i1)] trgtShp
 
-            let av = HostTensor.counting 12L |> Tensor.reshape [4L; 3L] |> Tensor<float>.convert
-            let i0v = [1L; 2L; 2L] |> HostTensor.ofList |> Tensor.padLeft
-            let i1v = [0L; 0L; 1L] |> HostTensor.ofList |> Tensor.padLeft
+            let av = HostTensor.counting 12L |> Tensor.reshape [4L; 3L] |> Tensor<float>.convert |> Tensor.transfer ctx.Dev
+            let i0v = [1L; 2L; 2L] |> HostTensor.ofList |> Tensor.padLeft |> Tensor.transfer ctx.Dev
+            let i1v = [0L; 0L; 1L] |> HostTensor.ofList |> Tensor.padLeft |> Tensor.transfer ctx.Dev
             let varEnv = VarEnv.ofSeq [
                 a.Untyped, av :> ITensor
                 i0.Untyped, i0v :> ITensor

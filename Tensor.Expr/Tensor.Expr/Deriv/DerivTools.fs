@@ -49,6 +49,9 @@ module internal DerivTools =
     /// N-ary derivative result.
     let inline nary xs = ArgValue.nary xs
 
+    /// N-ary derivative with option values result.
+    let inline naryOpt xs = ArgValue.naryOpt xs
+
     /// Environment with derivative helper values.
     type Env = {
         Op: IOp
