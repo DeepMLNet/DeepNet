@@ -26,7 +26,7 @@ type Deriv = private {
     _FunElems:   Size
     /// The derivatives w.r.t. the variables occuring in the expression.
     /// They are of the shape _FunElems x (shape of variable).
-    _WrtVar:     Map<Var, UExpr>
+    _WrtVar:     Map<VarName, UExpr>
 } with
 
     static member private log = Log "Deriv"
@@ -128,7 +128,7 @@ type Deriv = private {
             match UExpr expr with
             | UExpr.VarArg vs ->
                 // arrived at a variable: save its derivative
-                varDerivs <- varDerivs |> Map.add vs exprDeriv.[Ch.Default]
+                varDerivs <- varDerivs |> Map.add vs.Name exprDeriv.[Ch.Default]
             | _ -> 
                 // propagate derivative to arguments of op
                 let argDerivs = Deriv.derivOp expr exprDeriv
@@ -173,18 +173,23 @@ type Deriv = private {
         Deriv.compute rootExpr.Untyped
 
 
+    /// Returns the derivative of the specified variable name.
+    /// If the variable does not occur in the expression, None is returned.
+    member this.Wrt (varName: VarName) =
+        this._WrtVar |> Map.tryFind varName
+
     /// Returns the derivatives of the specified untyped variable.
+    /// If the variable does not occur in the expression, zeros are returned.
     member this.Wrt (var: Var) = 
-        match this._WrtVar |> Map.tryFind var with
+        match this._WrtVar |> Map.tryFind var.Name with
         | Some d -> d
         | None -> 
             UExpr.zeros var.DataType var.Dev [this.FunElems; Shape.nElem var.Shape]
 
-
     /// Returns the derivatives of the specified typed variable.
+    /// If the variable does not occur in the expression, zeros are returned.
     member this.Wrt (var: Var<'T>) = 
         this.Wrt var.Untyped |> Expr<'T>
-
 
     /// Number of function elements.
     member this.FunElems = this._FunElems
