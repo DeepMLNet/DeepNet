@@ -1,4 +1,4 @@
-﻿namespace Tensor.Expr
+﻿namespace global
 
 open DeepNet.Utils
 open Tensor
@@ -49,7 +49,9 @@ type DerivCheck =
 
     /// Checks that symbolic and numeric derivatives of the given expression are close enough.
     /// The derivatives are evaluated at the location specified by the given VarEnv.
-    static member expr (expr: UExpr, varEnv: VarEnv, ?maxDeviation: float, ?epsilon: float, ?log: string -> unit) =
+    static member expr (expr: UExpr, varEnv: VarEnv, ?maxDeviation: float, 
+                        ?epsilon: float, ?log: string -> unit) =
+
         let log = defaultArg log (printfn "%s")
         let printfn format = Printf.kprintf log format 
 
@@ -93,3 +95,20 @@ type DerivCheck =
                 failwithf "Average difference between symbolic and numeric derivative of %A wrt. %A is %f > %f."
                           expr wrt derivDiffAvg maxDeviation
 
+ 
+    /// Derivative check with random variable values.
+    static member random (typShps, exprFn: UExpr list -> UExpr, ?maxDeviation, ?epsilon, ?log) =
+        let log = defaultArg log (printfn "%s")
+        let printfn format = Printf.kprintf log format 
+
+        for devName, dev in TestUtils.allDevs do
+            printfn "\nPerforming random derivative check on %A..." devName
+            let ctx = Context.root dev
+            let rng = System.Random 123
+            let vars = TestUtils.buildVars ctx typShps
+            let varEnv = TestUtils.buildVarEnv rng vars
+            let varExprs = vars |> List.map UExpr
+            let expr = exprFn varExprs
+            DerivCheck.expr (expr, varEnv, ?maxDeviation=maxDeviation, ?epsilon=epsilon, log=log)   
+
+        printfn "All checks passed."

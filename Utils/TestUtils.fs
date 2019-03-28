@@ -176,24 +176,10 @@ let runOnAllDevs (output: ITestOutputHelper) (fn: Context -> unit) =
         printfn "Running on %s..." devName
         fn (Context.root dev)
     
-
 //let randomDerivativeCheckTree device tolerance shps (exprFn: ExprT list -> ExprT) =
 //    let rng = System.Random(123)
 //    let vars = buildVars<float> shps
 //    let expr = exprFn vars
 //    let varEnv = buildVarEnv<float> vars shps rng device
 //    DerivCheck.checkExprTree device tolerance 1e-7 varEnv expr
-
-//let randomDerivativeCheckTreeOnHost = randomDerivativeCheckTree DevHost
-//let randomDerivativeCheckTreeOnCuda = randomDerivativeCheckTree DevCuda
-
-//let randomDerivativeCheck device tolerance shps (exprFn: ExprT list -> ExprT) =
-//    let rng = System.Random(123)
-//    let vars = buildVars<float> shps
-//    let expr = exprFn vars
-//    let varEnv = buildVarEnv<float> vars shps rng device
-//    DerivCheck.checkExpr device tolerance 1e-7 varEnv expr
-
-//let randomDerivativeCheckOnHost = randomDerivativeCheck DevHost
-//let randomDerivativeCheckOnCuda = randomDerivativeCheck DevCuda
 
