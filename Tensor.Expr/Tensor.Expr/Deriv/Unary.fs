@@ -275,10 +275,10 @@ type ProductAxisDeriv(op: ProductAxis) =
             let env = DerivTools.Env.make op dOp 
             // TODO: This division method incorrectly returns NaN for zero elements.
             //       But currently I do not see any efficient alternative.
-            let aBc = env.Only |> UExpr.reshape (Size.broadcastable :: Shape.flatten env.Only.Shape)
-            let pBc = env.Expr |> UExpr.reshape [Size.broadcastable; Size.broadcastable]
-            (env.DOpJac |> UExpr.enableBroadcast 1) * (pBc / aBc) |> DerivTools.unary
-
+            let bcEgExp = env.DOp |> UExpr.reshape (env.DOp.Shape |> Shape.insertBroadcastAxis (op.Axis + 1))
+            let aBc = UExpr.padLeft env.Only
+            let pBc = env.Only |> UExpr.productKeepingAxis op.Axis |> UExpr.padLeft
+            bcEgExp * (pBc / aBc) |> DerivTools.unary
 
 [<OpExtender>]
 type MaxAxisDeriv(op: MaxAxis) =
