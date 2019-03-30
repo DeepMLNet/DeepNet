@@ -80,8 +80,8 @@ type MultiChannelExpr (baseExpr: BaseExpr) =
         MultiChannelExpr {Bundle.ChExprs=chExprs}
 
     /// A loop provides iterative evaluation of one or multiple expresisons.
-    /// All variables occurs in the loop channel expressions must be defined as loop variables.
-    /// The function `loop` performs automatic lifting of constants and thus allows for easy
+    /// All variables occuring in the loop channel expressions must be defined as loop variables.
+    /// The function `loop` performs automatic lifting of constants and thus allows for 
     /// usage of variables external to the loop.
     static member loopNoLift length vars channels (xs: UExpr list) =
         let xs = xs |> List.map UExpr.baseExprCh

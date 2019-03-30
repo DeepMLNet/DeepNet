@@ -26,7 +26,7 @@ type internal LoopChannelLayoutInfoT = {
 } 
 
 
-/// Elementwise interpolation using a value table.
+/// A loop.
 type Loop = {
     /// number of loop iterations
     Length:     Size
