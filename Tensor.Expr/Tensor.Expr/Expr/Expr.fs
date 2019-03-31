@@ -549,6 +549,22 @@ type Expr<'T> (baseExpr: BaseExpr) =
         let env = env |> Map.map (fun _ sExpr -> sExpr.BaseExpr)
         expr.BaseExpr |> BaseExpr.substVars env |> Expr<'T>
 
+        
+    static member loopInput (expr: Expr<'T>) =
+        UExpr.loopInput expr.Untyped |> Expr<'T>
+
+    static member loopInputSlice (expr: Expr<'T>) (sliceDim: int) =
+        UExpr.loopInputSlice expr.Untyped sliceDim |> Expr<'T>
+
+    static member loopPrevCh (ch: Ch) (delay: Size) (initial: Expr<'T>) =
+        UExpr.loopPrevCh ch delay initial.Untyped |> Expr<'T>
+
+    static member loopIterIdx (dev: ITensorDevice) =
+        UExpr.loopIterIdx dev |> Expr<int64>
+
+    static member loopIterRem (dev: ITensorDevice) =
+        UExpr.loopIterRem dev |> Expr<int64>
+
 
 
 

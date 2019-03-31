@@ -841,4 +841,20 @@ type UExpr (baseExpr: BaseExpr) =
         let evalEnv : EvalEnv = {VarEnv=varEnv; Tracer=NoTracer()}
         UExpr.evalWithEnv evalEnv expr
 
+        
+    static member loopInput (expr: UExpr) =
+        UExpr (LoopArg.Input expr.BaseExprCh)
+
+    static member loopInputSlice (expr: UExpr) (sliceDim: int) =
+        UExpr (LoopArg.InputSlice (expr.BaseExprCh, sliceDim))
+
+    static member loopPrevCh (ch: Ch) (delay: Size) (initial: UExpr) =
+        UExpr (LoopArg.PrevCh (ch, delay, initial.BaseExprCh))
+
+    static member loopIterIdx (dev: ITensorDevice) =
+        UExpr (LoopArg.IterIdx dev)
+
+    static member loopIterRem (dev: ITensorDevice) =
+        UExpr (LoopArg.IterRem dev)
+
 

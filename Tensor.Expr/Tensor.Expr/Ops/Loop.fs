@@ -26,6 +26,99 @@ type internal LoopChannelLayoutInfoT = {
 } 
 
 
+
+/// An argument within a loop.
+[<RequireQualifiedAccess>]
+type LoopArg =
+    /// same value for all loop iterations
+    | Input of expr:BaseExprCh
+    /// slice of the expression to each loop iteration
+    | InputSlice of expr:BaseExprCh * sliceDim:int 
+    /// the value of a loop channel from a previous loop iteration
+    | PrevCh of ch:Ch * delay:Size * initial:BaseExprCh
+    /// the index of the current loop iteration (zero-based)
+    | IterIdx of dev:ITensorDevice
+    /// the number of remaining loop iterations after this iteration
+    | IterRem of dev:ITensorDevice
+
+    interface IOp with
+        member this.Check () = 
+            match this with
+            | Input expr -> ()
+            | InputSlice (expr, sliceDim) -> 
+                if not (0 <= sliceDim && sliceDim < expr.NDims) then
+                    failwithf "Slice dimension %d is out of range for expression with %d dimensions."
+                        sliceDim expr.NDims
+            | PrevCh (ch, delay, initial) -> 
+                match Size.tryEval delay with
+                | Some delay when delay <= 0L ->
+                    failwithf "Delay must be positive, but it is %A." delay
+                | _ -> ()
+            | IterIdx dev -> ()
+            | IterRem dev -> ()
+        member this.Channels = Ch.onlyOne
+        member this.TypeNames = 
+            match this with
+            | Input expr -> expr.TypeName
+            | InputSlice (expr, sliceDim) -> expr.TypeName
+            | PrevCh (ch, delay, initial) -> initial.TypeName
+            | IterIdx dev -> TypeName.ofType<int64>
+            | IterRem dev -> TypeName.ofType<int64>
+            |> Ch.only
+        member this.Devs = 
+            match this with
+            | Input expr -> expr.Dev
+            | InputSlice (expr, sliceDim) -> expr.Dev
+            | PrevCh (ch, delay, initial) -> initial.Dev
+            | IterIdx dev -> dev
+            | IterRem dev -> dev
+            |> Ch.only
+        member this.Shapes = 
+           match this with
+            | Input expr -> expr.Shape
+            | InputSlice (expr, sliceDim) -> expr.Shape |> Shape.withoutAxis sliceDim
+            | PrevCh (ch, delay, initial) -> initial.Shape
+            | IterIdx dev -> Shape.scalar
+            | IterRem dev -> Shape.scalar
+            |> Ch.only
+        member this.Args = 
+          match this with
+            | Input expr -> Args.unary expr
+            | InputSlice (expr, sliceDim) -> Args.unary expr
+            | PrevCh (ch, delay, initial) -> Args.unary initial
+            | IterIdx dev -> Args.leaf
+            | IterRem dev -> Args.leaf
+        member this.ReplaceArgs args = 
+          match this with
+            | Input expr -> Input (Args.unaryX args)
+            | InputSlice (expr, sliceDim) ->  InputSlice (Args.unaryX args, sliceDim)
+            | PrevCh (ch, delay, initial) -> PrevCh (ch, delay, Args.unaryX args)
+            | IterIdx dev -> IterIdx dev
+            | IterRem dev -> IterRem dev
+            :> _
+        member this.SubstSymSizes env = 
+          match this with
+            | Input expr -> Input expr
+            | InputSlice (expr, sliceDim) ->  InputSlice (expr, sliceDim)
+            | PrevCh (ch, delay, initial) -> PrevCh (ch, Size.subst env delay, initial)
+            | IterIdx dev -> IterIdx dev
+            | IterRem dev -> IterRem dev
+            :> _
+        member this.CanEvalAllSymSizes = 
+          match this with
+            | Input expr -> true
+            | InputSlice (expr, sliceDim) ->  true
+            | PrevCh (ch, delay, initial) -> Size.canEval delay
+            | IterIdx dev -> true
+            | IterRem dev -> true
+        member this.Eval env argVals = 
+            failwith "LoopArg must be used within a loop."
+
+    interface IOpFormat with
+        member this.Text =
+            sprintf "%A" this
+
+
 /// A loop.
 type Loop = {
     /// number of loop iterations
@@ -384,4 +477,67 @@ type Loop = {
         BaseExpr.ofOp {Loop.Length=length; Vars=vars; Channels=liftedChannels; Xs=args} 
        
 
- 
+    static member internal fromExpr (length: Size) (channels: Map<Ch, BaseExprCh * int>) =  
+        let argVars = Dictionary<LoopArg, Var> ()
+        let loopArgs = ResizeArray<BaseExprCh> ()
+        let loopInput = Dictionary<Var, Loop.Input> ()
+
+        /// Returns a variable for a LoopArg.
+        let makeVar loopArg =
+            let varIdx = loopInput.Count
+            let varName = VarName (ContextPath.root / "_Loop" / (sprintf "%d" varIdx))
+            let var, inp =
+                match loopArg with
+                | LoopArg.Input expr ->
+                    let argIdx = loopArgs.Count
+                    loopArgs.Add expr
+                    let var = Var.make (varName, expr.DataType, expr.Dev, expr.Shape)
+                    let inp = Loop.Input.ConstArg argIdx
+                    var, inp
+                | LoopArg.InputSlice (expr, sliceDim) ->
+                    let argIdx = loopArgs.Count
+                    loopArgs.Add expr
+                    let shape = expr.Shape |> Shape.withoutAxis sliceDim
+                    let var = Var.make (varName, expr.DataType, expr.Dev, shape)
+                    let inp = Loop.Input.SequenceArgSlice {ArgIdx=argIdx; SliceDim=sliceDim}
+                    var, inp
+                | LoopArg.PrevCh (ch, delay, initial) ->
+                    let argIdx = loopArgs.Count
+                    loopArgs.Add initial
+                    let var = Var.make (varName, initial.DataType, initial.Dev, initial.Shape)
+                    let inp = Loop.Input.PreviousChannel {Channel=ch; Delay=delay; InitialArg=argIdx}
+                    var, inp
+                | LoopArg.IterIdx dev ->
+                    let var = Var.make (varName, typeof<int64>, dev, Shape.scalar)
+                    let inp = Loop.Input.IterationIndex
+                    var, inp
+                | LoopArg.IterRem dev ->
+                    let var = Var.make (varName, typeof<int64>, dev, Shape.scalar)
+                    let inp = Loop.Input.IterationsRemaining
+                    var, inp
+            argVars.Add (loopArg, var)
+            loopInput.Add (var, inp)         
+            var
+
+        // Replace LoopArgs with variables in all channels.
+        let processed = Dictionary<BaseExprCh, BaseExprCh> ()
+        let rec build (exprCh: BaseExprCh) : BaseExprCh =
+            match processed.TryFind exprCh with
+            | Some rep -> rep
+            | None ->
+                match exprCh.Expr.Op with
+                | :? LoopArg as loopArg ->
+                    let repExpr = BaseExpr.ofOp {VarArg.Var=makeVar loopArg}
+                    repExpr.[Ch.Default]
+                | _ ->
+                    exprCh |> BaseExprCh.map (BaseExpr.mapArgs build)
+        let channels = 
+            channels 
+            |> Map.map (fun _ (expr, sliceDim) -> {
+                Loop.Value.Expr=build expr
+                Loop.Value.SliceDim=sliceDim
+            })
+
+        Loop.withLift length (Map.ofDictionary loopInput) channels (List.ofSeq loopArgs)
+       
+  

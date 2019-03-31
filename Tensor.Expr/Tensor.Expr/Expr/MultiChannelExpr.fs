@@ -92,6 +92,13 @@ type MultiChannelExpr (baseExpr: BaseExpr) =
         let xs = xs |> List.map UExpr.baseExprCh
         Ops.Loop.withLift length vars channels xs |> MultiChannelExpr
 
+    static member loopExpr length (channels: Map<Ch, UExpr * int>) =
+        let channels =
+            channels
+            |> Map.map (fun _ (expr, sliceDim) -> 
+                expr.BaseExprCh, sliceDim)
+        Ops.Loop.fromExpr length channels |> MultiChannelExpr
+
     /// Evaluates all channels of the expression into numeric values using the specified evaluation envirnoment.
     static member evalWithEnv (evalEnv: EvalEnv) (expr: MultiChannelExpr) = 
         // Infer symbolic sizes from variable environment and substitute them into expression.
