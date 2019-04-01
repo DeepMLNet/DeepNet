@@ -7,6 +7,9 @@ open Tensor.Expr.Ops
 open Tensor.Backend
 
 
+type Ch = Ops.Ch
+type Arg = Ops.Arg
+
 
 /// start plus the specified number of (symbolic elements)
 type internal PlusElems (elems: Size) =
@@ -27,6 +30,38 @@ module internal ExprHelpers =
                 Some (subtensor.Range, subtensorExpr, trgtExpr)
             | _ -> None
         | _ -> None
+
+    let rec exprToString maxLength (expr: BaseExpr) =
+        let opStr =
+            match expr.Op with
+            | :? IOpFormat as opFormat -> opFormat.Text
+            | _ -> expr.Op.GetType().Name
+        let argSet = expr.Args |> Map.keys
+        let argList, withLabel =
+            match argSet with
+            | _ when argSet = Set [Arg.Only] -> [Arg.Only], false
+            | _ when argSet = Set [Arg.X; Arg.Y] -> [Arg.X; Arg.Y], false
+            | _ when argSet |> Set.toSeq |> Seq.forall (function | Arg.N _ -> true | _ -> false) ->
+                argSet |> Set.toList |> List.sortBy (function | Arg.N n -> n | _ -> 0), false
+            | _ ->
+                argSet |> Set.toList |> List.sortBy (sprintf "%A"), true
+        String.limited maxLength [
+            yield String.Formatter (fun _ -> opStr)
+            if not argList.IsEmpty then
+                yield String.Delim " ("
+                for i, arg in List.indexed argList do
+                    if i > 0 then
+                        yield String.Delim ", "
+                    if withLabel then
+                        yield String.Formatter (fun _ -> sprintf "%A=" arg)
+                    let (BaseExprCh (ch, expr)) = expr.Args.[arg]
+                    yield String.Formatter (fun ml -> exprToString ml expr)
+                    if ch <> Ch.Default then
+                        yield String.Delim ".["
+                        yield String.Formatter (fun _ -> sprintf "%A" ch)
+                        yield String.Delim "]"
+                yield String.Delim ")"
+        ]
 
 
 /// An tensor-valued expression with a single output channel.
@@ -119,32 +154,7 @@ type UExpr (baseExpr: BaseExpr) =
 
     /// Converts expression to string with specified approximate maximum length.
     member this.ToString maxLength =     
-        let opStr =
-            match this.Op with
-            | :? IOpFormat as opFormat -> opFormat.Text
-            | _ -> this.Op.GetType().Name
-        let args = this.Args
-        let argSet = args |> Map.keys
-        let argList, withLabel =
-            match argSet with
-            | _ when argSet = Set [Arg.Only] -> [Arg.Only], false
-            | _ when argSet = Set [Arg.X; Arg.Y] -> [Arg.X; Arg.Y], false
-            | _ when argSet |> Set.toSeq |> Seq.forall (function | Arg.N _ -> true | _ -> false) ->
-                argSet |> Set.toList |> List.sortBy (function | Arg.N n -> n | _ -> 0), false
-            | _ ->
-                argSet |> Set.toList |> List.sortBy (sprintf "%A"), true
-        String.limited maxLength [
-            yield String.Formatter (fun _ -> opStr)
-            if not argList.IsEmpty then
-                yield String.Delim " ("
-                for i, arg in List.indexed argList do
-                    if i > 0 then
-                        yield String.Delim ", "
-                    if withLabel then
-                        yield String.Formatter (fun _ -> sprintf "%A=" arg)
-                    yield String.Formatter (fun ml -> args.[arg].ToString ml)
-                yield String.Delim ")"
-        ]
+        ExprHelpers.exprToString maxLength this.BaseExpr
 
     /// Converts expression to string with unlimited length.
     override this.ToString () = this.ToString System.Int32.MaxValue
@@ -792,6 +802,26 @@ type UExpr (baseExpr: BaseExpr) =
     static member internal buildTensor shape ranges (xs: UExpr list) =
         let xs = xs |> List.map UExpr.baseExprCh
         UExpr {BuildTensor.Shape=shape; Ranges=ranges; Xs=xs} 
+
+    /// Slices the argument along the specified dimension.
+    /// Each loop iteration gets one slice.
+    static member loopInputSlice (expr: UExpr) (sliceDim: int) =
+        UExpr (LoopArg.InputSlice (expr.BaseExprCh, sliceDim))
+
+    /// The value of the specified channel from the previous loop iteration.
+    /// The delay is determined by the size of the initial value along the
+    /// specified slice dimension.
+    /// The slice dimension must match the slice dimension of the channel.
+    static member loopPrevCh (ch: Ch) (initial: UExpr) (sliceDim: int) =
+        UExpr (LoopArg.PrevCh (ch, initial.BaseExprCh, sliceDim))
+
+    /// The loop iteration index.
+    static member loopIterIdx (dev: ITensorDevice) =
+        UExpr (LoopArg.IterIdx dev)
+
+    /// The number of loop iterations remaining.
+    static member loopIterRem (dev: ITensorDevice) =
+        UExpr (LoopArg.IterRem dev)
     
     /// Calculates a tensor elementwise using the given element expression and result shape.
     static member elements shape elemExpr (xs: UExpr list) =
@@ -840,21 +870,6 @@ type UExpr (baseExpr: BaseExpr) =
     static member eval (varEnv: VarEnv) (expr: UExpr) : Tensor.ITensor = 
         let evalEnv : EvalEnv = {VarEnv=varEnv; Tracer=NoTracer()}
         UExpr.evalWithEnv evalEnv expr
-
-        
-    static member loopInput (expr: UExpr) =
-        UExpr (LoopArg.Input expr.BaseExprCh)
-
-    static member loopInputSlice (expr: UExpr) (sliceDim: int) =
-        UExpr (LoopArg.InputSlice (expr.BaseExprCh, sliceDim))
-
-    static member loopPrevCh (ch: Ch) (delay: Size) (initial: UExpr) =
-        UExpr (LoopArg.PrevCh (ch, delay, initial.BaseExprCh))
-
-    static member loopIterIdx (dev: ITensorDevice) =
-        UExpr (LoopArg.IterIdx dev)
-
-    static member loopIterRem (dev: ITensorDevice) =
-        UExpr (LoopArg.IterRem dev)
+       
 
 

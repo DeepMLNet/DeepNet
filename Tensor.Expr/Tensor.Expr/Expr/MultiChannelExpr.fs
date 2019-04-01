@@ -4,7 +4,8 @@ open Tensor.Expr.Ops
 open DeepNet.Utils
 
 
-
+/// An tensor-valued expression with multiple output channels.
+[<StructuredFormatDisplay("{Pretty}")>]
 type MultiChannelExpr (baseExpr: BaseExpr) =    
     do 
         if baseExpr.IsSingleChannel then
@@ -65,6 +66,16 @@ type MultiChannelExpr (baseExpr: BaseExpr) =
 
     override this.GetHashCode() = hash this.BaseExpr
 
+    /// Converts expression to string with specified approximate maximum length.
+    member this.ToString maxLength =     
+        ExprHelpers.exprToString maxLength this.BaseExpr
+
+    /// Converts expression to string with unlimited length.
+    override this.ToString () = this.ToString System.Int32.MaxValue
+
+    /// Pretty string.
+    member this.Pretty = this.ToString 80
+
     /// Accesses the specified channel of this multi-channel expression as IExpr.
     member this.Item 
         with get (channel: Ch) : UExpr = 
@@ -80,24 +91,12 @@ type MultiChannelExpr (baseExpr: BaseExpr) =
         MultiChannelExpr {Bundle.ChExprs=chExprs}
 
     /// A loop provides iterative evaluation of one or multiple expresisons.
-    /// All variables occuring in the loop channel expressions must be defined as loop variables.
-    /// The function `loop` performs automatic lifting of constants and thus allows for 
-    /// usage of variables external to the loop.
-    static member loopNoLift length vars channels (xs: UExpr list) =
-        let xs = xs |> List.map UExpr.baseExprCh
-        Ops.Loop.noLift length vars channels xs |> MultiChannelExpr
-
-    /// A loop provides iterative evaluation of one or multiple expresisons.
-    static member loop length vars channels (xs: UExpr list) =
-        let xs = xs |> List.map UExpr.baseExprCh
-        Ops.Loop.withLift length vars channels xs |> MultiChannelExpr
-
-    static member loopExpr length (channels: Map<Ch, UExpr * int>) =
+    static member loop length (channels: Map<Ch, UExpr * int>) =
         let channels =
             channels
             |> Map.map (fun _ (expr, sliceDim) -> 
                 expr.BaseExprCh, sliceDim)
-        Ops.Loop.fromExpr length channels |> MultiChannelExpr
+        Ops.Loop.fromLoopArgExpr length channels |> MultiChannelExpr
 
     /// Evaluates all channels of the expression into numeric values using the specified evaluation envirnoment.
     static member evalWithEnv (evalEnv: EvalEnv) (expr: MultiChannelExpr) = 

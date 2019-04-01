@@ -173,7 +173,10 @@ let extractVar (x: UExpr) =
 let runOnAllDevs (output: ITestOutputHelper) (fn: Context -> unit) =
     let printfn format = Printf.kprintf (fun msg -> output.WriteLine(msg)) format 
     for devName, dev in allDevs do
+        printfn ""
+        printfn "================================================================="
         printfn "Running on %s..." devName
+        printfn ""
         fn (Context.root dev)
     
 //let randomDerivativeCheckTree device tolerance shps (exprFn: ExprT list -> ExprT) =

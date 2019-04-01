@@ -66,13 +66,13 @@ type LoopDeriv(op: Loop) =
                 | Ch.N n -> sprintf "#%d" n
 
             /// map from variable representing a derivative to the loop input specification
-            let varInputSpecs = Dictionary<Var, Loop.Input> ()
+            let varInputSpecs = Dictionary<Var, Loop.LoopVar> ()
 
             /// map from a loop output to the variable representing its derivative
             let dOutputVars = Dictionary<Ch, Var> ()
 
             /// map from a loop PreviousPort to the variables representing its derivative sources
-            let dPreviousVars = Dictionary<Loop.PreviousChannel, Var> ()
+            let dPreviousVars = Dictionary<Loop.PrevCh, Var> ()
 
             /// map from a loop port to the value it must contain
             let portContents = Dictionary<Ch, PortContentsT> ()
@@ -105,11 +105,11 @@ type LoopDeriv(op: Loop) =
 
                 // create variable input specification:
                 // source of incoming Jacobian is sequence of derivatives of the loop output
-                let sas: Loop.SequenceArgSlice = {
+                let sas: Loop.InputSlice = {
                     ArgIdx = addArg dOutputs.[outPort]
                     SliceDim = value.SliceDim + 1
                 }
-                varInputSpecs.Add (dVar, Loop.SequenceArgSlice sas)         
+                varInputSpecs.Add (dVar, Loop.LoopVar.InputSlice sas)         
                
             // go through loop variables and create corresponding derivative variables and ports
             for KeyValue (usingVar, li) in spec.Vars do
@@ -120,7 +120,7 @@ type LoopDeriv(op: Loop) =
                 let liDims = Shape.nDim usingVar.Shape
 
                 match li with
-                | Loop.ConstArg argIdx ->
+                | Loop.LoopVar.Input argIdx ->
                     // create a variable for the sum of the accumulated Jacobian so far
                     let dAccumName = VarName (derivCtx / sprintf "dSum_ConstArg%d[-1]" argIdx)
                     let dAccumVar = Var.make (dAccumName, liType, liDev, funElems :: liShape)
@@ -133,12 +133,12 @@ type LoopDeriv(op: Loop) =
 
                     // create variable input specification:
                     // source is accumulated Jacobian w.r.t. ConstArg argIdx in previous derivative loop iteration
-                    let dpp: Loop.PreviousChannel = {
+                    let dpp: Loop.PrevCh = {
                         Channel    = dPort
                         Delay      = Size.one
                         InitialArg = addZeroInitialArg (funElems :: usingVar.Shape) usingVar.DataType usingVar.Dev (liDims+1) Size.one
                     }
-                    varInputSpecs.Add (dAccumVar, Loop.PreviousChannel dpp)
+                    varInputSpecs.Add (dAccumVar, Loop.LoopVar.PrevCh dpp)
 
                     // set Jacobian w.r.t. input argument argIdx specification
                     let slice = [
@@ -148,7 +148,7 @@ type LoopDeriv(op: Loop) =
                     ]
                     argIdxDerivs.[argIdx].Add {Port=dPort; Slice=slice; ReverseAxis=None} |> ignore
 
-                | Loop.SequenceArgSlice {ArgIdx=argIdx; SliceDim=sliceDim} ->
+                | Loop.LoopVar.InputSlice {ArgIdx=argIdx; SliceDim=sliceDim} ->
                     // a sequence arg slice is an input variable and thus outputs a gradient
                     // it thus needs a loop port 
 
@@ -167,7 +167,7 @@ type LoopDeriv(op: Loop) =
                     ]
                     argIdxDerivs.[argIdx].Add {Port=dPort; Slice=slice; ReverseAxis=Some (sliceDim+1)} |> ignore
 
-                | Loop.PreviousChannel pp ->
+                | Loop.LoopVar.PrevCh pp ->
                     // create loop port exposing the derivative w.r.t. the PreviousPort
                     let dPortName = sprintf "d_%s[%A]" (chName pp.Channel) pp.Delay
                     let dPort = Ch.Custom dPortName
@@ -182,12 +182,12 @@ type LoopDeriv(op: Loop) =
 
                     // create corresponding variable input specification:
                     // source is Jacobian calculated w.r.t. the PreviousPort in previous derivative loop iteration
-                    let dpp: Loop.PreviousChannel = {
+                    let dpp: Loop.PrevCh = {
                         Channel    = dPort
                         Delay      = pp.Delay
                         InitialArg = addZeroInitialArg (funElems :: usingVar.Shape) usingVar.DataType usingVar.Dev (sliceDim+1) pp.Delay
                     }
-                    varInputSpecs.Add (dVar, Loop.PreviousChannel dpp)                                 
+                    varInputSpecs.Add (dVar, Loop.LoopVar.PrevCh dpp)                                 
 
                     // We need to output the Jacboian w.r.t. to the initial sequence argument.
                     // It is available in the last "Delay" steps of the derivative loop port.
@@ -202,8 +202,8 @@ type LoopDeriv(op: Loop) =
                     argIdxDerivs.[pp.InitialArg].Add {Port=dPort; Slice=slice; ReverseAxis=Some (sliceDim+1)} |> ignore
 
                                                
-                | Loop.IterationIndex 
-                | Loop.IterationsRemaining -> 
+                | Loop.LoopVar.IterIdx 
+                | Loop.LoopVar.IterRem -> 
                     // iteration index is an intergral constant
                     ()        
             
@@ -254,7 +254,7 @@ type LoopDeriv(op: Loop) =
                             | Some vs -> yield UExpr vs
                             | None -> ()
                         } |> Seq.reduce (+)
-                    let value: Loop.Value = {Expr=expr.BaseExprCh; SliceDim=sliceDim}
+                    let value: Loop.ChValue = {Expr=expr.BaseExprCh; SliceDim=sliceDim}
                     value)
 
             // create variable specification
@@ -268,17 +268,22 @@ type LoopDeriv(op: Loop) =
                 spec.Vars
                 |> Map.map (fun vs li ->
                     match li with
-                    | Loop.ConstArg _ -> 
+                    | Loop.LoopVar.Input _ -> 
                         // constant arguments needs no adaption
                         li
-                    | Loop.SequenceArgSlice {ArgIdx=argIdx; SliceDim=sliceDim} ->
+                    | Loop.LoopVar.InputSlice {ArgIdx=argIdx; SliceDim=sliceDim} ->
                         // sequence arguments must be reversed
                         let revExpr = UExpr.reverseAxis sliceDim args.[argIdx]
-                        Loop.SequenceArgSlice {ArgIdx=addArg revExpr; SliceDim=sliceDim}
-                    | Loop.PreviousChannel pp ->
+                        Loop.LoopVar.InputSlice {ArgIdx=addArg revExpr; SliceDim=sliceDim}
+                    | Loop.LoopVar.PrevCh pp ->
                         // previous channel accesses the reversed output of the orignal loop
                         // with appropriate slicing to account for the delay                        
-                        let portLoop = MultiChannelExpr.loop spec.Length spec.Vars spec.Channels originalArgs
+                        let portLoop = UExpr {
+                            Loop.Length=spec.Length
+                            Loop.Vars=spec.Vars
+                            Loop.Channels=spec.Channels
+                            Loop.Xs=originalArgs |> List.map UExpr.baseExprCh
+                        }
                         let portOutput = portLoop.[pp.Channel]
                         let portExpr = spec.Channels.[pp.Channel].Expr
                         let sliceDim = spec.Channels.[pp.Channel].SliceDim
@@ -294,13 +299,13 @@ type LoopDeriv(op: Loop) =
                         ]
                         let delayedPortSeq = revPortSeq.[delaySlice]
 
-                        Loop.SequenceArgSlice {ArgIdx=addArg delayedPortSeq; SliceDim=sliceDim}
-                    | Loop.IterationIndex -> 
+                        Loop.LoopVar.InputSlice {ArgIdx=addArg delayedPortSeq; SliceDim=sliceDim}
+                    | Loop.LoopVar.IterIdx -> 
                         // iteration index and iterations remaining are swapped
-                        Loop.IterationsRemaining
-                    | Loop.IterationsRemaining -> 
+                        Loop.LoopVar.IterRem
+                    | Loop.LoopVar.IterRem -> 
                         // iteration index and iterations remaining are swapped
-                        Loop.IterationIndex)
+                        Loop.LoopVar.IterIdx)
 
             // build loop specification for derivative loop
             let dSpec: Loop = {

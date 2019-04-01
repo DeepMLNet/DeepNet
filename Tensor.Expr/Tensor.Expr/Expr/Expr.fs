@@ -513,6 +513,24 @@ type Expr<'T> (baseExpr: BaseExpr) =
     static member internal buildTensor shape ranges (xs: Expr<'T> list) =
         let xs = xs |> List.map (fun expr -> expr.Untyped)
         UExpr.buildTensor shape ranges xs |> Expr<'T>
+
+    /// Slices the argument along the specified dimension.
+    /// Each loop iteration gets one slice.        
+    static member loopInputSlice (expr: Expr<'T>) (sliceDim: int) =
+        UExpr.loopInputSlice expr.Untyped sliceDim |> Expr<'T>
+
+    /// The value of the specified channel from the previous loop iteration
+    /// with the specified delay.
+    static member loopPrevCh (ch: Ch) (initial: Expr<'T>) (sliceDim: int) =
+        UExpr.loopPrevCh ch initial.Untyped sliceDim |> Expr<'T>
+
+    /// The loop iteration index.
+    static member loopIterIdx (dev: ITensorDevice) =
+        UExpr.loopIterIdx dev |> Expr<int64>
+
+    /// The number of loop iterations remaining.
+    static member loopIterRem (dev: ITensorDevice) =
+        UExpr.loopIterRem dev |> Expr<int64>
     
     /// Calculates a tensor elementwise using the given element expression and result shape.
     static member elements shape elemExpr (xs: Expr<'T> list) =
@@ -548,22 +566,6 @@ type Expr<'T> (baseExpr: BaseExpr) =
     static member substVars (env: Map<VarName, UExpr>) (expr: Expr<'T>) =
         let env = env |> Map.map (fun _ sExpr -> sExpr.BaseExpr)
         expr.BaseExpr |> BaseExpr.substVars env |> Expr<'T>
-
-        
-    static member loopInput (expr: Expr<'T>) =
-        UExpr.loopInput expr.Untyped |> Expr<'T>
-
-    static member loopInputSlice (expr: Expr<'T>) (sliceDim: int) =
-        UExpr.loopInputSlice expr.Untyped sliceDim |> Expr<'T>
-
-    static member loopPrevCh (ch: Ch) (delay: Size) (initial: Expr<'T>) =
-        UExpr.loopPrevCh ch delay initial.Untyped |> Expr<'T>
-
-    static member loopIterIdx (dev: ITensorDevice) =
-        UExpr.loopIterIdx dev |> Expr<int64>
-
-    static member loopIterRem (dev: ITensorDevice) =
-        UExpr.loopIterRem dev |> Expr<int64>
 
 
 

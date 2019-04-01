@@ -21,39 +21,45 @@ type LoopTests (output: ITestOutputHelper) =
             let m = SizeSym "m"
             let n = SizeSym "n"
 
-            let prevA = Var<single> (ctx / "prevA", [m; n])
-            let initialA = Var<single> (ctx / "initialA", [Size.fix 1L; m; n])
+            let ch = Ch.Custom "A"
+            let initialA = Var<single> (ctx / "initialA", [Size.fix 1L; Size.sym m; Size.sym n])
+            let prevA = Expr.loopPrevCh ch (Expr initialA) 0
+            let chExpr = prevA + 1.0f          
 
-            let ch = "A"
-            let chExpr = Expr prevA + 1.0f
-            
-            let loopSpec = {
-                Expr.Length = nIters
-                Expr.Vars = Map [Expr.extractVar prevA, 
-                                 Expr.PreviousChannel {Channel=ch; Delay=Size.fix 1L; InitialArg=0}]
-                Expr.Channels = Map [ch,
-                                    {LoopValueT.Expr=chExpr; LoopValueT.SliceDim=0}]    
-            }
-            printfn "Loop specification:\n%A" loopSpec
+            printfn "initialA shape: %A" initialA.Shape
+            printfn "initialA dev:   %A" initialA.Dev
+            printfn "prevA shape:    %A" prevA.Shape
+            printfn "prevA dev:      %A" prevA.Dev
+            printfn "chExpr shape:   %A" chExpr.Shape
+            printfn "chExpr dev:     %A" chExpr.Dev
 
-            let result = Expr.loop loopSpec ch [initialA]
-            printfn "result :\n%A" result
+            let loopChs = Map [
+                ch, (chExpr.Untyped, 0)
+            ]
+            printfn "Loop channels:\n%A" (chExpr.ToString())
 
-            let symSizes = Map [Size.extractSymbol nIters, Size.fix 5L; 
-                                Size.extractSymbol m, Size.fix 3L; 
-                                Size.extractSymbol n, Size.fix 2L]
-            let result = result |> Expr.substSymSizes symSizes
-            printfn "result after substitution:\n%A" result
+            let loopExpr = MultiChannelExpr.loop (Size.sym nIters) loopChs
+            printfn "Loop expression:\n%A" (loopExpr.ToString())
 
-            let resultFn = Func.make<single> device.DefaultFactory result |> arg1 initialA
-    
-            let initialAv = HostTensor.zeros<single> [1L; 3L; 2L]
-            printfn "initialAv=\n%A" initialAv
+            let symSizes = Map [
+                nIters, Size.fix 5L
+                m, Size.fix 3L
+                n, Size.fix 2L
+            ]
+            let loopExprSubst = loopExpr |> MultiChannelExpr.substSymSizes symSizes
+            printfn "Loop expression after size substitution:\n%A" loopExprSubst
 
-            let resultVal = resultFn initialAv
-            printfn "result value=\n%A" resultVal 
+            let initialAv = HostTensor.zeros<single> [1L; 3L; 2L] |> Tensor.transfer ctx.Dev
+            let varEnv = VarEnv.ofSeq [
+                initialA, initialAv
+            ]
+
+            printfn "initialA=\n%A" initialAv
+            let resultVal = loopExprSubst |> MultiChannelExpr.eval varEnv
+            printfn "Loop result value=\n%A" resultVal 
     )
 
+#if false
     let ``Build complicated loop 1`` () =
         let nIters = Size.symbol "nIters"
         let m = Size.symbol "m"
@@ -259,3 +265,4 @@ type LoopTests (output: ITestOutputHelper) =
 
 
 
+#endif
