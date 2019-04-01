@@ -214,7 +214,7 @@ type LoopDeriv(op: Loop) =
                 |> Seq.map (fun (port, value) ->              
                     // build expression for incoming Jacobian, i.e. Jacobian w.r.t. this port
                     // shape is: [funElems; <shape of value.Expr>]
-                    let incomingExpandedJacobian = 
+                    let incomingJacobian = 
                         seq { 
                             // derivative coming from external use of port's output slice
                             match dOutputVars.TryFind port with
@@ -227,9 +227,6 @@ type LoopDeriv(op: Loop) =
                                 if previousPort.Channel = port then yield UExpr dVar
                         } |> Seq.reduce (+)
                     
-                    // collapse Jacobian
-                    let incomingJacobian = incomingExpandedJacobian |> UExpr.reshape [funElems; value.Expr.NElems]
-
                     // calculate Jacobians w.r.t. all variables
                     let chDeriv = Deriv.computeWithRootDeriv incomingJacobian (UExpr value.Expr)
                     chDeriv
@@ -278,7 +275,7 @@ type LoopDeriv(op: Loop) =
                     | Loop.LoopVar.PrevCh pp ->
                         // previous channel accesses the reversed output of the orignal loop
                         // with appropriate slicing to account for the delay                        
-                        let portLoop = UExpr {
+                        let portLoop = MultiChannelExpr {
                             Loop.Length=spec.Length
                             Loop.Vars=spec.Vars
                             Loop.Channels=spec.Channels
@@ -323,7 +320,7 @@ type LoopDeriv(op: Loop) =
                 |> Map.ofDictionary
                 |> Map.map (fun argIdx loopDerivs ->                
                     // sum over ports producing derivative and reverse if necessary
-                    let dExprExpanded =
+                    let dExpr =
                         loopDerivs
                         |> Seq.map (fun {Port=port; Slice=slice; ReverseAxis=reverseAxis} ->
                             let loopOutput = dLoopExpr.[port]
@@ -332,10 +329,6 @@ type LoopDeriv(op: Loop) =
                             | Some ax -> sliced |> UExpr.reverseAxis ax
                             | None -> sliced)
                         |> Seq.reduce (+)
-
-                    // collapse Jacobian
-                    let wrtElems = Shape.nElem dExprExpanded.Shape.[1..] 
-                    let dExpr = dExprExpanded |> UExpr.reshape [funElems; wrtElems]
                     dExpr)
 
             // output mapping from original argument to its derivative

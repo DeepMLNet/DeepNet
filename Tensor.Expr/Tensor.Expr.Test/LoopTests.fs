@@ -67,13 +67,9 @@ type LoopTests (output: ITestOutputHelper) =
         let delayA = SizeSym "delayA"
         let delayB = SizeSym "delayB"
 
-        //let prevA = Var<single> (ctx / "prevA", [Size.sym m; Size.sym n])
         let initialA = Var<single> (ctx / "initialA", [Size.sym delayA; Size.sym m; Size.sym n])
-        //let prevB = Var<single> (ctx / "prevB", [Size.sym m; Size.sym n])
         let initialB = Var<single> (ctx / "initialB", [Size.sym m; Size.sym n; Size.sym delayB])
-        //let sliceA = Var<single> (ctx / "sliceA", [Size.sym n; Size.sym m])
         let seqA = Var<single> (ctx / "seqA", [Size.sym n; Size.sym nIters; Size.sym m])
-        //let constA = Var<single> (ctx / "constA", [Size.sym n])
         let constAExt = Var<single> (ctx / "constAExt", [Size.sym n])
 
         let chA, chASliceDim = Ch.Custom "A", 0
@@ -90,15 +86,6 @@ type LoopTests (output: ITestOutputHelper) =
         ]
 
         let loop = MultiChannelExpr.loop (Size.sym nIters) loopChs
-        //let loopSpec = {
-        //    Expr.Length = nIters
-        //    Expr.Vars = Map [Expr.extractVar prevA,  Expr.PreviousChannel {Channel=chA; Delay=delayA; InitialArg=0}
-        //                     Expr.extractVar prevB,  Expr.PreviousChannel {Channel=chB; Delay=delayB; InitialArg=1}
-        //                     Expr.extractVar sliceA, Expr.SequenceArgSlice {ArgIdx=2; SliceDim=1}
-        //                     Expr.extractVar constA, Expr.ConstArg 3]
-        //    Expr.Channels = Map [chA, {LoopValueT.Expr=chAExpr; LoopValueT.SliceDim=0}
-        //                         chB, {LoopValueT.Expr=chBExpr; LoopValueT.SliceDim=2}]    
-        //}
         printfn "Loop specification:\n%A" loop
 
         let resultA: Expr<single> = loop.Ch chA
@@ -106,23 +93,8 @@ type LoopTests (output: ITestOutputHelper) =
         printfn "resultA:\n%A" resultA
         printfn "resultB:\n%A" resultB
 
-    //    let symSizes = Map [Size.extractSymbol nIters, Size.fix 5
-    //                        Size.extractSymbol m,      Size.fix 3 
-    //                        Size.extractSymbol n,      Size.fix 2
-    //                        Size.extractSymbol delayA, Size.fix 1
-    //                        Size.extractSymbol delayB, Size.fix 2
-    //                        ]
-    //    let resultA = resultA |> Expr.substSymSizes symSizes
-    //    let resultB = resultB |> Expr.substSymSizes symSizes   
-    //
-    //    let initialA = initialA |> Expr.substSymSizes symSizes
-    //    let initialB = initialB |> Expr.substSymSizes symSizes
-    //    let seqA = seqA |> Expr.substSymSizes symSizes
-    //    let constAExt = constAExt |> Expr.substSymSizes symSizes
-
         resultA, resultB, initialA, initialB, seqA, constAExt
 
-    
     let ``Values for complicated loop 1`` (dev: ITensorDevice) =
         let initialAv = Seq.initInfinite id |> Seq.map single |> HostTensor.ofSeqWithShape [1L; 3L; 2L] |> Tensor.transfer dev
         let initialBv = Seq.initInfinite ((+) 100) |> Seq.map single |> HostTensor.ofSeqWithShape [3L; 2L; 2L] |> Tensor.transfer dev
@@ -141,15 +113,10 @@ type LoopTests (output: ITestOutputHelper) =
             ExprFunc.make (resultA, resultB) 
             |> ExprFunc.arg4 initialA initialB seqA constAExt
 
-        //let ses = Trace.startSession "cloop"
-
         let initialAv, initialBv, seqAv, constAv = ``Values for complicated loop 1`` ctx.Dev
         let resultAv, resultBv = resultFn initialAv initialBv seqAv constAv
         printfn "resultAv=\n%A" resultAv
         printfn "resultBv=\n%A" resultBv
-
-        //let ts = ses.End ()
-        //ts |> Trace.dumpToFile "ComplicatedLoop1.txt"
 
     [<Fact>]
     let ``Evaluate complicated loop 1`` () =   
@@ -173,57 +140,76 @@ type LoopTests (output: ITestOutputHelper) =
     let ``Trace compare: Complicated loop 1`` () =   
         requireEqualTraces output ``Complicated loop 1 Expr``
 
-#if false
-    let ``Derivative of complicated loop 1`` (device: IDevice) =   
-        let resultA, resultB, initialA, initialB, seqA, constAExt = ``Build complicated loop 1`` ()
+    let ``Derivative of complicated loop 1`` (ctx: Context) =   
+        let resultA, resultB, initialA, initialB, seqA, constAExt = ``Build complicated loop 1`` ctx
 
         let result = Expr.sum resultA + Expr.sum resultB
         printfn "result:\n%A" result
-        let dResult = Deriv.compute result
-        let dInitialA = dResult |> Deriv.ofVar initialA
-        let dInitialB = dResult |> Deriv.ofVar initialB
-        let dSeqA = dResult |> Deriv.ofVar seqA
-        let dConstAExt = dResult |> Deriv.ofVar constAExt
 
-    //    printfn "result:\n%A" result
-    //    printfn "dresult / dInitialA:\n%A" dInitialA
-    //    printfn "dresult / dInitialB:\n%A" dInitialB
-    //    printfn "dresult / dSeqA:\n%A" dSeqA
-    //    printfn "dresult / dConstAExt:\n%A" dConstAExt
+        let dResult = Deriv.compute result
+        let dInitialA = dResult.Wrt initialA
+        let dInitialB = dResult.Wrt initialB
+        let dSeqA = dResult.Wrt seqA
+        let dConstAExt = dResult.Wrt constAExt
+
+        printfn "result:\n%A" result
+        printfn "dresult / dInitialA:\n%A" dInitialA
+        printfn "dresult / dInitialB:\n%A" dInitialB
+        printfn "dresult / dSeqA:\n%A" dSeqA
+        printfn "dresult / dConstAExt:\n%A" dConstAExt
 
         let resultFn = 
-            Func.make5<single, single, single, single, single> device.DefaultFactory 
-                result dInitialA dInitialB dSeqA dConstAExt
-            |> arg4 initialA initialB seqA constAExt
+            ExprFunc.make (result, dInitialA, dInitialB, dSeqA, dConstAExt)
+            |> ExprFunc.arg4 initialA initialB seqA constAExt
 
-        let initialAv, initialBv, seqAv, constAv = ``Values for complicated loop 1`` ()
-        let resultV, dInitialAV, dInitialBV, dSeqAV, dConstAExtV = resultFn initialAv initialBv seqAv constAv
-        let dInitialAV = dInitialAV |> Tensor.reshape initialAv.Shape
-        let dInitialBV = dInitialBV |> Tensor.reshape initialBv.Shape
-        let dSeqAV = dSeqAV |> Tensor.reshape seqAv.Shape
-        let dConstAExtV = dConstAExtV |> Tensor.reshape constAv.Shape
+        let initialAv, initialBv, seqAv, constAv = ``Values for complicated loop 1`` ctx.Dev
+        let resultV, dInitialAV, dInitialBV, dSeqAV, dConstAExtV = 
+            resultFn initialAv initialBv seqAv constAv
+
         printfn "resultV=\n%A" resultV
         printfn "dInitialAV=\n%A" dInitialAV.Full
         printfn "dInitialBV=\n%A" dInitialBV.Full
         printfn "dSeqA=\n%A" dSeqAV.Full
         printfn "dConstAExt=\n%A" dConstAExtV.Full
 
-    
-    [<Fact>]
-    let ``Derivative of complicated loop 1 on host`` () =   
-        ``Derivative of complicated loop 1`` DevHost
+    let ``Derivative of complicated loop 1 Expr`` (ctx: Context) =   
+        let resultA, resultB, initialA, initialB, seqA, constAExt = ``Build complicated loop 1`` ctx
+
+        let result = Expr.sum resultA + Expr.sum resultB
+
+        let dResult = Deriv.compute result
+        let dInitialA = dResult.Wrt initialA
+        let dInitialB = dResult.Wrt initialB
+        let dSeqA = dResult.Wrt seqA
+        let dConstAExt = dResult.Wrt constAExt
+
+        let expr = UExpr.discard [
+            result.Untyped
+            dInitialA.Untyped
+            dInitialB.Untyped
+            dSeqA.Untyped
+            dConstAExt.Untyped
+        ]
+
+        let initialAv, initialBv, seqAv, constAv = ``Values for complicated loop 1`` ctx.Dev
+        let varEnv = VarEnv.ofSeq [
+            initialA, initialAv
+            initialB, initialBv
+            seqA, seqAv
+            constAExt, constAv
+        ]      
+        expr, varEnv
 
     [<Fact>]
-    [<Trait("Category", "Skip_CI")>]
-    let ``Derivative of complicated loop 1 on CUDA`` () =   
-        ``Derivative of complicated loop 1`` DevCuda
+    let ``Evaluate derivative of complicated loop 1`` () =   
+        runOnAllDevs output ``Derivative of complicated loop 1`` 
 
     [<Fact>]
-    [<Trait("Category", "Skip_CI")>]
     let ``Trace compare: Derivative of complicated loop 1`` () =   
-        requireEqualTraces ``Derivative of complicated loop 1``
+        requireEqualTraces output ``Derivative of complicated loop 1 Expr``
 
 
+#if false
     [<Fact>]
     let ``Derivative compare: Complicated loop 1`` () =
         randomDerivativeCheckTreeOnHost 1e-4 [[1L; 3L; 2L]; [3L; 2L; 2L]; [2L; 5L; 3L]; [2L]] 

@@ -59,7 +59,20 @@ type Deriv = private {
             | Some d -> d
             | None -> failwithf "The op %A %A is not derivable." (expr.Op.GetType()) expr.Op
         let dExpr = dExpr |> Map.map (fun _ e -> UExpr e)
+
+        let funElems = dExpr |> Map.toSeq |> Seq.head |> snd |> UExpr.shape |> List.head
+        for KeyValue(ch, dCh) in dExpr do
+            if not (Shape.equalIgnoringBc dCh.Shape (funElems :: expr.[ch].Shape)) then
+                failwithf "Derivative for channel %A of op %A with shape %A has invalid shape %A."
+                    ch expr.Op expr.[ch].Shape dCh.Shape
+
         let dArgs = deriver.Deriv dExpr |> Map.map (fun _ e -> e.BaseExprCh)
+
+        for KeyValue(arg, dArg) in dArgs do
+            if not (Shape.equalIgnoringBc dArg.Shape (funElems :: expr.Args.[arg].Shape)) then
+                failwithf "Derivative for argument %A of op %A with shape %A has invalid shape %A."
+                    arg expr.Op expr.Args.[arg].Shape dArg.Shape
+
         let dArgExprs =
             expr.Args
             |> Map.toSeq
@@ -130,10 +143,10 @@ type Deriv = private {
             let expr = exprsWithFullDeriv.Dequeue ()
             let exprDeriv = incomingDeriv.[expr]
 
-            match UExpr expr with
-            | UExpr.VarArg vs ->
+            match expr.Op with
+            | :? VarArg as varArg ->
                 // arrived at a variable: save its derivative
-                varDerivs <- varDerivs |> Map.add vs.Name exprDeriv.[Ch.Default]
+                varDerivs <- varDerivs |> Map.add varArg.Var.Name exprDeriv.[Ch.Default]
             | _ -> 
                 // propagate derivative to arguments of op
                 let argDerivs = Deriv.derivOp expr exprDeriv
@@ -146,11 +159,11 @@ type Deriv = private {
     /// Computes the derivative expression w.r.t. all variables occuring in it using the specified
     /// value for the derivative of the specified expression.
     static member computeWithRootDeriv (rootDeriv: UExpr) (rootExpr: UExpr) : Deriv =
-        let funElems = Shape.nElem rootExpr.Shape
+        let funElems = rootDeriv.Shape.[0]
         let rootDerivShp = funElems :: rootExpr.Shape
         if not (Shape.equalIgnoringBc rootDerivShp rootDeriv.Shape) then
-            failwithf "Expecting shape %A for root derivative, but got shape %A."
-                      rootDerivShp rootDeriv.Shape
+            failwithf "Expecting shape %A for root derivative of expression with shape %A, but got shape %A."
+                      rootDerivShp rootExpr.Shape rootDeriv.Shape
         let rootDeriv = Map [Ch.Default, rootDeriv.BaseExprCh]
 
         Deriv.log.Info "Comptuing derivatives for %A with root derivative %A" rootExpr rootDeriv
