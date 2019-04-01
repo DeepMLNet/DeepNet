@@ -62,6 +62,10 @@ type ExprFunc private() =
         fun (val0: Tensor<'T0>) (val1: Tensor<'T1>) (val2: Tensor<'T2>) -> 
             VarEnv.empty |> VarEnv.add vs0 val0 |> VarEnv.add vs1 val1 |> VarEnv.add vs2 val2 |> f   
 
+    static member arg4 (vs0: Var<'T0>) (vs1: Var<'T1>) (vs2: Var<'T2>) (vs3: Var<'T3>) f : Tensor<'T0> -> Tensor<'T1> -> Tensor<'T2> -> Tensor<'T3> -> 'TR =
+        fun (val0: Tensor<'T0>) (val1: Tensor<'T1>) (val2: Tensor<'T2>) (val3: Tensor<'T3>) -> 
+            VarEnv.empty |> VarEnv.add vs0 val0 |> VarEnv.add vs1 val1 |> VarEnv.add vs2 val2 |> VarEnv.add vs3 val3 |> f   
+
 
     static member add (pi: ParSetInst) f =
         fun (ve: VarEnv) ->

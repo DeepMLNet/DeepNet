@@ -6,6 +6,9 @@ open DeepNet.Utils
 open Tensor.Backend
 
 
+/// Tensor device.
+type ITensorDevice = Tensor.Backend.ITensorDevice
+
 
 /// <summary>Type-neutral interface to Tensor&lt;'T&gt; of any type 'T.</summary>
 /// <remarks>These functions are useful for working with tensors of unknown types.

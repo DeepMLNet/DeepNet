@@ -59,43 +59,52 @@ type LoopTests (output: ITestOutputHelper) =
             printfn "Loop result value=\n%A" resultVal 
     )
 
-#if false
-    let ``Build complicated loop 1`` () =
-        let nIters = Size.symbol "nIters"
-        let m = Size.symbol "m"
-        let n = Size.symbol "n"
-        let delayA = Size.symbol "delayA"
-        let delayB = Size.symbol "delayB"
 
-        let prevA = Expr.var<single> "prevA" [m; n]
-        let initialA = Expr.var<single> "initialA" [delayA; m; n]
-        let prevB = Expr.var<single> "prevB" [m; n]
-        let initialB = Expr.var<single> "initialB" [m; n; delayB]
-        let sliceA = Expr.var<single> "sliceA" [n; m]
-        let seqA = Expr.var<single> "seqA" [n; nIters; m]
-        let constA = Expr.var<single> "constA" [n]
-        let constAExt = Expr.var<single> "constAExt" [n]
+    let ``Build complicated loop 1`` ctx =
+        let nIters = SizeSym "nIters"
+        let m = SizeSym "m"
+        let n = SizeSym "n"
+        let delayA = SizeSym "delayA"
+        let delayB = SizeSym "delayB"
 
-        let chA = "A"
+        //let prevA = Var<single> (ctx / "prevA", [Size.sym m; Size.sym n])
+        let initialA = Var<single> (ctx / "initialA", [Size.sym delayA; Size.sym m; Size.sym n])
+        //let prevB = Var<single> (ctx / "prevB", [Size.sym m; Size.sym n])
+        let initialB = Var<single> (ctx / "initialB", [Size.sym m; Size.sym n; Size.sym delayB])
+        //let sliceA = Var<single> (ctx / "sliceA", [Size.sym n; Size.sym m])
+        let seqA = Var<single> (ctx / "seqA", [Size.sym n; Size.sym nIters; Size.sym m])
+        //let constA = Var<single> (ctx / "constA", [Size.sym n])
+        let constAExt = Var<single> (ctx / "constAExt", [Size.sym n])
+
+        let chA, chASliceDim = Ch.Custom "A", 0
+        let chB, chBSliceDim = Ch.Custom "B", 2
+        let prevA = Expr.loopPrevCh chA (Expr initialA) chASliceDim
+        let prevB = Expr.loopPrevCh chB (Expr initialB) chBSliceDim
+        let sliceA = Expr.loopInputSlice (Expr seqA) 1
         let chAExpr = prevA + sliceA.T + 0.1f
-        let chB = "B"
-        let chBExpr = prevB + prevA + constA + 0.01f
+        let chBExpr = prevB + prevA + Expr constAExt + 0.01f
 
-        let loopSpec = {
-            Expr.Length = nIters
-            Expr.Vars = Map [Expr.extractVar prevA,  Expr.PreviousChannel {Channel=chA; Delay=delayA; InitialArg=0}
-                             Expr.extractVar prevB,  Expr.PreviousChannel {Channel=chB; Delay=delayB; InitialArg=1}
-                             Expr.extractVar sliceA, Expr.SequenceArgSlice {ArgIdx=2; SliceDim=1}
-                             Expr.extractVar constA, Expr.ConstArg 3]
-            Expr.Channels = Map [chA, {LoopValueT.Expr=chAExpr; LoopValueT.SliceDim=0}
-                                 chB, {LoopValueT.Expr=chBExpr; LoopValueT.SliceDim=2}]    
-        }
-        printfn "Loop specification:\n%A" loopSpec
+        let loopChs = Map [
+            chA, (chAExpr.Untyped, chASliceDim)
+            chB, (chBExpr.Untyped, chBSliceDim)
+        ]
 
-        let resultA = Expr.loop loopSpec chA [initialA; initialB; seqA; constAExt]
-        let resultB = Expr.loop loopSpec chB [initialA; initialB; seqA; constAExt]
-        //printfn "resultA:\n%A" resultA
-        //printfn "resultB:\n%A" resultB
+        let loop = MultiChannelExpr.loop (Size.sym nIters) loopChs
+        //let loopSpec = {
+        //    Expr.Length = nIters
+        //    Expr.Vars = Map [Expr.extractVar prevA,  Expr.PreviousChannel {Channel=chA; Delay=delayA; InitialArg=0}
+        //                     Expr.extractVar prevB,  Expr.PreviousChannel {Channel=chB; Delay=delayB; InitialArg=1}
+        //                     Expr.extractVar sliceA, Expr.SequenceArgSlice {ArgIdx=2; SliceDim=1}
+        //                     Expr.extractVar constA, Expr.ConstArg 3]
+        //    Expr.Channels = Map [chA, {LoopValueT.Expr=chAExpr; LoopValueT.SliceDim=0}
+        //                         chB, {LoopValueT.Expr=chBExpr; LoopValueT.SliceDim=2}]    
+        //}
+        printfn "Loop specification:\n%A" loop
+
+        let resultA: Expr<single> = loop.Ch chA
+        let resultB: Expr<single> = loop.Ch chB
+        printfn "resultA:\n%A" resultA
+        printfn "resultB:\n%A" resultB
 
     //    let symSizes = Map [Size.extractSymbol nIters, Size.fix 5
     //                        Size.extractSymbol m,      Size.fix 3 
@@ -114,27 +123,27 @@ type LoopTests (output: ITestOutputHelper) =
         resultA, resultB, initialA, initialB, seqA, constAExt
 
     
-    let ``Values for complicated loop 1`` () =
-        let initialAv = Seq.countingFrom 0 |> Seq.map single |> HostTensor.ofSeqWithShape [1L; 3L; 2L]
-        let initialBv = Seq.countingFrom 100 |> Seq.map single |> HostTensor.ofSeqWithShape [3L; 2L; 2L]
-        let seqAv     = Seq.countingFrom 1000 |> Seq.map single |> HostTensor.ofSeqWithShape [2L; 5L; 3L]
-        let constAv   = HostTensor.ofList [0.001f; 0.0004f] 
+    let ``Values for complicated loop 1`` (dev: ITensorDevice) =
+        let initialAv = Seq.initInfinite id |> Seq.map single |> HostTensor.ofSeqWithShape [1L; 3L; 2L] |> Tensor.transfer dev
+        let initialBv = Seq.initInfinite ((+) 100) |> Seq.map single |> HostTensor.ofSeqWithShape [3L; 2L; 2L] |> Tensor.transfer dev
+        let seqAv     = Seq.initInfinite ((+) 1000) |> Seq.map single |> HostTensor.ofSeqWithShape [2L; 5L; 3L] |> Tensor.transfer dev
+        let constAv   = HostTensor.ofList [0.001f; 0.0004f] |> Tensor.transfer dev
         printfn "initialAv=\n%A" initialAv
         printfn "initialBv=\n%A" initialBv
         printfn "seqAv=\n%A" seqAv
         printfn "constAv=\n%A" constAv
         initialAv, initialBv, seqAv, constAv
 
-    let ``Complicated loop 1`` (device: IDevice) =   
-        let resultA, resultB, initialA, initialB, seqA, constAExt = ``Build complicated loop 1`` ()
+    let ``Complicated loop 1`` (ctx: Context) =   
+        let resultA, resultB, initialA, initialB, seqA, constAExt = ``Build complicated loop 1`` ctx
 
         let resultFn = 
-            Func.make2<single, single> device.DefaultFactory resultA resultB 
-            |> arg4 initialA initialB seqA constAExt
+            ExprFunc.make (resultA, resultB) 
+            |> ExprFunc.arg4 initialA initialB seqA constAExt
 
         //let ses = Trace.startSession "cloop"
 
-        let initialAv, initialBv, seqAv, constAv = ``Values for complicated loop 1`` ()
+        let initialAv, initialBv, seqAv, constAv = ``Values for complicated loop 1`` ctx.Dev
         let resultAv, resultBv = resultFn initialAv initialBv seqAv constAv
         printfn "resultAv=\n%A" resultAv
         printfn "resultBv=\n%A" resultBv
@@ -143,19 +152,28 @@ type LoopTests (output: ITestOutputHelper) =
         //ts |> Trace.dumpToFile "ComplicatedLoop1.txt"
 
     [<Fact>]
-    let ``Complicated loop 1 on host`` () =   
-        ``Complicated loop 1`` DevHost
+    let ``Evaluate complicated loop 1`` () =   
+        runOnAllDevs output ``Complicated loop 1``
+
+    let ``Complicated loop 1 Expr`` (ctx: Context) =   
+        let resultA, resultB, initialA, initialB, seqA, constAExt = ``Build complicated loop 1`` ctx
+        let expr = UExpr.discard [resultA.Untyped; resultB.Untyped]
+
+        let initialAv, initialBv, seqAv, constAv = ``Values for complicated loop 1`` ctx.Dev
+        let varEnv = VarEnv.ofSeq [
+            initialA, initialAv
+            initialB, initialBv
+            seqA, seqAv
+            constAExt, constAv
+        ]
+        
+        expr, varEnv
 
     [<Fact>]
-    [<Trait("Category", "Skip_CI")>]
-    let ``Complicated loop 1 on CUDA`` () =   
-        ``Complicated loop 1`` DevCuda
-
-    [<Fact>]
-    [<Trait("Category", "Skip_CI")>]
     let ``Trace compare: Complicated loop 1`` () =   
-        requireEqualTraces ``Complicated loop 1``
+        requireEqualTraces output ``Complicated loop 1 Expr``
 
+#if false
     let ``Derivative of complicated loop 1`` (device: IDevice) =   
         let resultA, resultB, initialA, initialB, seqA, constAExt = ``Build complicated loop 1`` ()
 
