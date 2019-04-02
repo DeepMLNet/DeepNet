@@ -208,65 +208,57 @@ type LoopTests (output: ITestOutputHelper) =
     let ``Trace compare: Derivative of complicated loop 1`` () =   
         requireEqualTraces output ``Derivative of complicated loop 1 Expr``
 
-
-#if false
     [<Fact>]
-    let ``Derivative compare: Complicated loop 1`` () =
-        randomDerivativeCheckTreeOnHost 1e-4 [[1L; 3L; 2L]; [3L; 2L; 2L]; [2L; 5L; 3L]; [2L]] 
-            (fun [initialA; initialB; seqA; constAExt] ->
+    let ``Derivative check: Complicated loop 1`` () =
+        DerivCheck.random ([
+            typeof<float>, [1L; 3L; 2L]
+            typeof<float>, [3L; 2L; 2L]
+            typeof<float>, [2L; 5L; 3L]
+            typeof<float>, [2L]
+            ], (fun [initialA; initialB; seqA; constAExt] ->
                 let nIters = Size.fix 5L
-                let m = Size.fix 3L
-                let n = Size.fix 2L
-                let delayA = Size.fix 1L
-                let delayB = Size.fix 2L
 
-                let prevA = Expr.var<float> "prevA" [m; n]
-                let prevB = Expr.var<float> "prevB" [m; n]
-                let sliceA = Expr.var<float> "sliceA" [n; m]
-                let constA = Expr.var<float> "constA" [n]
+                let chA, chASliceDim = Ch.Custom "A", 0
+                let chB, chBSliceDim = Ch.Custom "B", 2
+                let prevA = UExpr.loopPrevCh chA initialA chASliceDim
+                let prevB = UExpr.loopPrevCh chB initialB chBSliceDim
+                let sliceA = UExpr.loopInputSlice seqA 1
+                let chAExpr = prevA + sliceA.T + UExpr.scalar prevA.Dev 0.1
+                let chBExpr = prevB + prevA + constAExt + UExpr.scalar prevA.Dev 0.01
 
-                let chA = "A"
-                let chAExpr = prevA + 1.0 + sliceA.T
-                let chB = "B"
-                let chBExpr = prevB + prevA + constA
+                let loopChs = Map [
+                    chA, (chAExpr, chASliceDim)
+                    chB, (chBExpr, chBSliceDim)
+                ]
 
-                let loopSpec = {
-                    Expr.Length = nIters
-                    Expr.Vars = Map [Expr.extractVar prevA,  Expr.PreviousChannel {Channel=chA; Delay=delayA; InitialArg=0}
-                                     Expr.extractVar prevB,  Expr.PreviousChannel {Channel=chB; Delay=delayB; InitialArg=1}
-                                     Expr.extractVar sliceA, Expr.SequenceArgSlice {ArgIdx=2; SliceDim=1}
-                                     Expr.extractVar constA, Expr.ConstArg 3]
-                    Expr.Channels = Map [chA, {LoopValueT.Expr=chAExpr; LoopValueT.SliceDim=0}
-                                         chB, {LoopValueT.Expr=chBExpr; LoopValueT.SliceDim=2}]    
-                }
-                let resultA = Expr.loop loopSpec chA [initialA; initialB; seqA; constAExt]
-                let resultB = Expr.loop loopSpec chB [initialA; initialB; seqA; constAExt]
-                Expr.sum resultA + Expr.sum resultB            
-            )
+                let loop = MultiChannelExpr.loop nIters loopChs
+                printfn "Loop specification:\n%A" loop
 
+                let resA = UExpr.sum loop.[chA]
+                let resB = UExpr.sum loop.[chB]
+                let res = resA + resB
+                printfn "Result:\n%A" res
+
+                res
+            ), maxDeviation=1e-4, log=output.WriteLine)
 
     [<Fact>]
-    let ``Derivative compare: Simple loop 1`` () =
-        randomDerivativeCheckTreeOnHost 1e-4 [[1L; 2L]] 
+    let ``Derivative check: Simple loop 1`` () =
+        DerivCheck.random (
+            [typeof<float>, [1L; 2L]],
             (fun [initialA] ->
                 let nIters = Size.fix 3L
-                let n = Size.fix 2L
-                let delayA = Size.fix 1L
 
-                let prevA = Expr.var<float> "prevA" [n]
+                let ch = Ch.Custom "A"
+                let prevA = UExpr.loopPrevCh ch initialA 0
+                let chExpr = UExpr.scalar initialA.Dev 2.0 * prevA + UExpr.scalar initialA.Dev 1.0         
 
-                let chA = "A"
-                let chAExpr = 2.0 * prevA + 1.0
+                let loopChs = Map [
+                    ch, (chExpr, 0)
+                ]
+                let loopExpr = MultiChannelExpr.loop nIters loopChs
 
-                let loopSpec = {
-                    Expr.Length = nIters
-                    Expr.Vars = Map [Expr.extractVar prevA,  Expr.PreviousChannel {Channel=chA; Delay=delayA; InitialArg=0}]
-                    Expr.Channels = Map [chA, {LoopValueT.Expr=chAExpr; LoopValueT.SliceDim=0}]
-                }
-                let resultA = Expr.loop loopSpec chA [initialA]
-                Expr.sum resultA
-            )
+                let resultA = loopExpr.[ch]
+                UExpr.sum resultA
+            ), maxDeviation=1e-4, log=output.WriteLine)
 
-
-
-#endif
