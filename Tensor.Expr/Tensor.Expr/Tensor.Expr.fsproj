@@ -34,6 +34,7 @@
     <Compile Include="Ops\Tools.fs" />
     <Compile Include="Ops\ExprGroup.fs" />
     <Compile Include="Ops\BaseExprEval.fs" />
+    <Compile Include="Ops\BaseExprEvaluator.fs" />
     <Compile Include="Ops/Leaf.fs" />
     <Compile Include="Ops/Unary.fs" />
     <Compile Include="Ops\Binary.fs" />
@@ -53,6 +54,8 @@
     <Compile Include="Deriv\Binary.fs" />
     <Compile Include="Deriv\Nary.fs" />
     <Compile Include="Deriv\Loop.fs" />
+    <Compile Include="Opt\Optimizer.fs" />
+    <Compile Include="Opt\ShapeOpt.fs" />
     <Compile Include="Trace/TextTracer.fs" />
     <Compile Include="Trace/HDF5Tracer.fs" />
     <Compile Include="EvalUpdateBundle.fs" />

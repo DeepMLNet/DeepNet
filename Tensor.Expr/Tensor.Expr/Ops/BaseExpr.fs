@@ -191,6 +191,11 @@ type IVarOp =
     /// Variable represented by this op.
     abstract Var: Var
 
+
+/// An operation that works element-wise on its operands.
+type IElemwiseOp =
+    interface end
+
     
 /// An op that has a custom print format.
 type IOpFormat =

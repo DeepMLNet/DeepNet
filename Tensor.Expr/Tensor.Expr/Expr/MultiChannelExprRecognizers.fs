@@ -20,3 +20,14 @@ module MultiChannelExpr =
         | :? Loop as this -> Some (this.Length, this.Vars, this.Channels, this.Xs |> List.map UExpr)
         | _ -> None
 
+
+/// Active recognizers for single- and multi-channel expressions.
+module ExprChs = 
+
+    /// Discriminates between single- and multi-channel expressions.
+    let (|Single|Multi|) (baseExpr: BaseExpr) =
+        if baseExpr.IsSingleChannel then
+            Single (UExpr baseExpr)
+        else
+            Multi (MultiChannelExpr baseExpr)
+

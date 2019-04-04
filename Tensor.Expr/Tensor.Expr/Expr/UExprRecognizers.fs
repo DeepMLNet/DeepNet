@@ -1,11 +1,25 @@
 ﻿namespace Tensor.Expr
 
+open DeepNet.Utils
 open Tensor.Expr.Ops
 
 
 /// Active recognizers for untyped single-channel expressions.
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module UExpr =
+
+    /// Matches an expression with an element-wise operation.
+    let (|UnaryElemwise|_|) (expr: UExpr) =
+        match expr.Op with
+        | :? IElemwiseOp when Map.keys expr.Args = Set [Arg.Only] -> 
+            Some (expr.Op, expr.Args.[Arg.Only])
+        | _ -> None
+
+    let (|BinaryElemwise|_|) (expr: UExpr) =
+        match expr.Op with
+        | :? IElemwiseOp when Map.keys expr.Args = Set [Arg.X; Arg.Y] ->
+            Some (expr.Op, expr.Args.[Arg.X], expr.Args.[Arg.Y])
+        | _ -> None
 
     let (|Scalar|_|) (expr: UExpr) =
         match expr.Op with
