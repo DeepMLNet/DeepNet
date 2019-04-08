@@ -24,7 +24,7 @@ type BuildTensorOptimizer() =
         member __.Order = 20
 
     interface IUExprOptimizer with
-        member __.Optimize subOpt expr =
+        member __.Optimize opt expr =
             match expr with
 
             // tranform SetSubtensor(Zero, X) into BuildTensor(X)

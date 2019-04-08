@@ -15,7 +15,7 @@ type ShapeOptimizer() =
         member __.Order = 10
 
     interface IUExprOptimizer with
-        member __.Optimize subOpt expr =
+        member __.Optimize opt expr =
             match expr with
             // remove unnecessary axes permutations
             | UExpr.PermuteAxes (perm, x) when Permutation.isIdentity perm -> x

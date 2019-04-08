@@ -54,8 +54,8 @@
     <Compile Include="Deriv\Binary.fs" />
     <Compile Include="Deriv\Nary.fs" />
     <Compile Include="Deriv\Loop.fs" />
-    <Compile Include="Opt\OptTools.fs" />
     <Compile Include="Opt\Optimizer.fs" />
+    <Compile Include="Opt\OptTools.fs" />
     <Compile Include="Opt\ShapeOpt.fs" />
     <Compile Include="Opt\BuildTensorOpt.fs" />
     <Compile Include="Opt\ElementsOpt.fs" />
@@ -70,7 +70,6 @@
     <None Include="Old\ModelContext.fs" />
     <None Include="Old\Expr.fs" />
     <None Include="Old\Hold.fs" />
-    <None Include="Old\Optimizer.fs" />
     <None Include="Old\UExpr.fs" />
     <None Include="Old\TensorManikin.fs" />
     <None Include="Old\Trace.fs" />
