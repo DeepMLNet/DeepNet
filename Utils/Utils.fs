@@ -497,8 +497,8 @@ module internal Util =
         Path.GetDirectoryName assemblyPath
 
     /// matches integral values (e.g. 2, 2.0 or 2.0f, etc.)
-    let (|Integral|_|) (x: 'T) =
-        match typeof<'T> with
+    let (|Integral|_|) (x: obj) =
+        match x.GetType() with
         | t when t = typeof<int> ->
             Some (x |> box |> unbox<int>)
         | t when t = typeof<byte> ->

@@ -54,8 +54,12 @@
     <Compile Include="Deriv\Binary.fs" />
     <Compile Include="Deriv\Nary.fs" />
     <Compile Include="Deriv\Loop.fs" />
+    <Compile Include="Opt\OptTools.fs" />
     <Compile Include="Opt\Optimizer.fs" />
     <Compile Include="Opt\ShapeOpt.fs" />
+    <Compile Include="Opt\BuildTensorOpt.fs" />
+    <Compile Include="Opt\ElementsOpt.fs" />
+    <Compile Include="Opt\LoopOpt.fs" />
     <Compile Include="Trace/TextTracer.fs" />
     <Compile Include="Trace/HDF5Tracer.fs" />
     <Compile Include="EvalUpdateBundle.fs" />

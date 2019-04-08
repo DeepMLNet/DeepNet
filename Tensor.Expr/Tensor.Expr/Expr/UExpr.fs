@@ -798,11 +798,6 @@ type UExpr (baseExpr: BaseExpr) =
         let xs = xs |> List.map UExpr.baseExprCh
         UExpr {Discard.Xs=xs} 
 
-    /// Build tensor from numeric ranges.
-    static member internal buildTensor shape ranges (xs: UExpr list) =
-        let xs = xs |> List.map UExpr.baseExprCh
-        UExpr {BuildTensor.Shape=shape; Ranges=ranges; Xs=xs} 
-
     /// Slices the argument along the specified dimension.
     /// Each loop iteration gets one slice.
     static member loopInputSlice (expr: UExpr) (sliceDim: int) =

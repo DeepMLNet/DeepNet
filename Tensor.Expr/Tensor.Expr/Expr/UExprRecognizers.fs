@@ -23,7 +23,7 @@ module UExpr =
 
     let (|Scalar|_|) (expr: UExpr) =
         match expr.Op with
-        | :? Scalar as this -> Some this.Value.Value
+        | :? Scalar as this -> Some this.Value
         | _ -> None
 
     let (|SizeValue|_|) (expr: UExpr) =
@@ -410,11 +410,6 @@ module UExpr =
         | :? Discard as this -> Some (this.Xs |> List.map UExpr)
         | _ -> None
 
-    let (|BuildTensor|_|) (expr: UExpr) =
-        match expr.Op with
-        | :? BuildTensor as this -> Some (this.Shape, this.Ranges, this.Xs |> List.map UExpr)
-        | _ -> None
-
     let (|Elements|_|) (expr: UExpr) =
         match expr.Op with
         | :? Elements as this -> Some (this.Shape, this.ElemExpr, this.Xs |> List.map UExpr)
@@ -425,3 +420,20 @@ module UExpr =
         | :? Interpolate as this -> Some (this.Interpolator, this.Xs |> List.map UExpr)
         | _ -> None
 
+    /// True if expression is zero.
+    /// False does not indicate that expression is non-zero.
+    let rec private hasZeroValue expr =
+        match expr with
+        | Scalar Const.Zero -> true
+        | Reshape (_, a) -> hasZeroValue a
+        | DoBroadcast (_, a) -> hasZeroValue a
+        | PermuteAxes (_, a) -> hasZeroValue a
+        | _ -> false
+
+    /// Matches an expression that is zero.
+    let (|ZeroValued|_|) (expr: UExpr) =
+        if hasZeroValue expr then Some ()
+        else None
+
+
+        

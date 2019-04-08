@@ -21,11 +21,11 @@ type IOptimizer =
 
 type IUExprOptimizer =
     /// Perform optimization of the specified expression.
-    abstract Optimize: UExpr -> UExpr
+    abstract Optimize: subOpt:(BaseExpr -> BaseExpr) -> expr:UExpr -> UExpr
 
 type IMultiChannelOptimizer =
     /// Perform optimization of the specified expression.
-    abstract Optimize: MultiChannelExpr -> MultiChannelExpr
+    abstract Optimize: subOpt:(BaseExpr -> BaseExpr) -> expr:MultiChannelExpr -> MultiChannelExpr
 
 
 /// Optimizer access functions.
@@ -72,20 +72,20 @@ module Optimizer =
         |> List.sortBy (fun opt -> opt.Order)
         
     /// Apply optimizer to expression once.
-    let private applyOnce (opt: IOptimizer) (baseExpr: BaseExpr) =
+    let private applyOnce (optRec: BaseExpr -> BaseExpr) (opt: IOptimizer) (baseExpr: BaseExpr) =
         match opt, baseExpr with
         | :? IUExprOptimizer as opt, ExprChs.Single uExpr -> 
-            opt.Optimize uExpr |> UExpr.baseExpr
+            opt.Optimize optRec uExpr |> UExpr.baseExpr
         | :? IMultiChannelOptimizer as opt, ExprChs.Multi mcExpr -> 
-            opt.Optimize mcExpr |> MultiChannelExpr.baseExpr
+            opt.Optimize optRec mcExpr |> MultiChannelExpr.baseExpr
         | _ -> baseExpr
 
     /// Apply optimizers to expression until no more optimizations are performed.
-    let rec applyIterated (opts: IOptimizer list) (baseExpr: BaseExpr) =       
+    let rec applyIterated (optRec: BaseExpr -> BaseExpr) (opts: IOptimizer list) (baseExpr: BaseExpr) =       
         let rec applyLoop optQueue expr =
             match optQueue with
             | opt :: rOptQueue ->
-                let optExpr = applyOnce opt expr
+                let optExpr = applyOnce optRec opt expr
                 if optExpr = baseExpr then 
                     applyLoop rOptQueue optExpr
                 else
@@ -102,7 +102,7 @@ module Optimizer =
             optimized.GetOrAdd expr (fun _ ->
                 expr
                 |> BaseExpr.mapArgs (BaseExprCh.map optRec)
-                |> applyIterated opts)
+                |> applyIterated optRec opts)
         optRec baseExpr
 
 

@@ -509,11 +509,6 @@ type Expr<'T> (baseExpr: BaseExpr) =
     static member ifThenElse (cond: Expr<bool>) (ifTrue: Expr<'T>) (ifFalse: Expr<'T>) =
         UExpr.ifThenElse cond.Untyped ifTrue.Untyped ifFalse.Untyped |> Expr<'T>
 
-    /// Build tensor from numeric ranges.
-    static member internal buildTensor shape ranges (xs: Expr<'T> list) =
-        let xs = xs |> List.map (fun expr -> expr.Untyped)
-        UExpr.buildTensor shape ranges xs |> Expr<'T>
-
     /// Slices the argument along the specified dimension.
     /// Each loop iteration gets one slice.        
     static member loopInputSlice (expr: Expr<'T>) (sliceDim: int) =
