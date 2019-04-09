@@ -40,7 +40,6 @@
     <Compile Include="Ops/Unary.fs" />
     <Compile Include="Ops\Binary.fs" />
     <Compile Include="Ops\Nary.fs" />
-    <Compile Include="Ops\LoopTypes.fs" />
     <Compile Include="Ops\Loop.fs" />
     <Compile Include="Expr\UExpr.fs" />
     <Compile Include="Expr\Expr.fs" />
