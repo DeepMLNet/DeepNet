@@ -5,15 +5,21 @@ open Tensor
 
 
 type CompileEnv = {
-    Optimizers: string list
+    /// List of optimizers to apply.
+    /// If None, all registered optimizers are applied.
+    Optimizers: string list option
 }
 
 
 type BaseExprEvaluator (expr: BaseExpr, compileEnv: CompileEnv) =
 
-    // do optimization
-    // how to do optimization?
-    // 
+    /// optimized expression
+    let optExpr =
+        let opts =
+            match compileEnv.Optimizers with
+            | Some optNames -> BaseExprOpt.getOptimizers optNames
+            | None -> BaseExprOpt.allOptimizers ()
+        BaseExprOpt.optimize opts expr
 
     member this.Eval (evalEnv: EvalEnv) : Map<Ch, ITensor> =
         failwith "TODO"

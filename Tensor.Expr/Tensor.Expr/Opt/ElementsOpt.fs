@@ -60,148 +60,7 @@ module internal ElementOptTools =
         [0 .. nDims-1]
         |> Seq.map (fun dim -> sigInDim dim elemExpr)
 
-
 open ElementOptTools
-
-
-
-/// Optimizes elements expressions.
-[<Optimizer>]
-type ElementsOptimizer() =
-
-    /// optimizes an element expression
-    static member internal optimizeElemExpr (elemExpr: Elem.Expr) =
-        match elemExpr with
-
-        // replace powers with integral exponents less than 5 with iterated multiplications
-        | Elem.Expr.Binary (Elem.Power, a, Elem.Expr.Leaf (Elem.Const cs)) ->
-            let rec repMul cnt arg =
-                match cnt with
-                | 0 -> Elem.Expr.constSpec (Const.oneOf elemExpr.Type)
-                | 1 -> arg
-                | _ when cnt > 0 ->
-                    arg * repMul (cnt - 1) arg
-                | _ when cnt < 0 ->
-                    Elem.Expr.constSpec (Const.oneOf elemExpr.Type) / repMul (-cnt) arg
-                | _ -> failwith "impossible"
-
-            match cs.Value with
-            | Util.Integral p when abs p < 5 -> repMul p a
-            | _ -> elemExpr                
-
-        | Elem.Expr.Leaf _ -> 
-            elemExpr
-        | Elem.Expr.Unary (op, a) -> 
-            Elem.Expr.Unary(op, ElementsOptimizer.optimizeElemExpr a)
-        | Elem.Expr.Binary (op, a, b) -> 
-            Elem.Expr.Binary (op, 
-                ElementsOptimizer.optimizeElemExpr a, 
-                ElementsOptimizer.optimizeElemExpr b)
-
-    interface IOptimizer with
-        member __.Order = 31
-
-    interface IUExprOptimizer with
-        member __.Optimize opt expr =
-            match expr with
-            | UExpr.Elements (resShape, elemExpr, args) ->
-                UExpr.elements resShape (ElementsOptimizer.optimizeElemExpr elemExpr) args
-            | _ -> expr
-
-
-
-/// Pulls summation out of element expressions.
-[<Optimizer>]
-type PullSumOutOfElements () =
-    interface IOptimizer with
-        member __.Order = 32
-
-    interface IUExprOptimizer with
-        member __.Optimize opt expr =
-            match expr with
-            | UExpr.Elements (resShape, elemExpr, args) ->
-                let nDims = Shape.nDim resShape
-                let mutable nArgs = args.Length 
-                let newArg () =
-                    let res = nArgs
-                    nArgs <- nArgs + 1
-                    res
-
-                let rec splitSum elemExpr =
-                    match elemExpr with
-                    | Elem.Expr.Unary (Elem.Sum (sym, first, last), summand) ->     
-                        // replace sum by argument access
-                        let typ = (Elem.Expr.typeName elemExpr).Type
-                        let sumArgPos = newArg ()
-                        let sumArgIdx =
-                            [for d=0 to nDims - 1 do yield Elem.Expr.idx d]
-                        let sumArg = Elem.Expr.argElemWithType typ sumArgPos sumArgIdx
-
-                        // add summation dimension to the right
-                        let sumElems = last - first + 1L
-                        let sumandShape = resShape @ [sumElems]
-                        let sumandIdx = first + Elem.Expr.idx nDims
-
-                        // substitute summation symbol with last dimension index
-                        let subst = Map [sym, sumandIdx]
-                        let summandSubst = summand |> Elem.Expr.substSymSizes subst
-
-                        // build sumand elements expression and sum over last dimensions
-                        let summandExpr = UExpr.elements sumandShape summandSubst args
-                        let summedExpr = summandExpr |> UExpr.sumAxis nDims
-
-                        sumArg, [opt.Optimize summedExpr]
-
-                    | Elem.Expr.Leaf (op) -> 
-                        Elem.Expr.Leaf (op), []
-                    | Elem.Expr.Unary (op, a) ->
-                        let aSplit, aArgs = splitSum a
-                        Elem.Expr.Unary (op, aSplit), aArgs
-                    | Elem.Expr.Binary (op, a, b) ->
-                        let aSplit, aArgs = splitSum a
-                        let bSplit, bArgs = splitSum b
-                        Elem.Expr.Binary (op, aSplit, bSplit), aArgs @ bArgs
-
-                let elemExprWithoutSum, sumArgs = splitSum elemExpr
-                UExpr.elements resShape elemExprWithoutSum (args @ sumArgs)
-
-            | _ -> expr
-
-
-
-/// Replaces result dimensions that compute identical values for all elements by broadcasting.
-[<Optimizer>]
-type BroadcastInsignificantElementsAxes () =
-    interface IOptimizer with
-        member __.Order = 33
-
-    interface IUExprOptimizer with
-        member __.Optimize opt expr =
-            match expr with
-            | UExpr.Elements (resShape, elemExpr, args) as elements ->
-                // determine significancy of all axes
-                let axSigs = elementsAxesSignificancy elements
-                let insigAx = 
-                    Seq.indexed axSigs 
-                    |> Seq.tryFind (fun (ax, axSig) ->
-                        not axSig && resShape.[ax] <> Size.broadcastable)
-
-                match insigAx with
-                | Some (insigAx, _) ->
-                    //printfn "removing insignificant axis %d with shape %A of expr:\n%A"
-                    //    insigAx resShape.[insigAx] elemExpr
-
-                    // replace insignificant axis by axis with one broadcastable element
-                    let sigResShape = resShape |> Shape.set insigAx Size.broadcastable
-                    let sigElements = UExpr.elements sigResShape elemExpr args
-
-                    // broadcast result to original shape
-                    let bcElements = sigElements |> UExpr.broadcast resShape
-                    opt.Optimize bcElements
-                | None -> elements
-            
-            | _ -> expr
-
 
 
 type internal CorrespondingElemOp =
@@ -346,8 +205,149 @@ type TransformToElements () =
 
     interface IOptimizer with
         member __.Order = 30
+        member __.Optimize opt expr = apply opt expr __.Optimize
 
-    interface IUExprOptimizer with
-        member __.Optimize data expr =
-            combineIntoElements data.ExprGroup expr
+    member __.Optimize data expr =
+        combineIntoElements data.ExprGroup expr
+
+
+
+
+/// Optimizes elements expressions.
+[<Optimizer>]
+type ElementsOptimizer() =
+
+    /// optimizes an element expression
+    static member internal optimizeElemExpr (elemExpr: Elem.Expr) =
+        match elemExpr with
+
+        // replace powers with integral exponents less than 5 with iterated multiplications
+        | Elem.Expr.Binary (Elem.Power, a, Elem.Expr.Leaf (Elem.Const cs)) ->
+            let rec repMul cnt arg =
+                match cnt with
+                | 0 -> Elem.Expr.constSpec (Const.oneOf elemExpr.Type)
+                | 1 -> arg
+                | _ when cnt > 0 ->
+                    arg * repMul (cnt - 1) arg
+                | _ when cnt < 0 ->
+                    Elem.Expr.constSpec (Const.oneOf elemExpr.Type) / repMul (-cnt) arg
+                | _ -> failwith "impossible"
+
+            match cs.Value with
+            | Util.Integral p when abs p < 5 -> repMul p a
+            | _ -> elemExpr                
+
+        | Elem.Expr.Leaf _ -> 
+            elemExpr
+        | Elem.Expr.Unary (op, a) -> 
+            Elem.Expr.Unary(op, ElementsOptimizer.optimizeElemExpr a)
+        | Elem.Expr.Binary (op, a, b) -> 
+            Elem.Expr.Binary (op, 
+                ElementsOptimizer.optimizeElemExpr a, 
+                ElementsOptimizer.optimizeElemExpr b)
+
+    interface IOptimizer with
+        member __.Order = 31
+        member __.Optimize opt expr = apply opt expr __.Optimize
+
+    member __.Optimize opt expr =
+        match expr with
+        | UExpr.Elements (resShape, elemExpr, args) ->
+            UExpr.elements resShape (ElementsOptimizer.optimizeElemExpr elemExpr) args
+        | _ -> expr
+
+
+
+/// Pulls summation out of element expressions.
+[<Optimizer>]
+type PullSumOutOfElements () =
+    interface IOptimizer with
+        member __.Order = 32
+        member __.Optimize opt expr = apply opt expr __.Optimize
+
+    member __.Optimize opt expr =
+        match expr with
+        | UExpr.Elements (resShape, elemExpr, args) ->
+            let nDims = Shape.nDim resShape
+            let mutable nArgs = args.Length 
+            let newArg () =
+                let res = nArgs
+                nArgs <- nArgs + 1
+                res
+
+            let rec splitSum elemExpr =
+                match elemExpr with
+                | Elem.Expr.Unary (Elem.Sum (sym, first, last), summand) ->     
+                    // replace sum by argument access
+                    let typ = (Elem.Expr.typeName elemExpr).Type
+                    let sumArgPos = newArg ()
+                    let sumArgIdx =
+                        [for d=0 to nDims - 1 do yield Elem.Expr.idx d]
+                    let sumArg = Elem.Expr.argElemWithType typ sumArgPos sumArgIdx
+
+                    // add summation dimension to the right
+                    let sumElems = last - first + 1L
+                    let sumandShape = resShape @ [sumElems]
+                    let sumandIdx = first + Elem.Expr.idx nDims
+
+                    // substitute summation symbol with last dimension index
+                    let subst = Map [sym, sumandIdx]
+                    let summandSubst = summand |> Elem.Expr.substSymSizes subst
+
+                    // build sumand elements expression and sum over last dimensions
+                    let summandExpr = UExpr.elements sumandShape summandSubst args
+                    let summedExpr = summandExpr |> UExpr.sumAxis nDims
+
+                    sumArg, [subOpt opt summedExpr]
+
+                | Elem.Expr.Leaf (op) -> 
+                    Elem.Expr.Leaf (op), []
+                | Elem.Expr.Unary (op, a) ->
+                    let aSplit, aArgs = splitSum a
+                    Elem.Expr.Unary (op, aSplit), aArgs
+                | Elem.Expr.Binary (op, a, b) ->
+                    let aSplit, aArgs = splitSum a
+                    let bSplit, bArgs = splitSum b
+                    Elem.Expr.Binary (op, aSplit, bSplit), aArgs @ bArgs
+
+            let elemExprWithoutSum, sumArgs = splitSum elemExpr
+            UExpr.elements resShape elemExprWithoutSum (args @ sumArgs)
+
+        | _ -> expr
+
+
+
+/// Replaces result dimensions that compute identical values for all elements by broadcasting.
+[<Optimizer>]
+type BroadcastInsignificantElementsAxes () =
+    interface IOptimizer with
+        member __.Order = 33
+        member __.Optimize opt expr = apply opt expr __.Optimize
+
+    member __.Optimize opt expr =
+        match expr with
+        | UExpr.Elements (resShape, elemExpr, args) as elements ->
+            // determine significancy of all axes
+            let axSigs = elementsAxesSignificancy elements
+            let insigAx = 
+                Seq.indexed axSigs 
+                |> Seq.tryFind (fun (ax, axSig) ->
+                    not axSig && resShape.[ax] <> Size.broadcastable)
+
+            match insigAx with
+            | Some (insigAx, _) ->
+                //printfn "removing insignificant axis %d with shape %A of expr:\n%A"
+                //    insigAx resShape.[insigAx] elemExpr
+
+                // replace insignificant axis by axis with one broadcastable element
+                let sigResShape = resShape |> Shape.set insigAx Size.broadcastable
+                let sigElements = UExpr.elements sigResShape elemExpr args
+
+                // broadcast result to original shape
+                let bcElements = sigElements |> UExpr.broadcast resShape
+                subOpt opt bcElements
+            | None -> elements
+            
+        | _ -> expr
+
 

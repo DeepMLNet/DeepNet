@@ -13,15 +13,15 @@ type LoopOptimizer() =
 
     interface IOptimizer with
         member __.Order = 60
+        member __.Optimize opt expr = applyMultiChannel opt expr __.Optimize
 
-    interface IMultiChannelOptimizer with
-        member __.Optimize opt expr =
-            match expr with
-            | MultiChannelExpr.Loop loopSpec ->
-                let optChannels = 
-                    loopSpec.Channels                        
-                    |> Map.map (fun _ch lv -> {lv with Expr=lv.Expr |> BaseExprCh.map opt.SubOptimize})
-                MultiChannelExpr {loopSpec with Channels=optChannels}
+    member __.Optimize opt expr =
+        match expr with
+        | MultiChannelExpr.Loop loopSpec ->
+            let optChannels = 
+                loopSpec.Channels                        
+                |> Map.map (fun _ch lv -> {lv with Expr=lv.Expr |> BaseExprCh.map opt.SubOptimize})
+            MultiChannelExpr {loopSpec with Channels=optChannels}
 
-            | _ -> expr
+        | _ -> expr
 

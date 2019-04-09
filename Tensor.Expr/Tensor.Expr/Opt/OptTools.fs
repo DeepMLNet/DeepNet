@@ -6,15 +6,36 @@ open Tensor.Expr.Ops
 
 
 
+/// Common utility functions for optimizers.
 module Tools =
+
+    /// Apply single-channel optimization function.
+    let apply (optData: OptimizerData) (baseExpr: BaseExpr) (opt: OptimizerData -> UExpr -> UExpr) =
+        match baseExpr with
+        | ExprChs.Single uExpr -> opt optData uExpr |> UExpr.baseExpr       
+        | _ -> baseExpr
+
+    /// Apply multi-channel optimization function.
+    let applyMultiChannel (optData: OptimizerData) (baseExpr: BaseExpr) (opt: OptimizerData -> MultiChannelExpr -> MultiChannelExpr) =
+        match baseExpr with
+        | ExprChs.Multi uExpr -> opt optData uExpr |> MultiChannelExpr.baseExpr       
+        | _ -> baseExpr
+
+    /// Apply the optimizers with the current settings to the expression tree.
+    let subOpt (data: OptimizerData) (expr: UExpr) =
+        data.SubOptimize expr.BaseExpr |> UExpr    
+        
+    /// Apply the optimizers with the current settings to the expression tree.
+    let subOptMultiChannel (data: OptimizerData) (expr: MultiChannelExpr) =
+        data.SubOptimize expr.BaseExpr |> MultiChannelExpr  
 
     /// Replace the argument of the unary operation.
     let replaceUnaryArg (op: IOp) (newArg: UExpr) =
         op.ReplaceArgs (Map [Arg.Only, newArg.BaseExprCh]) |> UExpr
 
+    /// Replace the argument of the binary operation.
     let replaceBinaryArgs (op: IOp) (newX: UExpr) (newY: UExpr) =
         op.ReplaceArgs (Map [Arg.X, newX.BaseExprCh; Arg.Y, newY.BaseExprCh]) |> UExpr
-
 
     /// Broadcast information
     type BcInfo =

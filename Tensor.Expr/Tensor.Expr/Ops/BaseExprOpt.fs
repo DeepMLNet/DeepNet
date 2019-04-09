@@ -1,11 +1,10 @@
-﻿namespace Tensor.Expr.Opt
+﻿namespace Tensor.Expr.Ops
 
 open System
 open System.Reflection
 
 open DeepNet.Utils
-open Tensor.Expr
-open Tensor.Expr.Ops
+
 
 
 /// Declares that this type is an optimizer and should be
@@ -19,38 +18,24 @@ type OptimizerAttribute () =
 type IOptimizer =
     /// Position in optimizer execution order.
     abstract Order: int
+    /// Perform optimization of the specified expression.
+    abstract Optimize: data:OptimizerData -> expr:BaseExpr -> BaseExpr
 
 
 /// Information about an expression that may help an optimizer to perform its
 /// optimizations.
-type OptimizerData = {
+and OptimizerData = {
     /// Apply the optimizers with the current settings to the expression tree.
     SubOptimize:   BaseExpr -> BaseExpr 
     /// Information about the expression tree being optimized.
     ExprGroup:     BaseExprGroup
     ///  Active optimizer.
     Optimizers:    IOptimizer list
-} with
-    /// Apply the optimizers with the current settings to the expression tree.
-    member this.Optimize (expr: UExpr) =
-        this.SubOptimize expr.BaseExpr |> UExpr
-    /// Apply the optimizers with the current settings to the expression tree.
-    member this.Optimize (expr: MultiChannelExpr) =
-        this.SubOptimize expr.BaseExpr |> MultiChannelExpr
-
-
-type IUExprOptimizer =
-    /// Perform optimization of the specified expression.
-    abstract Optimize: data:OptimizerData -> expr:UExpr -> UExpr
-
-
-type IMultiChannelOptimizer =
-    /// Perform optimization of the specified expression.
-    abstract Optimize: data:OptimizerData -> expr:MultiChannelExpr -> MultiChannelExpr
+}
 
 
 /// Optimizer access functions.
-module Optimizer = 
+module BaseExprOpt = 
 
     /// Registered optimiers.
     let mutable private regOpts: Map<string, IOptimizer> = Map.empty
@@ -94,21 +79,21 @@ module Optimizer =
         |> List.map snd
         |> List.sortBy (fun opt -> opt.Order)
 
-    /// Apply optimizer to expression once.
-    let private applyOnce (data: OptimizerData) (opt: IOptimizer) (baseExpr: BaseExpr) =
-        match opt, baseExpr with
-        | :? IUExprOptimizer as opt, ExprChs.Single uExpr -> 
-            opt.Optimize data uExpr |> UExpr.baseExpr
-        | :? IMultiChannelOptimizer as opt, ExprChs.Multi mcExpr -> 
-            opt.Optimize data mcExpr |> MultiChannelExpr.baseExpr
-        | _ -> baseExpr
+    ///// Apply optimizer to expression once.
+    //let private applyOnce (data: OptimizerData) (opt: IOptimizer) (baseExpr: BaseExpr) =
+    //    match opt, baseExpr with
+    //    | :? IUExprOptimizer as opt, ExprChs.Single uExpr -> 
+    //        opt.Optimize data uExpr |> UExpr.baseExpr
+    //    | :? IMultiChannelOptimizer as opt, ExprChs.Multi mcExpr -> 
+    //        opt.Optimize data mcExpr |> MultiChannelExpr.baseExpr
+    //    | _ -> baseExpr
 
     /// Apply optimizers to expression until no more optimizations are performed.
     let rec applyIterated (data: OptimizerData) (opts: IOptimizer list) (baseExpr: BaseExpr) =       
-        let rec applyLoop optQueue expr =
+        let rec applyLoop (optQueue: IOptimizer list) expr =
             match optQueue with
             | opt :: rOptQueue ->
-                let optExpr = applyOnce data opt expr
+                let optExpr = opt.Optimize data expr
                 if optExpr = baseExpr then 
                     applyLoop rOptQueue optExpr
                 else
