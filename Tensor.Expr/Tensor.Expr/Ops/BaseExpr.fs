@@ -203,6 +203,7 @@ type IOpFormat =
     abstract Text: string
 
 
+
 module private BaseExprTools =
 
     let collectMap (getOp: IOp -> 'V seq) (getExpr: BaseExpr -> Map<'K,'V>) (getKey: 'V -> 'K) (op: IOp) =

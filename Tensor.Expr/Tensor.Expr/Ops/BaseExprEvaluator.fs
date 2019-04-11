@@ -4,22 +4,26 @@ open DeepNet.Utils
 open Tensor
 
 
-type CompileEnv = {
+type EvaluatorEnv = {
     /// List of optimizers to apply.
     /// If None, all registered optimizers are applied.
     Optimizers: string list option
 }
 
 
-type BaseExprEvaluator (expr: BaseExpr, compileEnv: CompileEnv) =
+type BaseExprEvaluator (expr: BaseExpr, cfg: EvaluatorEnv) =
 
     /// optimized expression
     let optExpr =
         let opts =
-            match compileEnv.Optimizers with
+            match cfg.Optimizers with
             | Some optNames -> BaseExprOpt.getOptimizers optNames
             | None -> BaseExprOpt.allOptimizers ()
         BaseExprOpt.optimize opts expr
+
+    member this.Expr = expr
+
+    member this.Optimized = optExpr
 
     member this.Eval (evalEnv: EvalEnv) : Map<Ch, ITensor> =
         failwith "TODO"

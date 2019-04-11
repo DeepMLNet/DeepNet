@@ -35,6 +35,8 @@
     <Compile Include="Ops\ExprGroup.fs" />
     <Compile Include="Ops\BaseExprEval.fs" />
     <Compile Include="Ops\BaseExprOpt.fs" />
+    <Compile Include="Ops\TensorStub.fs" />
+    <Compile Include="Ops\BaseExprCompiler.fs" />
     <Compile Include="Ops\BaseExprEvaluator.fs" />
     <Compile Include="Ops/Leaf.fs" />
     <Compile Include="Ops/Unary.fs" />
