@@ -6,20 +6,22 @@ open Tensor.Expr
 
 
 
-type CompileFns = {
-    Alloc: AllocReq -> AllocStub
+type CompileEnv = {
+    VarOffsetStrides: Map<VarName, int64 * int64 list> 
 }
+
+type CompileData = {
+    Alloc: AllocReq -> AllocStub
+    Env: CompileEnv
+}
+
 
 type ICompilableOp =
     /// Should compute the output stubs given the input stubs.
-    abstract ChStubs: CompileFns -> Map<Arg, TensorStub> -> Map<Ch, TensorStub>
+    abstract ChStubs: CompileData -> Map<Arg, TensorStub> -> Map<Ch, TensorStub>
 
 
 module BaseExprCompiler =
-
-    type Config = {
-        none: unit
-    }
 
     /// Evaluates an expression tree using the specified function for evaluation
     /// of each expression given its arguments.
@@ -91,7 +93,7 @@ module BaseExprCompiler =
 
 
     // step 1: perform allocations
-    let performLayouting (rootExpr: BaseExpr) =
+    let performLayouting (env: CompileEnv) (rootExpr: BaseExpr) =
         let group = BaseExprGroup [rootExpr]
 
         /// All allocation stubs.
@@ -112,6 +114,7 @@ module BaseExprCompiler =
         group |> iter (fun expr ->    
             let compileFns = {
                 Alloc = alloc expr
+                Env = env
             }
             let argStubs = expr.Args |> Map.map (fun _ argExpr -> tensorStubs.[argExpr])
 
@@ -161,3 +164,14 @@ module BaseExprCompiler =
         ()
 
 
+module CompileTools =
+
+    let channelStubs (fns: CompileData) (op: IOp) =
+        op.Channels
+        |> Set.toSeq
+        |> Seq.map (fun ch ->
+            let typeName = op.TypeNames.[ch]
+            let shape = Shape.eval op.Shapes.[ch]
+            let dev = op.Devs.[ch]
+            ch, TensorStub.alloc (fns.Alloc, typeName, shape, dev))
+        |> Map.ofSeq

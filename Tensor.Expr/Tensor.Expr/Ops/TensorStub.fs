@@ -22,16 +22,15 @@ type AllocStub = {
     member this.Dev = this.Req.Dev
     member this.Size = this.Req.Size
 
+type AllocFn = AllocReq -> AllocStub
 
+    
 [<RequireQualifiedAccess>]
 type StorageStub =
     | Allocated of AllocStub
     | Dynamic
-
-//[<RequireQualifiedAccess>]
-//type LayoutStub =
-//    | Fixed of offset:int64 * stride:int64 list
-//    | Dynamic
+    | VarStorage of VarName
+    | Fixed of ITensorStorage
 
 
 // shall we allow dynamic shapes here?
@@ -45,7 +44,6 @@ type TensorStub = {
     TypeName:       TypeName
     /// Storage device (always known).
     Dev:            ITensorDevice
-
     /// Offset and strides (may be unknown at compile-time).
     OffsetStride:   (int64 * int64 list) option
     /// Storage (may be unknown at compile-time).
@@ -78,6 +76,25 @@ type TensorStub = {
         | Some layout -> ts |> TensorStub.relayout (fn layout)
         | None ->
             failwithf "Cannot apply operation to layout-less to TensorStub %A." ts
+
+    static member make (layout: TensorLayout, alloc: AllocStub) = {
+        Shape = layout.Shape
+        TypeName = alloc.TypeName
+        Dev = alloc.Dev
+        OffsetStride = Some (layout.Offset, layout.Stride)
+        Storage = StorageStub.Allocated alloc
+    }    
+
+    static member alloc (allocFn: AllocReq -> AllocStub, dataType: TypeName, shape: int64 list, 
+                         dev: ITensorDevice, ?order: TensorOrder) =
+        let order = defaultArg order RowMajor
+        let layout = 
+            match order with
+            | RowMajor -> TensorLayout.newRowMajor shape
+            | ColumnMajor -> TensorLayout.newColumnMajor shape
+            | CustomOrder perm -> TensorLayout.newOrdered shape perm
+        let alloc = allocFn {TypeName=dataType; Dev=dev; Size=layout.NElems}
+        TensorStub.make (layout, alloc)
 
     /// Transpose.
     member this.T = 

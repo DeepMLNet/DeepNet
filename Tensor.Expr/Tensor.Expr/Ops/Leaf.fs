@@ -21,6 +21,10 @@ type Scalar = { Value: Const; Dev: ITensorDevice } with
         member this.Eval env argVals = 
             this.Value |> Const.asITensor this.Dev |> Ch.only
 
+    interface ICompilableOp with
+        member this.ChStubs data argStubs =
+            CompileTools.channelStubs data this
+
     interface IOpFormat with
         member this.Text =
             sprintf "%A<@%A>" this.Value this.Dev
@@ -40,6 +44,10 @@ type SizeValue = { Value: Size; Dev: ITensorDevice } with
         member this.CanEvalAllSymSizes = Size.canEval this.Value
         member this.Eval env argVals = 
             Size.eval this.Value |> Tensor.scalar this.Dev :> ITensor |> Ch.only     
+
+    interface ICompilableOp with
+        member this.ChStubs data argStubs =
+            CompileTools.channelStubs data this
 
     interface IOpFormat with
         member this.Text =
@@ -61,6 +69,10 @@ type Identity = { Size: Size; Type: TypeName; Dev: ITensorDevice } with
         member this.Eval env argVals = 
             (Generic<IdentityTyped<_>, IIdentityTyped> [this.Type.Type]).Eval this env
             |> Ch.only
+
+    interface ICompilableOp with
+        member this.ChStubs data argStubs =
+            CompileTools.channelStubs data this
 
     interface IOpFormat with
         member this.Text =
@@ -91,6 +103,10 @@ type Counting = { Size: Size; Dev: ITensorDevice } with
             Tensor.counting this.Dev (Size.eval this.Size) :> ITensor  
             |> Ch.only
 
+    interface ICompilableOp with
+        member this.ChStubs data argStubs =
+            CompileTools.channelStubs data this
+
     interface IOpFormat with
         member this.Text =
             sprintf "0 .. %A<@%A>" this.Size this.Dev
@@ -115,6 +131,16 @@ type VarArg = { Var: Var } with
     interface IVarOp with
         member this.Var = this.Var
 
+    interface ICompilableOp with
+        member this.ChStubs data argStubs =
+            Ch.only {
+                Shape = Shape.eval this.Var.Shape
+                TypeName = this.Var.TypeName
+                Dev = this.Var.Dev
+                OffsetStride = data.Env.VarOffsetStrides |> Map.tryFind this.Var.Name 
+                Storage = StorageStub.VarStorage this.Var.Name
+            }
+
     interface IOpFormat with
         member this.Text =
             sprintf "%A" this.Var
@@ -137,6 +163,16 @@ type DataArg = { Data: OrdRef<ITensor> } with
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals =
             this.Data.Value |> Ch.only       
+
+    interface ICompilableOp with
+        member this.ChStubs data argStubs =
+            Ch.only {
+                Shape = this.Data.Value.Shape
+                TypeName = TypeName.ofTypeInst this.Data.Value.DataType
+                Dev = this.Data.Value.Dev
+                OffsetStride = Some (this.Data.Value.Layout.Offset, this.Data.Value.Layout.Stride) 
+                Storage = StorageStub.Fixed this.Data.Value.Storage
+            }
 
     interface IOpFormat with
         member this.Text = 
