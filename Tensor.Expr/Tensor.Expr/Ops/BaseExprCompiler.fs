@@ -11,14 +11,17 @@ type CompileEnv = {
 }
 
 type CompileData = {
-    Alloc: AllocReq -> AllocStub
-    Env: CompileEnv
+    Alloc:              AllocReq -> AllocStub
+    Env:                CompileEnv
+    ArgStubs:           Map<Arg, TensorStub> 
+    OverwritableArgs:   Set<Arg>
+    Expr:               BaseExpr
 }
 
 
 type ICompilableOp =
     /// Should compute the output stubs given the input stubs.
-    abstract ChStubs: CompileData -> Map<Arg, TensorStub> -> Map<Ch, TensorStub>
+    abstract ChStubs: CompileData -> Map<Ch, TensorStub>
 
 
 module BaseExprCompiler =
@@ -98,38 +101,93 @@ module BaseExprCompiler =
 
         /// All allocation stubs.
         let allocStubs = ResizeArray<AllocStub> ()
+        let allocUsers = Dictionary<AllocStub, Set<BaseExpr>> ()
+        let allocUserChs = Dictionary<AllocStub, Set<BaseExprCh>> ()
         let alloc expr req =
-            let alloc = {
-                Req = req
-                Users = HashSet<BaseExpr> ()
-            }
-            alloc.Users.Add expr |> ignore
+            let alloc = {Req = req}
+            allocUsers.Add (alloc, Set<BaseExpr> [expr])
+            allocUserChs.Add (alloc, Set.empty)
             allocStubs.Add alloc
             alloc
 
         /// All tensor stubs.
         let tensorStubs = Dictionary<BaseExprCh, TensorStub> ()
 
+        /// All expressions that an expression depends on transitively.
+        // TODO: might need to clear values when they are not used anymore to save memory.
+        let depending = Dictionary<BaseExpr, Set<BaseExpr>> ()
+
         // Walk over expression tree.
         group |> iter (fun expr ->    
-            let compileFns = {
-                Alloc = alloc expr
-                Env = env
-            }
             let argStubs = expr.Args |> Map.map (fun _ argExpr -> tensorStubs.[argExpr])
+
+            /// All expression channels this expression transitively depends on.
+            let exprDepending =
+                if Map.isEmpty expr.Args then 
+                    Set.empty
+                else
+                    expr.Args
+                    |> Map.toSeq
+                    |> Seq.map (fun (_arg, argExpr) -> Set.add argExpr.Expr depending.[argExpr.Expr])
+                    |> Set.unionMany
+            depending.[expr] <- exprDepending
 
             // Add expression to users of its argument stubs.
             for KeyValue(_, argStub) in argStubs do
                 match argStub.Storage with
-                | StorageStub.Allocated allocStub -> allocStub.Users.Add expr |> ignore
-                | StorageStub.Dynamic -> ()
+                | StorageStub.Allocated allocStub -> 
+                    allocUsers.[allocStub] <- allocUsers.[allocStub] |> Set.add expr 
+                | _ -> ()
+
+            // Compute set of overwritable arguments for in-place operations.
+            // An argument value can be overwritten with the result of this expression
+            // if no other expression uses this argument value after this expression.
+            let overwritableArgs =
+                expr.Args
+                |> Map.toSeq
+                |> Seq.filter (fun (arg, argExprCh) ->
+                    // Arguments that share the same storage cannot be overwritten.
+                    expr.Args |> Map.toSeq |> Seq.exists (fun (otherArg, otherArgExprCh) ->
+                        arg <> otherArg && tensorStubs.[otherArgExprCh] = tensorStubs.[argExprCh])
+                    |> not)
+                |> Seq.filter (fun (_arg, argExprCh) ->
+                    match tensorStubs.[argExprCh].Storage with
+                    | StorageStub.Allocated argAlloc ->
+                        // Arguments uses an allocated storage: overwriting it might be possible.
+                        // Get all expression channels that use the allocated storage of that argument (so far).
+                        let exprChsUsingArgStorage = allocUserChs.[argAlloc] 
+                        // Get their (complete) dependants.
+                        let deps =
+                            exprChsUsingArgStorage
+                            |> Set.toSeq
+                            |> Seq.collect group.Dependants
+                            |> Seq.filter ((<>) expr)
+                        // Check if we depend on all their dependants.
+                        // If this is the case, we can overwrite that argument because all other users
+                        // have already been evaluated before we can be evaluated.
+                        deps |> Seq.forall exprDepending.Contains
+                    | _ -> 
+                        // Argument uses other storage. Do not overwrite it.
+                        false)
+                |> Seq.map fst
+                |> Set.ofSeq
+
+            // TODO:
+            // - verify that this works and write down proof
                 
             // Compute channel stubs given argument stubs.
             let chStubs =
                 match expr.Op with
                 | :? ICompilableOp as cop -> 
                     // Let op compute its output stubs given argument stubs.
-                    cop.ChStubs compileFns argStubs
+                    let data = {
+                        Alloc = alloc expr
+                        Env = env
+                        ArgStubs = argStubs
+                        OverwritableArgs = overwritableArgs
+                        Expr = expr
+                    }
+                    cop.ChStubs data
                 | _ ->
                     // Op cannot compute stubs, generate dynamic stubs for all
                     // its output channels. 
@@ -146,10 +204,12 @@ module BaseExprCompiler =
                     |> Map.ofSeq
 
             // Add expression to users of its channel stubs.
-            for KeyValue(_, chStub) in chStubs do
+            for KeyValue(ch, chStub) in chStubs do
                 match chStub.Storage with
-                | StorageStub.Allocated allocStub -> allocStub.Users.Add expr |> ignore
-                | StorageStub.Dynamic -> ()
+                | StorageStub.Allocated allocStub -> 
+                    allocUsers.[allocStub] <- allocUsers.[allocStub] |> Set.add expr 
+                    allocUserChs.[allocStub] <- allocUserChs.[allocStub] |> Set.add expr.[ch]
+                | _ -> ()
 
             // Store channel stubs.
             for KeyValue(ch, chStub) in chStubs do
@@ -164,14 +224,58 @@ module BaseExprCompiler =
         ()
 
 
-module CompileTools =
+type CompileTools () =
 
-    let channelStubs (fns: CompileData) (op: IOp) =
+    /// Allocates tensor stubs for all output channels of the op.
+    /// Argument stubs will be reused if tryInplace is true.
+    static member chStubs (data: CompileData, ?tryInplace: bool) =
+        let tryInplace = defaultArg tryInplace false
+
+        let op = data.Expr.Op
+        let mutable availArgs = data.OverwritableArgs
+        
+        /// Returns an overwritable argument TensorStub that matches the
+        /// given specifications, if available.
+        let tryUseArg typeName dev shape =
+            availArgs
+            |> Set.toSeq
+            |> Seq.filter (fun arg ->
+                // only reuse stubs with allocated storage
+                match data.ArgStubs.[arg].Storage with
+                | StorageStub.Allocated _ -> true
+                | _ -> false)
+            |> Seq.filter (fun arg ->
+                // only reuse stubs with non-aliased elements 
+                TensorStub.isNotAliased data.ArgStubs.[arg])
+            |> Seq.tryFind (fun arg ->
+                let argExpr = op.Args.[arg]
+                argExpr.TypeName = typeName &&
+                argExpr.Dev = dev &&
+                Shape.eval argExpr.Shape = shape)
+            |> Option.map (fun arg -> 
+                availArgs <- availArgs |> Set.remove arg
+                data.ArgStubs.[arg])
+
+        // Other problem:
+        // - it could happen that two arguments use the same storage and thus get overwritten twice.
+        // - also 
+
         op.Channels
         |> Set.toSeq
         |> Seq.map (fun ch ->
             let typeName = op.TypeNames.[ch]
             let shape = Shape.eval op.Shapes.[ch]
             let dev = op.Devs.[ch]
-            ch, TensorStub.alloc (fns.Alloc, typeName, shape, dev))
+            let stub = 
+                if tryInplace then
+                    match tryUseArg typeName dev shape with
+                    | Some inplaceStub -> inplaceStub
+                    | None -> TensorStub.alloc (data.Alloc, typeName, shape, dev)
+                else
+                    TensorStub.alloc (data.Alloc, typeName, shape, dev)
+            ch, stub)
         |> Map.ofSeq
+
+
+
+

@@ -20,6 +20,37 @@ type UnaryPlus = { X: BaseExprCh } with
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.unaryX argVals).UnaryPlus () |> Ch.only     
 
+    interface ICompilableOp with
+        member this.ChStubs data =
+            // with unary ops goal is to reuse the argument, i.e. do it in-place
+            // however, we need to make sure that no other op will reuse the argument
+            // So how to do that?
+            // Possibilities:
+            // - precalculate the ability to reuse the arguments
+            //   - for that we need to know if an op consumes the argument
+            // - so it must output which inputs were consumed so that we know
+            //   if we can offer them to other ops
+            // So in-place can only be offered to one op?
+            // - yes, the last dependand of an argument expression
+            // - but we might be offered multiple arguments
+            // - well, we are unary, so here it cannot happen
+            // - we now need to check if we can work in-place
+            // - for that
+            // - 1. op needs to support it
+            // - 2. something about tensor layout?
+            // - 3. we should not overwrite external variables
+            // - 2a. If tensor is broadcasted, then it might cause issues for non-elementwise operations.
+            // - 2b. For in graph expressions, this should not occur, as braodcasts are usually pulled out.
+            // - 2c. So just disallow in-place operations when source is broadcasted?
+            // - 2d. yes, simplest solution for now.
+            // - where should we impose that limitation?
+            // - in the allocator or in the Ops?
+            // - ops: more flexibility, but also more work
+            // - however op also must check if device, type, etc. matches
+            // - so leave it to op
+
+
+            failwith "todo"
 
 /// Negation.
 type Negate = { X: BaseExprCh } with

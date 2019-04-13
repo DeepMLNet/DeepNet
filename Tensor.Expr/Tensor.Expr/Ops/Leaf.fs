@@ -22,8 +22,8 @@ type Scalar = { Value: Const; Dev: ITensorDevice } with
             this.Value |> Const.asITensor this.Dev |> Ch.only
 
     interface ICompilableOp with
-        member this.ChStubs data argStubs =
-            CompileTools.channelStubs data this
+        member this.ChStubs data =
+            CompileTools.chStubs data 
 
     interface IOpFormat with
         member this.Text =
@@ -46,8 +46,8 @@ type SizeValue = { Value: Size; Dev: ITensorDevice } with
             Size.eval this.Value |> Tensor.scalar this.Dev :> ITensor |> Ch.only     
 
     interface ICompilableOp with
-        member this.ChStubs data argStubs =
-            CompileTools.channelStubs data this
+        member this.ChStubs data =
+            CompileTools.chStubs data 
 
     interface IOpFormat with
         member this.Text =
@@ -71,8 +71,8 @@ type Identity = { Size: Size; Type: TypeName; Dev: ITensorDevice } with
             |> Ch.only
 
     interface ICompilableOp with
-        member this.ChStubs data argStubs =
-            CompileTools.channelStubs data this
+        member this.ChStubs data =
+            CompileTools.chStubs data 
 
     interface IOpFormat with
         member this.Text =
@@ -104,8 +104,8 @@ type Counting = { Size: Size; Dev: ITensorDevice } with
             |> Ch.only
 
     interface ICompilableOp with
-        member this.ChStubs data argStubs =
-            CompileTools.channelStubs data this
+        member this.ChStubs data =
+            CompileTools.chStubs data 
 
     interface IOpFormat with
         member this.Text =
@@ -132,7 +132,7 @@ type VarArg = { Var: Var } with
         member this.Var = this.Var
 
     interface ICompilableOp with
-        member this.ChStubs data argStubs =
+        member this.ChStubs data =
             Ch.only {
                 Shape = Shape.eval this.Var.Shape
                 TypeName = this.Var.TypeName
@@ -165,7 +165,7 @@ type DataArg = { Data: OrdRef<ITensor> } with
             this.Data.Value |> Ch.only       
 
     interface ICompilableOp with
-        member this.ChStubs data argStubs =
+        member this.ChStubs data =
             Ch.only {
                 Shape = this.Data.Value.Shape
                 TypeName = TypeName.ofTypeInst this.Data.Value.DataType

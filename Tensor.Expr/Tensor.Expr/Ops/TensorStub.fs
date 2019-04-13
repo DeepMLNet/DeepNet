@@ -16,7 +16,6 @@ type AllocReq = {
 [<ReferenceEquality>]
 type AllocStub = {
     Req:        AllocReq
-    Users:      HashSet<BaseExpr>
 } with
     member this.TypeName = this.Req.TypeName
     member this.Dev = this.Req.Dev
@@ -27,9 +26,13 @@ type AllocFn = AllocReq -> AllocStub
     
 [<RequireQualifiedAccess>]
 type StorageStub =
-    | Allocated of AllocStub
+    /// Storage will be known at run-time.
     | Dynamic
+    /// Allocated for internal results in the expression tree.
+    | Allocated of AllocStub
+    /// Storage of a variable.
     | VarStorage of VarName
+    /// Fixed storage (already allocated before compilation).
     | Fixed of ITensorStorage
 
 
@@ -109,6 +112,12 @@ type TensorStub = {
     /// a view of the specified tensor over the given range 
     static member range (rng: Rng list) a =
         a |> TensorStub.mapLayout (TensorLayout.view rng)
+
+    /// Returns true, if no aliasing of elements can occur.
+    static member isNotAliased ts =
+        match TensorStub.layout ts with
+        | Some layout -> TensorLayout.isNotAliased layout
+        | None -> false
 
     ///// Tries to reshape the tensor without copying.
     ///// For this to succeed, the tensor must have row-major layout.

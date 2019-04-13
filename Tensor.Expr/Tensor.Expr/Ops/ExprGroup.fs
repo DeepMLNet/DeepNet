@@ -77,10 +77,16 @@ type BaseExprGroup (exprs: BaseExpr list) =
         allExprs.Force() :> IReadOnlyCollection<_>
 
     /// Returns all expressions that depend directly on the specified expression channel.
-    member this.Dependants exprCh =
+    member this.Dependants (exprCh: BaseExprCh) : seq<BaseExpr> =
         match dependants.Force().TryFind exprCh with
-        | Some deps -> deps :> IReadOnlyCollection<_>
-        | None -> HashSet<_> () :> IReadOnlyCollection<_>
+        | Some deps -> deps :> _
+        | None -> HashSet<_> () :> _
+
+    /// Returns all expressions that depend directly on the specified expression.
+    member this.Dependants (expr: BaseExpr) : seq<BaseExpr> =
+        expr.Channels
+        |> Set.toSeq
+        |> Seq.collect (fun ch -> this.Dependants expr.[ch])
 
     /// Returns all expressions that expr directly depends on.
     member this.Depending (expr: BaseExpr) = seq {

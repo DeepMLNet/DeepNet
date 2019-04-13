@@ -269,10 +269,29 @@ module TensorLayout =
                 invalidOp "Cannot broadcast shape %A to shape %A." (shape ain) bs
         a
 
-    /// returns true if at least one dimension is broadcasted
+    /// Returns true, if at least one dimension is broadcasted.
     let isBroadcasted a =
         (shape a, stride a)
         ||> List.exists2 (fun shp str -> str = 0L && shp > 1L)
+
+    /// Returns true, if no aliasing of elements can occur, i.e.
+    /// an element of the tensor cannot be accessed using two different indices.
+    let isNotAliased a =
+        let sortedShape, sortedStride =
+            List.zip (shape a) (stride a)
+            |> List.filter (fun (shp, _str) -> shp > 1L)
+            |> List.sortBy snd
+            |> List.unzip
+
+        let rec notAliasedStride shape str =
+            match shape with
+            | shp :: rShp -> str :: notAliasedStride rShp (shp * str)
+            | [] -> []
+
+        match List.tryHead sortedStride with
+        | Some initialStride ->
+            sortedStride = notAliasedStride sortedShape initialStride
+        | None -> true        
 
     /// Reshape layout under the assumption that it is contiguous.
     /// The number of elements must not change.
