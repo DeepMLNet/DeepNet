@@ -112,7 +112,7 @@ type TransformToElements () =
         /// new element expression if the argument is not an element expression.
         let rec getArgElemExpr (argExpr: UExpr) =            
             let combinable () = 
-                (exprInfo.Dependants argExpr.BaseExprCh).Count = 1 ||
+                Seq.length (exprInfo.Dependants argExpr.BaseExprCh) = 1 ||
                 Set.count argExpr.Vars = 0            
 
             let rec insertBcAxes substSize substStartDim srcShp rsShp elemExpr =

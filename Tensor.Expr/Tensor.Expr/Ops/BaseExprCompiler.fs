@@ -15,6 +15,7 @@ type CompileData = {
     Env:                CompileEnv
     ArgStubs:           Map<Arg, TensorStub> 
     OverwritableArgs:   Set<Arg>
+    ChStubWishes:       Map<Ch, TensorStub>
     Expr:               BaseExpr
 }
 
@@ -23,86 +24,64 @@ type ICompilableOp =
     /// Should compute the output stubs given the input stubs.
     abstract ChStubs: CompileData -> Map<Ch, TensorStub>
 
+type ITensorStubWishPropagatingOp =
+    abstract PropagateWishes: Map<Ch, TensorStub> -> Map<Arg, TensorStub>
+
 
 module BaseExprCompiler =
 
-    /// Evaluates an expression tree using the specified function for evaluation
-    /// of each expression given its arguments.
-    let eval (fn: BaseExpr -> Map<Arg, 'D> -> Map<Ch, 'D>) (group: BaseExprGroup) =
-        /// Evaluated values for each BaseExpr channel.
-        let exprChValues = Dictionary<BaseExprCh, 'D> ()
-        /// BaseExprs that have all their arguments evaluated and thus can be evaluated themselves.
-        let evalQueue = Queue<BaseExpr> ()
-        /// Values that are still missing but needed for evaluation of a BaseExpr.
-        let missingValuesForExpr = Dictionary<BaseExpr, HashSet<BaseExprCh>> ()
-        /// Dependants of an expression channel that are not yet evaluated.
-        let unevaledDeps = Dictionary<BaseExprCh, HashSet<BaseExpr>> ()
-                  
-        // Build missing values for each expression and enqueue leafs.
-        for expr in group.AllExprs do
-            let dependingOn = HashSet<_> ()
-            for KeyValue(_, arg) in expr.Args do
-                dependingOn.Add arg |> ignore
-            missingValuesForExpr.[expr] <- dependingOn
+    /// Propagates tensor stub wishes from the roots of the expression tree towards its nodes.
+    let propagateStubWishes (env: CompileEnv) (stubWish: Map<BaseExprCh, TensorStub>) (group: BaseExprGroup) =
 
-            if dependingOn.Count = 0 then
-                evalQueue.Enqueue expr
+        /// Tensor stub wishes for an expression channel.
+        let stubWish = Dictionary<BaseExprCh, TensorStub> stubWish
 
-            for ch in expr.Channels do
-                unevaledDeps.[expr.[ch]] <- HashSet (group.Dependants expr.[ch])
+        /// Propagates wishes from an expression to its arguments.
+        let propagate (expr: BaseExpr) =
+            match expr.Op with
+            | :? ITensorStubWishPropagatingOp as op ->
+                // Op supports wish propagation.
 
-        // Loop until all expressions are evaluated.
-        while evalQueue.Count > 0 do
-            // Get expression to evaluate and its argument values.
-            let expr = evalQueue.Dequeue ()
-            let argVals = expr.Args |> Map.map (fun _ argExpr -> exprChValues.[argExpr])
+                // Assemble all channel wishes of an expression.
+                let chWishes =
+                    expr.Channels
+                    |> Seq.choose (fun ch ->
+                        stubWish.TryFind expr.[ch]
+                        |> Option.map (fun wish -> ch, wish))
+                    |> Map.ofSeq
 
-            // Evaluate.
-            let chVals = fn expr argVals
+                // Let op calculate wishes for its arguments.
+                let argWishes = op.PropagateWishes chWishes
 
-            // Store the result value of the expression and update its dependants.
-            for KeyValue(ch, value) in chVals do
-                // Store channel value.
-                exprChValues.[expr.[ch]] <- value
+                // Store argument wishes.
+                for KeyValue(arg, argWish) in argWishes do
+                    let argExprCh = expr.Args.[arg]
+                    // The first wish for an expression channel wins and subsequent 
+                    // wishes are ignored.
+                    if not (stubWish.ContainsKey argExprCh) then
+                        stubWish.[argExprCh] <- argWish
 
-                // Update dependants.
-                for dep in group.Dependants expr.[ch] do
-                    let mv = missingValuesForExpr.[dep]
-                    mv.Remove expr.[ch] |> ignore
+            | _ -> 
+                // Op does not support wish propagation. Do nothing.
+                ()
 
-                    // Enqueue, if all arguments have evaluated values.
-                    if mv.Count = 0 then
-                        evalQueue.Enqueue dep
+        // Walk over expression tree from roots to leafs and propagate wishes.
+        group |> BaseExprGroup.revIter propagate
 
-                // Update unevaled deps.
-                for KeyValue(_, arg) in expr.Args do    
-                    let ueDeps = unevaledDeps.[arg]
-                    ueDeps.Remove expr |> ignore
-
-                    // Remove value, if all dependants are evaluated.
-                    if ueDeps.Count = 0 then
-                        exprChValues.Remove arg |> ignore
-
-        exprChValues |> Map.ofDictionary
+        stubWish |> Map.ofDictionary
 
 
-    /// Walks over an expression tree in such a way that all arguments of an
-    /// expression are evaluated first before that expression itself is evaluated.
-    let iter (fn: BaseExpr -> unit) (group: BaseExprGroup) =
-        let evalFn (expr: BaseExpr) (_arg: Map<Arg, unit>) =
-            fn expr
-            expr.Channels |> Set.toSeq |> Seq.map (fun ch -> ch, ()) |> Map.ofSeq
-        eval evalFn group |> ignore
-
-
-    // step 1: perform allocations
-    let performLayouting (env: CompileEnv) (rootExpr: BaseExpr) =
-        let group = BaseExprGroup [rootExpr]
+    /// Assigns a tensor stub to each expression channel in the expression tree.
+    let assignStubs (env: CompileEnv) (stubWish: Map<BaseExprCh, TensorStub>) (group: BaseExprGroup) =
 
         /// All allocation stubs.
         let allocStubs = ResizeArray<AllocStub> ()
+        /// Users of an allocation, either as argument, internally or as channel.
         let allocUsers = Dictionary<AllocStub, Set<BaseExpr>> ()
+        /// Expression channels that use an allocation.
         let allocUserChs = Dictionary<AllocStub, Set<BaseExprCh>> ()
+
+        /// Allocate memory for the specified expression.
         let alloc expr req =
             let alloc = {Req = req}
             allocUsers.Add (alloc, Set<BaseExpr> [expr])
@@ -110,18 +89,20 @@ module BaseExprCompiler =
             allocStubs.Add alloc
             alloc
 
-        /// All tensor stubs.
+        /// Assigned tensor stub for each expression channel.
         let tensorStubs = Dictionary<BaseExprCh, TensorStub> ()
 
         /// All expressions that an expression depends on transitively.
-        // TODO: might need to clear values when they are not used anymore to save memory.
         let depending = Dictionary<BaseExpr, Set<BaseExpr>> ()
 
-        // Walk over expression tree.
-        group |> iter (fun expr ->    
+        /// Processes an expression.
+        let processExpr (expr: BaseExpr) =    
+            /// Stubs for the arguments of the expression.
             let argStubs = expr.Args |> Map.map (fun _ argExpr -> tensorStubs.[argExpr])
 
             /// All expression channels this expression transitively depends on.
+            /// Due to the walk order over the expression tree all these expressions
+            /// have already been processed.
             let exprDepending =
                 if Map.isEmpty expr.Args then 
                     Set.empty
@@ -140,16 +121,23 @@ module BaseExprCompiler =
                 | _ -> ()
 
             // Compute set of overwritable arguments for in-place operations.
-            // An argument value can be overwritten with the result of this expression
-            // if no other expression uses this argument value after this expression.
+            // An argument value can be overwritten with the result of this expression,
+            // if it is guaranteed that all other expressions using the argument value are
+            // finished evaluating before the evaluation of this expression starts.
+            // Additionally, the argument must not share the same storage with another
+            // argument.
             let overwritableArgs =
                 expr.Args
                 |> Map.toSeq
                 |> Seq.filter (fun (arg, argExprCh) ->
-                    // Arguments that share the same storage cannot be overwritten.
+                    // Arguments that share the same storage must not be overwritten.
                     expr.Args |> Map.toSeq |> Seq.exists (fun (otherArg, otherArgExprCh) ->
-                        arg <> otherArg && tensorStubs.[otherArgExprCh] = tensorStubs.[argExprCh])
+                        otherArg <> arg && tensorStubs.[otherArgExprCh] = tensorStubs.[argExprCh])
                     |> not)
+                |> Seq.filter (fun (_arg, argExprCh) ->
+                    // Only overwrite arguments that do not have aliased elements,
+                    // for example due to broadcasting.
+                    TensorStub.isNotAliased tensorStubs.[argExprCh])
                 |> Seq.filter (fun (_arg, argExprCh) ->
                     match tensorStubs.[argExprCh].Storage with
                     | StorageStub.Allocated argAlloc ->
@@ -162,19 +150,24 @@ module BaseExprCompiler =
                             |> Set.toSeq
                             |> Seq.collect group.Dependants
                             |> Seq.filter ((<>) expr)
-                        // Check if we depend on all their dependants.
-                        // If this is the case, we can overwrite that argument because all other users
-                        // have already been evaluated before we can be evaluated.
+                        // Check if we depend on all their dependants *and* that they have been processed,
+                        // i.e. if they exposed the allocation via an output channel it would already have been
+                        // added to allocUserChs.
                         deps |> Seq.forall exprDepending.Contains
                     | _ -> 
                         // Argument uses other storage. Do not overwrite it.
                         false)
                 |> Seq.map fst
                 |> Set.ofSeq
-
-            // TODO:
-            // - verify that this works and write down proof
                 
+            // Assemble all channel wishes for the expression.
+            let chWishes =
+                expr.Channels
+                |> Seq.choose (fun ch ->
+                    stubWish.TryFind expr.[ch]
+                    |> Option.map (fun wish -> ch, wish))
+                |> Map.ofSeq
+
             // Compute channel stubs given argument stubs.
             let chStubs =
                 match expr.Op with
@@ -185,6 +178,7 @@ module BaseExprCompiler =
                         Env = env
                         ArgStubs = argStubs
                         OverwritableArgs = overwritableArgs
+                        ChStubWishes = chWishes
                         Expr = expr
                     }
                     cop.ChStubs data
@@ -214,14 +208,53 @@ module BaseExprCompiler =
             // Store channel stubs.
             for KeyValue(ch, chStub) in chStubs do
                 tensorStubs.[expr.[ch]] <- chStub
-            )
+
+        /// Called after all dependencies of an expression have been processed.
+        let allDepsOfExprEvaled (expr: BaseExpr) =
+            // Clear dependency set of expression to save memory.
+            depending.Remove expr |> ignore
+
+        // Process expression tree.
+        group |> BaseExprGroup.iter processExpr (fun _ -> ()) allDepsOfExprEvaled 
+
+        // Return assigned tensor stub for each expression channel.
+        Map.ofDictionary tensorStubs 
 
 
-        // next step? 
-        // - Try to write the allocation stub function for some ops.
-        // - Before that: switch to op extenders here?
-
+    /// Generates action items for each expression in the expression tree.
+    let generateActions (env: CompileEnv) (stubs: Map<BaseExprCh, TensorStub>) (group: BaseExprGroup) =
         ()
+
+        // Shall we build an execution plan or what would be next step?
+        // One possible execution would be passing and storing of lambda functions,
+        // but how would this be compatible with later code generation?
+        // Also we need to make sure that it will work both for CUDA and host execution
+        // and code generation...
+    
+        // We could return a list of IAction items that are then enqueued properly.
+        // These IAction items could also have a method for code generation for
+        // the appropriate language.
+        // Synchronization would have to be handled by the overall code generator
+        // for a specific language and technology.
+
+        // What about the up-propagation of storage wishes?
+        // This could be important to avoid copies for loop expressions and parameter 
+        // updates of optimizers.
+
+        // Where would wishes come from?
+        // - basically passed in externally since StoreToVar is gone
+        // - i.e. usually a bundle will be used for evaluation and it could
+        //   pass in the desired layout for the variables
+        // - so we could accept a map of desired TensorStubs for expressions
+        //   and propagate them upwards.
+        // - No allocations should be possible.
+        // - So up-propagation would only go through to the first allocation.
+        // - memory saving is probably no issue there, so the first op
+        //   that does actual work can stop the propagation
+        // - so, the up-propagation interface should be optional
+        // - however, the wishes should be presented to every op
+
+
 
 
 type CompileTools () =
@@ -232,33 +265,23 @@ type CompileTools () =
         let tryInplace = defaultArg tryInplace false
 
         let op = data.Expr.Op
-        let mutable availArgs = data.OverwritableArgs
+        let mutable overwritableArgs = data.OverwritableArgs
         
         /// Returns an overwritable argument TensorStub that matches the
         /// given specifications, if available.
         let tryUseArg typeName dev shape =
-            availArgs
+            overwritableArgs
             |> Set.toSeq
-            |> Seq.filter (fun arg ->
-                // only reuse stubs with allocated storage
-                match data.ArgStubs.[arg].Storage with
-                | StorageStub.Allocated _ -> true
-                | _ -> false)
-            |> Seq.filter (fun arg ->
-                // only reuse stubs with non-aliased elements 
-                TensorStub.isNotAliased data.ArgStubs.[arg])
             |> Seq.tryFind (fun arg ->
+                // match type, device and shape
                 let argExpr = op.Args.[arg]
                 argExpr.TypeName = typeName &&
                 argExpr.Dev = dev &&
                 Shape.eval argExpr.Shape = shape)
             |> Option.map (fun arg -> 
-                availArgs <- availArgs |> Set.remove arg
+                // remove from set of overwritable arguments
+                overwritableArgs <- overwritableArgs |> Set.remove arg
                 data.ArgStubs.[arg])
-
-        // Other problem:
-        // - it could happen that two arguments use the same storage and thus get overwritten twice.
-        // - also 
 
         op.Channels
         |> Set.toSeq
