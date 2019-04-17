@@ -391,6 +391,11 @@ type Reshape = { X: BaseExprCh; Shape: Shape } with
         member this.Eval env argVals =
             (ArgValue.unaryX argVals) |> ITensor.reshape (Shape.eval this.Shape) |> Ch.only
 
+    interface ITensorStubWishPropagatingOp with
+        member this.PropagateWishes chWishes =
+            chWishes |> CompileTools.propUnaryWish (fun wish ->
+                wish |> TensorStub.tryReshape (Shape.eval this.Shape))
+
     interface ICompilableOp with
         member this.ChStubs data =
             // We return a view of X, when layout is in row-major order.
@@ -428,6 +433,7 @@ type DoBroadcast = { X: BaseExprCh; Shape: Shape } with
         member this.CanEvalAllSymSizes = 
             Shape.canEval this.Shape
         member this.Eval env argVals = (ArgValue.unaryX argVals) |> ITensor.broadcastTo (Shape.eval this.Shape) |> Ch.only
+
     interface IOpFormat with
         member this.Text =
             sprintf "DoBroadcast%A" this.Shape
@@ -451,6 +457,12 @@ type PermuteAxes = {X: BaseExprCh; Permutation: int list} with
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.unaryX argVals) |> ITensor.permuteAxes this.Permutation |> Ch.only
+
+    interface ITensorStubWishPropagatingOp with
+        member this.PropagateWishes chWishes =
+            chWishes |> CompileTools.propUnaryWish (fun wish ->
+                wish |> TensorStub.tryPermuteAxes (Permutation.invert this.Permutation))
+
     interface IOpFormat with
         member this.Text =
             sprintf "PermuteAxes%A" this.Permutation
@@ -497,6 +509,7 @@ type Subtensor = {X: BaseExprCh; Range: SimpleRanges} with
                 |> SimpleRangesArgs.resolveDynElems dynVals 
                 |> SimpleRanges.eval
             (ArgValue.unaryX argVals).[range] |> Ch.only
+
     interface IOpFormat with
         member this.Text =
             sprintf "Subtensor%A" this.Range
@@ -515,6 +528,15 @@ type ReverseAxis = {X: BaseExprCh; Axis: int} with
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.unaryX argVals) |> ITensor.reverseAxis this.Axis |> Ch.only
+
+    interface ITensorStubWishPropagatingOp with
+        member this.PropagateWishes chWishes =
+            chWishes |> CompileTools.propUnaryWish (fun wish ->
+                wish |> TensorStub.tryReverseAxis this.Axis)
+
+    interface IOpFormat with
+        member this.Text =
+            sprintf "ReverseAxis<%d>" this.Axis
 
 
 /// Extract the diagonal(s) along the given axes.

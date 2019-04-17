@@ -74,11 +74,15 @@ type TensorStub = {
             OffsetStride = Some (layout.Offset, layout.Stride)
         }
 
-    static member mapLayout (fn: TensorLayout -> TensorLayout) (ts: TensorStub) =
+    static member tryMapLayout (fn: TensorLayout -> TensorLayout) (ts: TensorStub) =
         match ts.Layout with
-        | Some layout -> ts |> TensorStub.relayout (fn layout)
-        | None ->
-            failwithf "Cannot apply operation to layout-less to TensorStub %A." ts
+        | Some layout -> Some (ts |> TensorStub.relayout (fn layout))
+        | None -> None     
+
+    static member mapLayout (fn: TensorLayout -> TensorLayout) (ts: TensorStub) =
+        match ts |> TensorStub.tryMapLayout fn with
+        | Some res -> res
+        | None -> failwithf "Cannot apply operation to layout-less to TensorStub %A." ts
 
     static member make (layout: TensorLayout, alloc: AllocStub) = {
         Shape = layout.Shape
@@ -103,15 +107,18 @@ type TensorStub = {
     member this.T = 
         this |> TensorStub.mapLayout TensorLayout.transpose
 
-    //let isRowMajor (ary: TensorManikin) =
-    //    ary |> layout |> TensorLayout.isRowMajor
+    /// True, if the layout is known and row major.
+    static member isRowMajor (ts: TensorStub) =
+        match ts.Layout with
+        | Some layout -> TensorLayout.isRowMajor layout
+        | None -> false
 
     //let isColumnMajor (ary: TensorManikin) =
     //    ary |> layout |> TensorLayout.isColumnMajor
         
     /// a view of the specified tensor over the given range 
-    static member range (rng: Rng list) a =
-        a |> TensorStub.mapLayout (TensorLayout.view rng)
+    static member tryRange (rng: Rng list) ts =
+        ts |> TensorStub.tryMapLayout (TensorLayout.view rng)
 
     /// Returns true, if no aliasing of elements can occur.
     static member isNotAliased ts =
@@ -119,13 +126,12 @@ type TensorStub = {
         | Some layout -> TensorLayout.isNotAliased layout
         | None -> false
 
-    ///// Tries to reshape the tensor without copying.
-    ///// For this to succeed, the tensor must have row-major layout.
-    ///// If this a reshape without copying is impossible, None is returned.
-    //static member tryReshapeView shp (a: TensorStub) =
-    //    match a.Layout |> TensorLayout.tryReshape shp with
-    //    | Some newLayout -> a |> TensorStub.relayout newLayout |> Some
-    //    | None -> None
+    /// Tries to reshape the tensor stub.
+    /// For this to succeed, the stub's layout must be known and in row-major order.
+    static member tryReshape shp (ts: TensorStub) =
+        match ts.Layout |> Option.map (TensorLayout.tryReshape shp) with
+        | Some (Some newLayout) -> Some (TensorStub.relayout newLayout ts)
+        | _ -> None
 
     ///// Tries to reshape the tensor without copying.
     ///// For this to succeed, the tensor must have row-major layout.
@@ -145,11 +151,9 @@ type TensorStub = {
     //    | Some _ -> true
     //    | None -> false
 
-    ///// Permutes the axes as specified.
-    ///// Each entry in the specified permutation specifies the new position of 
-    ///// the corresponding axis, i.e. to which position the axis should move.
-    //static member permuteAxes (permut: int list) a =
-    //    a |> TensorStub.relayout (a.Layout |> TensorLayout.permuteAxes permut)
+    /// Permutes the axes as specified.
+    static member tryPermuteAxes (permut: int list) (ts: TensorStub) =
+        ts |> TensorStub.tryMapLayout (TensorLayout.permuteAxes permut)
 
     ///// inserts a broadcastable dimension of size one as first dimension
     //static member padLeft a =
@@ -179,9 +183,9 @@ type TensorStub = {
     ////let cppType (a: TensorManikin) = 
     ////    a.CPPType
 
-    ///// Reverses the elements in the specified dimension.
-    //static member reverseAxis ax a =
-    //    a |> TensorStub.relayout (a.Layout |> TensorLayout.reverseAxis ax)      
+    /// Reverses the elements in the specified dimension.
+    static member tryReverseAxis ax (ts: TensorStub) =
+        ts |> TensorStub.tryMapLayout (TensorLayout.reverseAxis ax)      
 
     ///// Returns a view of the diagonal along the given axes.
     ///// The diagonal replaces the first axis and the second axis is removed.

@@ -23,7 +23,7 @@ module BaseExprEval =
 
         // Perform evaluation of expression tree.
         let group = BaseExprGroup [rootExpr]
-        let exprChValues = group |> BaseExprGroup.eval evalFn true
+        let exprChValues = group.Eval (evalFn, clearInternalValues=true)
 
         /// Evaluated channel values of root expression.
         let rootVals =

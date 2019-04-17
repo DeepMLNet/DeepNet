@@ -106,8 +106,12 @@ type BaseExprGroup (exprs: BaseExpr list) =
     /// Walks over an expression tree in such a way that all arguments of an
     /// expression are processed first before that expression itself is evaluated.
     /// I.e. the expression tree is processed from leafs to roots.
-    static member iter (fn: BaseExpr -> unit) (allDepsOfExprChEvaledFn: BaseExprCh -> unit) 
-            (allDepsOfExprEvaledFn: BaseExpr -> unit) (group: BaseExprGroup) =
+    member group.Iter (fn: BaseExpr -> unit,
+                       ?allDepsOfExprChEvaled: BaseExprCh -> unit,
+                       ?allDepsOfExprEvaled: BaseExpr -> unit)  =
+
+        let allDepsOfExprChEvaled = defaultArg allDepsOfExprChEvaled (fun _ -> ())
+        let allDepsOfExprEvaled = defaultArg allDepsOfExprEvaled (fun _ -> ())
 
         /// BaseExprs that have all their arguments evaluated and thus can be evaluated themselves.
         let evalQueue = Queue<BaseExpr> ()
@@ -157,41 +161,42 @@ type BaseExprGroup (exprs: BaseExpr list) =
 
                     // Remove value, if all dependants are evaluated.
                     if ueDeps.Count = 0 then
-                        allDepsOfExprChEvaledFn arg
+                        allDepsOfExprChEvaled arg
 
                         let ueDepExprs = unevaledDepExprs.[arg.Expr]
                         ueDepExprs.Remove arg.Channel |> ignore
                         if ueDepExprs.Count = 0 then
-                            allDepsOfExprEvaledFn arg.Expr
+                            allDepsOfExprEvaled arg.Expr
 
 
     /// Evaluates an expression tree using the specified function for evaluation
     /// of each expression given its arguments.
-    static member eval (fn: BaseExpr -> Map<Arg, 'D> -> Map<Ch, 'D>) (clearInternalValues: bool) 
-            (group: BaseExprGroup) =
+    member group.Eval (fn: BaseExpr -> Map<Arg, 'D> -> Map<Ch, 'D>, ?clearInternalValues: bool) =
+        let clearInternalValues = defaultArg clearInternalValues true
 
+        /// Evaluated values of each expression channel.
         let exprChValues = Dictionary<BaseExprCh, 'D> ()
 
+        /// Evaluates one expression.
         let evalFn (expr: BaseExpr) =
             let argVals = expr.Args |> Map.map (fun _ argExpr -> exprChValues.[argExpr])     
             let chVals = fn expr argVals            
             for KeyValue(ch, value) in chVals do
                 exprChValues.[expr.[ch]] <- value
 
-        let allDepsOfExprChEvaled (exprCh: BaseExprCh) =
+        /// Clears evaluated values that are not used anymore.
+        let clearChValues (exprCh: BaseExprCh) =
             if clearInternalValues then 
                 exprChValues.Remove exprCh |> ignore
 
-        let allDepsOfExprEvaled (_expr: BaseExpr) = ()
-
-        group |> BaseExprGroup.iter evalFn allDepsOfExprChEvaled allDepsOfExprEvaled 
+        group.Iter (evalFn, allDepsOfExprChEvaled=clearChValues) 
         exprChValues |> Map.ofDictionary
 
 
     /// Walks over an expression tree in such a way that all dependants of an
     /// expression are processed first before that expression itself is evaluated.
     /// I.e. the expression tree is processed from roots towards leafs.
-    static member revIter (fn: BaseExpr -> unit) (group: BaseExprGroup) =
+    member group.RevIter (fn: BaseExpr -> unit) =
         /// BaseExprs that have all their dependants evaluated and thus can be evaluated themselves.
         let evalQueue = Queue<BaseExpr> ()
         /// Values that are still missing but needed for evaluation of a BaseExpr.

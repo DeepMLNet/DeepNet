@@ -389,4 +389,13 @@ type SetSubtensor = {X: BaseExprCh; Y: BaseExprCh; Range: SimpleRanges} with
             trgt.[range] <- ArgValue.binaryY argVals
             trgt |> Ch.only
 
+    interface ITensorStubWishPropagatingOp with
+        member this.PropagateWishes chWishes =
+            // Wish for base tensor to be evaluated into channel wish.
+            match chWishes |> Map.tryFind Ch.Default with
+            | Some chWish -> Map [Arg.X, chWish]
+            | None -> Map.empty
 
+    interface IOpFormat with
+        member this.Text =
+            sprintf "SetSubtensor%A" this.Range

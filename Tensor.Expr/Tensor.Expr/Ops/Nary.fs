@@ -109,6 +109,22 @@ type BuildTensor = {Shape: Shape; Ranges: BaseRanges list; Xs: BaseExprCh list} 
                 trgt.[aryRng] <- e 
             trgt |> Ch.only
 
+    interface ITensorStubWishPropagatingOp with
+        member this.PropagateWishes chWishes =
+            let notOverlapped = BaseRanges.areCoveringWithoutOverlap this.Shape this.Ranges
+            match chWishes |> Map.tryFind Ch.Default with
+            | Some chWish when notOverlapped && TensorStub.isNotAliased chWish ->
+                this.Ranges 
+                |> Seq.indexed
+                |> Seq.choose (fun (i, rng) ->
+                    let evaledRng = rng |> List.map (fun (first, last) -> 
+                        Rng.Rng (Some (Size.eval first), Some (Size.eval last)))
+                    chWish 
+                    |> TensorStub.tryRange evaledRng
+                    |> Option.map (fun argWish -> Arg.N i, argWish))
+                |> Map.ofSeq
+            | _ -> Map.empty
+
 
 
 /// Elementwise calculated tensor.

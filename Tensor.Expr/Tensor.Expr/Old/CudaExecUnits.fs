@@ -201,7 +201,7 @@ module CudaExecUnit =
     let srcReqs cudaEnv ({TargetRequest=reqChViews
                           Op=op
                           Metadata=metadata
-                          SrcShapes=srcShapes} as args) : ChannelReqsT list =
+                          SrcShapes=srcShapes} as args) : ChannelReqsT list = // DONE
 
         /// number of arguments
         let nSrcs = List.length srcShapes
@@ -277,23 +277,23 @@ module CudaExecUnit =
         | UUnaryOp (ArgMinAxis _) -> dfltSrcWithNoViewReq ()
 
         // shape operations
-        | UUnaryOp (Reshape _) ->        
+        | UUnaryOp (Reshape _) ->   // DONE
             match trgtDfltChReq () with
             | Some rv when TensorManikin.isRowMajor rv ->
                 [dfltChReq (Some (TensorManikin.reshapeView srcShapes.[0].[dfltChId] rv))]
             | _ -> dfltSrcWithNoViewReq ()
         | UUnaryOp (DoBroadcast _) -> dfltSrcWithNoViewReq ()
-        | UUnaryOp (PermuteAxes perm) ->
+        | UUnaryOp (PermuteAxes perm) -> // DONE
             match trgtDfltChReq () with
             | Some rv -> [dfltChReq (Some (TensorManikin.permuteAxes (Permutation.invert perm) rv))]
             | _ -> dfltSrcWithNoViewReq ()
-        | UUnaryOp (ReverseAxis ax) ->
+        | UUnaryOp (ReverseAxis ax) -> // DONE
             match trgtDfltChReq () with
             | Some rv -> [dfltChReq (Some (TensorManikin.reverseAxis ax rv))]
             | _ -> dfltSrcWithNoViewReq ()
 
         // variable access
-        | UUnaryOp (StoreToVar vs) ->
+        | UUnaryOp (StoreToVar vs) -> // REMOVED
             match cudaEnv.VarStorLoc |> Map.find vs with
             | dev when dev=CudaTensor.Dev -> 
                 // request to store directly into external var
@@ -339,7 +339,7 @@ module CudaExecUnit =
         | UNaryOp Discard -> dfltSrcWithNoViewReq ()
         | UNaryOp (Interpolate _) -> inplaceFirstSrcReq ()
 
-        | UNaryOp (BuildTensor (shp, rngs)) ->
+        | UNaryOp (BuildTensor (shp, rngs)) -> // DONE
             match trgtDfltChReq () with
             | Some req when not (TensorManikin.isBroadcasted req) && 
                     BaseRanges.areCoveringWithoutOverlap shp rngs -> 
@@ -361,7 +361,7 @@ module CudaExecUnit =
         | UExtraOp (Subtensor _) -> dfltSrcWithNoViewReq ()
 
         | UBinaryOp (BinaryOp.SetSubtensor _) -> needExtra op
-        | UExtraOp (SetSubtensor _) -> 
+        | UExtraOp (SetSubtensor _) ->  // DONE
             // "a" can be evaluated into requested manikin if it is not broadcasted, 
             // but "b" (the replacement value) must be placed
             // in a temporary manikin and copied over to avoid race conditions.
