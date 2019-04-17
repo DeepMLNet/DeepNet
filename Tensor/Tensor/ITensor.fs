@@ -51,6 +51,8 @@ type ITensor =
     abstract FillZero:          unit -> unit
     /// fills the tensors with ones
     abstract FillOnes:          unit -> unit
+    /// Fills the tensor with the identity matrix.
+    abstract FillIdentity:      unit -> unit
     /// Tensor of same type filled with zeros.
     abstract ZerosOfSameType:   dev:ITensorDevice -> shape:int64 list -> ITensor
     /// Convert this tensor to tensor of specified type.
@@ -136,6 +138,30 @@ type ITensor =
     abstract SetSlice : i0s:int64 option * i0f:int64 option * i1s:int64 option * i1f:int64 option * i2:int64 * o3:obj * o4:obj * [<System.ParamArray>] r:obj [] -> unit
     abstract SetSlice : i0s:int64 option * i0f:int64 option * i1s:int64 option * i1f:int64 option * i2s:int64 option * i2f:int64 option * o3:obj * o4:obj * [<System.ParamArray>] r:obj [] -> unit
 
+    // type-neutral unary fill operations
+    abstract FillUnaryPlus: ITensor -> unit
+    abstract FillUnaryMinus: ITensor -> unit
+    abstract FillAbs: ITensor -> unit
+    abstract FillSgn: ITensor -> unit
+    abstract FillLog: ITensor -> unit
+    abstract FillLog10: ITensor -> unit
+    abstract FillExp: ITensor -> unit
+    abstract FillSin: ITensor -> unit
+    abstract FillCos: ITensor -> unit
+    abstract FillTan: ITensor -> unit
+    abstract FillAsin: ITensor -> unit
+    abstract FillAcos: ITensor -> unit
+    abstract FillAtan: ITensor -> unit
+    abstract FillSinh: ITensor -> unit
+    abstract FillCosh: ITensor -> unit
+    abstract FillTanh: ITensor -> unit
+    abstract FillSqrt: ITensor -> unit
+    abstract FillCeiling: ITensor -> unit
+    abstract FillFloor: ITensor -> unit
+    abstract FillRound: ITensor -> unit
+    abstract FillTruncate: ITensor -> unit
+    abstract FillIsFinite: ITensor -> unit
+
     // type-neutral unary operations
     abstract UnaryPlus: unit -> ITensor
     abstract UnaryMinus: unit -> ITensor
@@ -160,6 +186,14 @@ type ITensor =
     abstract Truncate: unit -> ITensor
     abstract IsFinite: unit -> ITensor
     abstract AllFinite: unit -> bool
+
+    // type-neutral binary fill operations
+    abstract FillAdd: ITensor -> ITensor -> unit
+    abstract FillSubtract: ITensor -> ITensor -> unit
+    abstract FillMultiply: ITensor -> ITensor -> unit
+    abstract FillDivide: ITensor -> ITensor -> unit
+    abstract FillModulo: ITensor -> ITensor -> unit
+    abstract FillPow: ITensor -> ITensor -> unit
 
     // type-neutral binary operations
     abstract Add: ITensor -> ITensor

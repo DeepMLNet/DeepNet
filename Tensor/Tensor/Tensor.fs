@@ -1146,6 +1146,18 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     member trgt.FillOnes () =
         trgt.FillConst one<'T>
 
+    /// <summary>Fills this tensor with the identity tensor.</summary>
+    /// <remarks>The tensor must be a square matrix.</remarks>
+    /// <seealso cref="identity"/>
+    member trgt.FillIdentity () =
+        match trgt.Shape with
+        | [rows; cols] when rows = cols -> ()
+        | _ -> invalidOp "Cannot fill tensor of shape %A with identity matrix." trgt.Shape
+
+        trgt.FillZeros ()
+        let d : Tensor<'T> = Tensor.diag trgt
+        d.FillOnes ()
+
     /// <summary>Fills this vector with an equispaced sequence of elements.</summary>
     /// <param name="start">The starting value.</param>
     /// <param name="incr">The increment between successive elements.</param>    
@@ -1936,7 +1948,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <param name="a">The tensor on the left side of this binary operation.</param>
     /// <param name="b">The tensor on the right side of this binary operation.</param>
     /// <seealso cref="Pow"/>
-    member trgt.FillPower (a: Tensor<'T>) (b: Tensor<'T>) = 
+    member trgt.FillPow (a: Tensor<'T>) (b: Tensor<'T>) = 
         let a, b = Tensor.PrepareElemwiseSources (trgt, a, b)
         trgt.Backend.Power (trgt=trgt, src1=a, src2=b)
 
@@ -1959,7 +1971,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <seealso cref="FillPower"/>
     static member Pow (a: Tensor<'T>, b: Tensor<'T>) =
         let trgt, a, b = Tensor.PrepareElemwise (a, b)
-        trgt.FillPower a b
+        trgt.FillPow a b
         trgt
 
     /// <summary>Element-wise exponentiation with scalar.</summary>
@@ -3887,8 +3899,9 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         member this.CopyFrom src = this.CopyFrom (src :?> Tensor<'T>)
         member this.Transfer (dev) = this.Transfer (dev) :> ITensor
         member this.TransferFrom src = this.TransferFrom (src :?> Tensor<'T>)
-        member this.FillZero () = this.FillConst zero<'T>
-        member this.FillOnes () = this.FillConst one<'T>
+        member this.FillZero () = this.FillZeros ()
+        member this.FillOnes () = this.FillOnes ()
+        member this.FillIdentity () = this.FillIdentity ()
         member this.ZerosOfSameType dev shape = Tensor<'T>.zeros dev shape :> ITensor
         
         member this.Convert dataType =
@@ -3992,6 +4005,29 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         member this.GetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option, i2s: int64 option, i2f: int64 option, o3: obj, [<System.ParamArray>] r: obj[]) = this.IGetRngWithRest [|i0s; i0f; i1s; i1f; i2s; i2f; o3|] r
         member this.SetSlice (i0s: int64 option, i0f: int64 option, i1s: int64 option, i1f: int64 option, i2s: int64 option, i2f: int64 option, o3: obj, o4: obj, [<System.ParamArray>] r: obj[]) = this.ISetRngWithRest [|i0s; i0f; i1s; i1f; i2s; i2f; o3; o4|] r
 
+        member trgt.FillUnaryPlus a = trgt.FillUnaryPlus (a :?> Tensor<'T>)
+        member trgt.FillUnaryMinus a = trgt.FillUnaryMinus (a :?> Tensor<'T>)
+        member trgt.FillAbs a = trgt.FillAbs (a :?> Tensor<'T>)
+        member trgt.FillSgn a = trgt.FillSgn (a :?> Tensor<'T>)
+        member trgt.FillLog a = trgt.FillLog (a :?> Tensor<'T>)
+        member trgt.FillLog10 a = trgt.FillLog10 (a :?> Tensor<'T>)
+        member trgt.FillExp a = trgt.FillExp (a :?> Tensor<'T>)
+        member trgt.FillSin a = trgt.FillSin (a :?> Tensor<'T>)
+        member trgt.FillCos a = trgt.FillCos (a :?> Tensor<'T>)
+        member trgt.FillTan a = trgt.FillTan (a :?> Tensor<'T>)
+        member trgt.FillAsin a = trgt.FillAsin (a :?> Tensor<'T>)
+        member trgt.FillAcos a = trgt.FillAcos (a :?> Tensor<'T>)
+        member trgt.FillAtan a = trgt.FillAtan (a :?> Tensor<'T>)
+        member trgt.FillSinh a = trgt.FillSinh (a :?> Tensor<'T>)
+        member trgt.FillCosh a = trgt.FillCosh (a :?> Tensor<'T>)
+        member trgt.FillTanh a = trgt.FillTanh (a :?> Tensor<'T>)
+        member trgt.FillSqrt a = trgt.FillSqrt (a :?> Tensor<'T>)
+        member trgt.FillCeiling a = trgt.FillCeiling (a :?> Tensor<'T>)
+        member trgt.FillFloor a = trgt.FillFloor (a :?> Tensor<'T>)
+        member trgt.FillRound a = trgt.FillRound (a :?> Tensor<'T>)
+        member trgt.FillTruncate a = trgt.FillTruncate (a :?> Tensor<'T>)
+        member trgt.FillIsFinite a = trgt.FillIsFinite (a :?> Tensor<'T>)
+
         member a.UnaryPlus () = +a :> ITensor
         member a.UnaryMinus () = -a :> ITensor
         member a.Abs () = Tensor<'T>.Abs a :> ITensor
@@ -4015,6 +4051,13 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         member a.Truncate () = Tensor<'T>.Truncate a :> ITensor
         member a.IsFinite () = Tensor<'T>.isFinite a :> ITensor
         member a.AllFinite () = Tensor<'T>.allFinite a
+
+        member trgt.FillAdd a b = trgt.FillAdd (a :?> Tensor<'T>) (b :?> Tensor<'T>)
+        member trgt.FillSubtract a b = trgt.FillSubtract (a :?> Tensor<'T>) (b :?> Tensor<'T>)
+        member trgt.FillMultiply a b = trgt.FillMultiply (a :?> Tensor<'T>) (b :?> Tensor<'T>)
+        member trgt.FillDivide a b = trgt.FillDivide (a :?> Tensor<'T>) (b :?> Tensor<'T>)
+        member trgt.FillModulo a b = trgt.FillModulo (a :?> Tensor<'T>) (b :?> Tensor<'T>)
+        member trgt.FillPow a b = trgt.FillPow (a :?> Tensor<'T>) (b :?> Tensor<'T>)
 
         member a.Add b = a + (b :?> Tensor<'T>) :> ITensor
         member a.Subtract b = a - (b :?> Tensor<'T>) :> ITensor
@@ -4312,10 +4355,10 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>A new square matrix of the specified size is created on the specified device.</para>
     /// <para>The tensor is filled with ones on the diagonal and zeros elsewhere.</para>
     /// </remarks>
+    /// <seealso cref="FillIdentity"/>
     static member identity (dev: ITensorDevice) (size: int64) : Tensor<'T> =
-        let x = Tensor<'T>.zeros dev [size; size]
-        let d : Tensor<'T> = Tensor.diag x
-        d.FillConst one<'T>
+        let x = Tensor<'T> ([size; size], dev)
+        x.FillIdentity ()
         x           
 
     /// <summary>Creates a new vector filled with the integers from zero to the specified maximum.</summary>

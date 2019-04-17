@@ -28,9 +28,15 @@ type ActionData = {
     Expr:               BaseExpr
 }
 
+type ExecuteData = {
+    StubValues:         IReadOnlyDictionary<TensorStub, ITensor>
+    ArgValues:          Map<Arg, ITensor>
+    ChValues:           Map<Ch, ITensor>
+}
+
 type IAction =
     /// Execute actions and return resulting tensor for dynamic stubs.
-    abstract Execute: unit -> Map<Ch, ITensor>
+    abstract Execute: ExecuteData -> Map<Ch, ITensor>
 
 
 [<ReferenceEquality>]
@@ -270,7 +276,7 @@ module BaseExprCompiler =
 
     type NonCompilableOpAction (expr: BaseExpr, argStubs: Map<Arg, TensorStub>) =
         interface IAction with
-            member this.Execute () =
+            member this.Execute data =
                 failwith "TODO"
 
 
@@ -394,6 +400,16 @@ type CompileTools () =
             | Some argWish -> Map [Arg.Only, argWish]
             | None -> Map.empty
         | None -> Map.empty
+
+
+    static member simpleAction (actFn: Map<Ch, ITensor> -> Map<Arg, ITensor> -> unit) =
+        let action = 
+            { new IAction with
+                member __.Execute data =
+                    actFn data.ChValues data.ArgValues 
+                    Map.empty
+            }
+        [action]
 
 
 

@@ -49,6 +49,9 @@ module Ch =
     let onlyOne = Set [Ch.Default]
 
 
+module ChValue =
+    let inline onlyX (chs: Map<_, _>) = chs.[Ch.Default]
+
 /// Helper functions for working with argument values (of any type) of ops.
 module ArgValue =
    

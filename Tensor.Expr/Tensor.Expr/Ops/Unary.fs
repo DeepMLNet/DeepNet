@@ -23,6 +23,9 @@ type UnaryPlus = { X: BaseExprCh } with
     interface ICompilableOp with
         member this.ChStubs data =
             CompileTools.chStubs (data, tryInplace=true)
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillUnaryPlus (ArgValue.unaryX argVals))
 
 
 /// Negation.
@@ -42,6 +45,9 @@ type Negate = { X: BaseExprCh } with
     interface ICompilableOp with
         member this.ChStubs data =
             CompileTools.chStubs (data, tryInplace=true)
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillUnaryMinus (ArgValue.unaryX argVals))
 
 
 /// Absolute value.
@@ -61,6 +67,9 @@ type Abs = { X: BaseExprCh } with
     interface ICompilableOp with
         member this.ChStubs data =
             CompileTools.chStubs (data, tryInplace=true)
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillAbs (ArgValue.unaryX argVals))
 
     
 /// Sign.
@@ -80,6 +89,9 @@ type SignT = { X: BaseExprCh } with
     interface ICompilableOp with
         member this.ChStubs data =
             CompileTools.chStubs (data, tryInplace=true)
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillSgn (ArgValue.unaryX argVals))
 
 
 /// Logarithm to base exp.
@@ -402,6 +414,8 @@ type Reshape = { X: BaseExprCh; Shape: Shape } with
             // Otherwise, a copy is required.
             failwith "TODO"
             CompileTools.chStubs (data, tryInplace=true)
+        member this.Actions data =
+            failwith "TODO"
 
     interface IOpFormat with
         member this.Text =

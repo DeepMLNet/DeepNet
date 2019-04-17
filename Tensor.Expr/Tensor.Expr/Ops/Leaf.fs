@@ -24,6 +24,10 @@ type Scalar = { Value: Const; Dev: ITensorDevice } with
     interface ICompilableOp with
         member this.ChStubs data =
             CompileTools.chStubs data 
+        member this.Actions data =
+            let valueTensor = this.Value |> Const.asITensor this.Dev 
+            CompileTools.simpleAction (fun chVals argVals ->
+                chVals.[Ch.Default].CopyFrom valueTensor)
 
     interface IOpFormat with
         member this.Text =
@@ -48,6 +52,10 @@ type SizeValue = { Value: Size; Dev: ITensorDevice } with
     interface ICompilableOp with
         member this.ChStubs data =
             CompileTools.chStubs data 
+        member this.Actions data =
+            let valueTensor = Size.eval this.Value |> Tensor.scalar this.Dev
+            CompileTools.simpleAction (fun chVals argVals ->
+                chVals.[Ch.Default].CopyFrom valueTensor)
 
     interface IOpFormat with
         member this.Text =
@@ -73,6 +81,9 @@ type Identity = { Size: Size; Type: TypeName; Dev: ITensorDevice } with
     interface ICompilableOp with
         member this.ChStubs data =
             CompileTools.chStubs data 
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                chVals.[Ch.Default].FillIdentity ())
 
     interface IOpFormat with
         member this.Text =
@@ -106,6 +117,10 @@ type Counting = { Size: Size; Dev: ITensorDevice } with
     interface ICompilableOp with
         member this.ChStubs data =
             CompileTools.chStubs data 
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                let t = chVals.[Ch.Default] :?> Tensor<int64>
+                t.FillIncrementing (0L, 1L))
 
     interface IOpFormat with
         member this.Text =
@@ -140,6 +155,10 @@ type VarArg = { Var: Var } with
                 OffsetStride = data.Env.VarOffsetStrides |> Map.tryFind this.Var.Name 
                 Storage = StorageStub.VarStorage this.Var.Name
             }
+        member this.Actions data =
+            // Variable value is read directly from its storage, thus 
+            // no actions need to be performed.
+            []
 
     interface IOpFormat with
         member this.Text =
@@ -173,6 +192,10 @@ type DataArg = { Data: OrdRef<ITensor> } with
                 OffsetStride = Some (this.Data.Value.Layout.Offset, this.Data.Value.Layout.Stride) 
                 Storage = StorageStub.Fixed this.Data.Value.Storage
             }
+        member this.Actions data =
+            // Data value is read directly from its storage, thus 
+            // no actions need to be performed.
+            []
 
     interface IOpFormat with
         member this.Text = 
