@@ -57,6 +57,9 @@ type ITensor =
     abstract FillIdentity:      unit -> unit
     /// Tensor of same type filled with zeros.
     abstract ZerosOfSameType:   dev:ITensorDevice -> shape:int64 list -> ITensor
+
+    /// Fill this tensor with the data of the other tensor converted to this type.
+    abstract FillConvert:       ITensor -> unit
     /// Convert this tensor to tensor of specified type.
     abstract Convert:           Type -> ITensor
 

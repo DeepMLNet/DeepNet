@@ -36,6 +36,9 @@ type ExecuteData = {
 
 type IAction =
     /// Execute actions and return resulting tensor for dynamic stubs.
+    /// A returned tensor for a dynamic tensor stub must not use a storage
+    /// with a static allocation.
+    /// TODO: verify and enforce.
     abstract Execute: ExecuteData -> Map<Ch, ITensor>
 
 
@@ -391,6 +394,9 @@ type CompileTools () =
             ch, stub)
         |> Map.ofSeq
 
+    /// Passes through tensor stub of unary argument.
+    static member passthroughStub (data: CompileData) =
+        Map [Ch.Default, data.ArgStubs.[Arg.Only]]
 
     /// Propagates a tensor stub wish for an unary operation.
     static member propUnaryWish (fn: TensorStub -> TensorStub option) (chWishes: Map<Ch, TensorStub>) =
@@ -410,6 +416,10 @@ type CompileTools () =
                     Map.empty
             }
         [action]
+
+
+    static member noAction () : IAction list =
+        []
 
 
 

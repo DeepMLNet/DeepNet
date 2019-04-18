@@ -36,9 +36,6 @@ type StorageStub =
     | Fixed of ITensorStorage
 
 
-// shall we allow dynamic shapes here?
-// since graph does not allow it, no.
-// also types and devices are fixed.
    
 type TensorStub = {
     /// Shape (always known).
@@ -66,6 +63,9 @@ type TensorStub = {
             }
         | None -> None
     static member layout (ts: TensorStub) = ts.Layout
+
+    /// True, if layout (offset and strides) are known.
+    member this.HasLayout = this.OffsetStride.IsSome
 
     /// Apply a new layout to the tensor stub.
     static member relayout (layout: TensorLayout) (ts: TensorStub) =
@@ -192,9 +192,9 @@ type TensorStub = {
     //static member diagAxis ax1 ax2 a =
     //    a |> TensorStub.relayout (a.Layout |> TensorLayout.diagAxis ax1 ax2)
 
-    ///// broadcasts the tensor to the given shape
-    //static member broadcastTo shp a =
-    //    a |> TensorStub.relayout (a.Layout |> TensorLayout.broadcastToShape shp)
+    /// broadcasts the tensor to the given shape
+    static member tryBroadcastTo shp (ts: TensorStub) =
+        ts |> TensorStub.tryMapLayout (TensorLayout.broadcastToShape shp)
 
     ///// returns true if at least one dimension is broadcasted
     //static member isBroadcasted (a: TensorStub) =

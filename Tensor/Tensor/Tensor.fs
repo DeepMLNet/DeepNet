@@ -3904,10 +3904,14 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         member this.FillIdentity () = this.FillIdentity ()
         member this.ZerosOfSameType dev shape = Tensor<'T>.zeros dev shape :> ITensor
         
+        member this.FillConvert src =
+            // TODO: cache generic method instance
+            let fn = this.GetType().GetMethod("FillConvert").MakeGenericMethod(src.DataType)
+            fn.Invoke(this, [|src|]) |> ignore
+
         member this.Convert dataType =
             let trgt = Tensor.NewOfType (this.Shape, dataType, this.Dev)
-            let fn = trgt.GetType().GetMethod("FillConvert").MakeGenericMethod(this.DataType)
-            fn.Invoke(trgt, [|this|]) |> ignore
+            trgt.FillConvert this
             trgt
         
         member this.Value

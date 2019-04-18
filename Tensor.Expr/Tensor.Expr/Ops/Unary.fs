@@ -545,12 +545,49 @@ type Reshape = { X: BaseExprCh; Shape: Shape } with
 
     interface ICompilableOp with
         member this.ChStubs data =
-            // We return a view of X, when layout is in row-major order.
-            // Otherwise, a copy is required.
-            failwith "TODO"
-            CompileTools.chStubs (data, tryInplace=true)
+            let shape = Shape.eval this.Shape
+            let argStub = ArgValue.unaryX data.ArgStubs 
+            if argStub.HasLayout then
+                // Layout is known, check if in-place reshape is possible.
+                match argStub |> TensorStub.tryReshape shape with
+                | Some chStub -> 
+                    // Perform in-place reshape, return reshaped tensor.
+                    Ch.only chStub
+                | None ->
+                    // in-place reshape is impossible, allocate channel stub for copy
+                    CompileTools.chStubs data
+            else
+                // Layout is unknown, decide during execution.
+                Ch.only {
+                    Shape = shape
+                    TypeName = argStub.TypeName
+                    Dev = argStub.Dev
+                    OffsetStride = None
+                    Storage = StorageStub.Dynamic
+                }
+
         member this.Actions data =
-            failwith "TODO"
+            let shape = Shape.eval this.Shape
+            let argStub = ArgValue.unaryX data.ArgStubs 
+            if argStub.HasLayout then
+                // Layout is known, check if in-place reshape is possible.
+                match argStub |> TensorStub.tryReshape shape with
+                | Some _ -> 
+                    // In-place reshape requires no actions.
+                    CompileTools.noAction ()
+                | None ->
+                    // Perform copy into allocated channel tensor.
+                    CompileTools.simpleAction (fun chVals argVals ->
+                        (ChValue.onlyX chVals).CopyFrom (ArgValue.unaryX argVals))
+            else
+                // Layout is unknown, decide during execution.
+                [{
+                    new IAction with
+                        member this.Execute execData =                            
+                            let argVal = ArgValue.unaryX execData.ArgValues
+                            let chVal = argVal |> ITensor.reshape shape
+                            Ch.only chVal
+                }]              
 
     interface IOpFormat with
         member this.Text =
@@ -581,7 +618,37 @@ type DoBroadcast = { X: BaseExprCh; Shape: Shape } with
             { this with Shape = Shape.subst env this.Shape } :> _
         member this.CanEvalAllSymSizes = 
             Shape.canEval this.Shape
-        member this.Eval env argVals = (ArgValue.unaryX argVals) |> ITensor.broadcastTo (Shape.eval this.Shape) |> Ch.only
+        member this.Eval env argVals = 
+            (ArgValue.unaryX argVals) |> ITensor.broadcastTo (Shape.eval this.Shape) |> Ch.only
+
+    interface ICompilableOp with
+        member this.ChStubs data =
+            let shape = Shape.eval this.Shape
+            let argStub = ArgValue.unaryX data.ArgStubs 
+            match argStub |> TensorStub.tryBroadcastTo shape with
+            | Some chStub -> Ch.only chStub
+            | None ->
+                Ch.only {
+                    Shape = shape
+                    TypeName = argStub.TypeName
+                    Dev = argStub.Dev
+                    OffsetStride = None
+                    Storage = argStub.Storage
+                }
+
+        member this.Actions data =
+            let shape = Shape.eval this.Shape
+            let argStub = ArgValue.unaryX data.ArgStubs 
+            match argStub |> TensorStub.tryBroadcastTo shape with
+            | Some _ -> CompileTools.noAction ()
+            | None ->
+                [{
+                    new IAction with
+                        member this.Execute execData =                            
+                            let argVal = ArgValue.unaryX execData.ArgValues
+                            let chVal = argVal |> ITensor.broadcastTo shape
+                            Ch.only chVal
+                }]           
 
     interface IOpFormat with
         member this.Text =
@@ -969,6 +1036,12 @@ type AssumeZeroDeriv = { X: BaseExprCh } with
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = ArgValue.unaryX argVals |> Ch.only
+
+    interface ICompilableOp with
+        member this.ChStubs data =
+            CompileTools.passthroughStub data
+        member this.Actions data =
+            CompileTools.noAction ()
     
 
 /// Sets the Jacobian of its argument to zero when calculating derivatives.
@@ -996,6 +1069,11 @@ type AssumeDeriv = {Deriv: BaseExprCh; X: BaseExprCh} with
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = ArgValue.unaryX argVals |> Ch.only
     
+    interface ICompilableOp with
+        member this.ChStubs data =
+            CompileTools.passthroughStub data
+        member this.Actions data =
+            CompileTools.noAction ()
 
 /// Annotation (no influence on value).
 type Annotated = {Label: System.IComparable; X: BaseExprCh} with
@@ -1009,7 +1087,13 @@ type Annotated = {Label: System.IComparable; X: BaseExprCh} with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env argVals = ArgValue.unaryX argVals |> Ch.only                 
+        member this.Eval env argVals = ArgValue.unaryX argVals |> Ch.only   
+        
+    interface ICompilableOp with
+        member this.ChStubs data =
+            CompileTools.passthroughStub data
+        member this.Actions data =
+            CompileTools.noAction ()
 
     
 /// Prints the value together with the given label.
@@ -1027,8 +1111,16 @@ type Print = {Label: string; X: BaseExprCh} with
         member this.Eval env argVals = 
             let v = ArgValue.unaryX argVals
             printfn "%s=\n%A\n" this.Label v
-            v |> Ch.only                          
-    
+            Ch.only v
+            
+    interface ICompilableOp with
+        member this.ChStubs data =
+            CompileTools.passthroughStub data
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                let v = ArgValue.unaryX argVals
+                printfn "%s=\n%A\n" this.Label v)
+
 
 /// Dumps the result into the given dataset in the active HDF5 dump file.
 type Dump = {Dataset: string; X: BaseExprCh} with
@@ -1045,7 +1137,15 @@ type Dump = {Dataset: string; X: BaseExprCh} with
         member this.Eval env argVals = 
             let v = ArgValue.unaryX argVals
             Dump.dumpValue this.Dataset v
-            v |> Ch.only                            
+            Ch.only v
+            
+    interface ICompilableOp with
+        member this.ChStubs data =
+            CompileTools.passthroughStub data
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                let v = ArgValue.unaryX argVals
+                Dump.dumpValue this.Dataset v)
 
 
 /// A non-finite value was encountered.
@@ -1057,6 +1157,12 @@ exception NonFiniteValueException of msg:string with
 /// If the value contains NaNs or infinities, outputs their location and 
 /// stops the computation.
 type CheckFinite = {Label: string; X: BaseExprCh} with
+    member internal this.DoCheck (v: ITensor) =
+        if not (v.AllFinite ()) then
+            let msg = 
+                sprintf "Non-finite value encountered in %s with value:\n%A" this.Label v
+            raise (NonFiniteValueException msg)
+
     interface IOp with      
         member this.Check () = ()
         member this.Channels = Ch.onlyOne
@@ -1069,11 +1175,16 @@ type CheckFinite = {Label: string; X: BaseExprCh} with
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = 
             let v = ArgValue.unaryX argVals
-            if not (v.AllFinite ()) then
-                let msg = 
-                    sprintf "Non-finite value encountered in %s with value:\n%A" this.Label v
-                raise (NonFiniteValueException msg)
-            v |> Ch.only                            
+            this.DoCheck v
+            v |> Ch.only                    
+            
+    interface ICompilableOp with
+        member this.ChStubs data =
+            CompileTools.passthroughStub data
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                let v = ArgValue.unaryX argVals
+                this.DoCheck v)
 
 
 /// Converts the data to the specified type.
@@ -1092,6 +1203,13 @@ type Convert = {ToType: TypeName; X: BaseExprCh} with
             let v = ArgValue.unaryX argVals
             v |> ITensor.convertToType this.ToType.Type |> Ch.only     
 
+    interface ICompilableOp with
+        member this.ChStubs data =
+            CompileTools.chStubs (data)
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillConvert (ArgValue.unaryX argVals))
+
 
 /// Transfers the data to the specified device.
 type Transfer = {ToDev: ITensorDevice; X: BaseExprCh} with
@@ -1109,6 +1227,14 @@ type Transfer = {ToDev: ITensorDevice; X: BaseExprCh} with
             let v = ArgValue.unaryX argVals
             v |> ITensor.transfer this.ToDev |> Ch.only     
 
+    interface ICompilableOp with
+        member this.ChStubs data =
+            CompileTools.chStubs (data)
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                // TODO: Do we need to take care about cross-device synchronization here? 
+                (ChValue.onlyX chVals).TransferFrom (ArgValue.unaryX argVals))
+
 
 /// Returns the specified channel of a multi-channnel as its only channel.
 type Channel = {X: BaseExprCh} with
@@ -1125,5 +1251,10 @@ type Channel = {X: BaseExprCh} with
         member this.Eval env argVals = 
             ArgValue.unaryX argVals |> Ch.only
 
+    interface ICompilableOp with
+        member this.ChStubs data =
+            CompileTools.passthroughStub data
+        member this.Actions data =
+            CompileTools.noAction ()
 
 
