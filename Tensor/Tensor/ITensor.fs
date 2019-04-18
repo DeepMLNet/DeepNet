@@ -10,6 +10,8 @@ open Tensor.Backend
 type ITensorDevice = Tensor.Backend.ITensorDevice
 
 
+
+
 /// <summary>Type-neutral interface to Tensor&lt;'T&gt; of any type 'T.</summary>
 /// <remarks>These functions are useful for working with tensors of unknown types.
 /// For most use cases the functions provided by <see cref="Tensor`1"/> are better suited.</remarks>
@@ -203,14 +205,14 @@ type ITensor =
     abstract Modulo: ITensor -> ITensor
     abstract Pow: ITensor -> ITensor
 
-    // type-neutral binary fill comparisons (last argument is target)
-    abstract FillEqual: b:ITensor -> trgt:ITensor -> unit
-    abstract FillNotEqual: b:ITensor -> trgt:ITensor -> unit
-    abstract FillLess: b:ITensor -> trgt:ITensor -> unit
-    abstract FillLessOrEqual: b:ITensor -> trgt:ITensor -> unit
-    abstract FillGreater: b:ITensor -> trgt:ITensor -> unit
-    abstract FillGreaterOrEqual: b:ITensor -> trgt:ITensor -> unit
-    
+    // type-neutral fill binary comparison
+    abstract FillEqual: ITensor -> ITensor -> unit       
+    abstract FillNotEqual: ITensor -> ITensor -> unit         
+    abstract FillLess: ITensor -> ITensor -> unit             
+    abstract FillLessOrEqual: ITensor -> ITensor -> unit      
+    abstract FillGreater: ITensor -> ITensor -> unit          
+    abstract FillGreaterOrEqual: ITensor -> ITensor -> unit   
+
     // type-neutral binary comparison
     abstract Equal: ITensor -> ITensor
     abstract NotEqual: ITensor -> ITensor
@@ -234,6 +236,12 @@ type ITensor =
     abstract IsClose: other:ITensor * ?absTol:obj * ?relTol:obj -> ITensor
     abstract AlmostEqual: other:ITensor * ?absTol:obj * ?relTol:obj -> bool
 
+    // type-neutral reduction fill operations
+    abstract FillSumAxis: ax:int -> src:ITensor -> unit
+    abstract FillProductAxis: ax:int -> src:ITensor -> unit
+    abstract FillMinAxis: ax:int -> src:ITensor -> unit
+    abstract FillMaxAxis: ax:int -> src:ITensor -> unit
+
     // type-neutral reduction operations
     abstract SumAxis: ax:int -> ITensor
     abstract SumTensor: unit -> ITensor
@@ -243,6 +251,12 @@ type ITensor =
     abstract MinTensor: unit -> ITensor
     abstract MaxAxis: ax:int -> ITensor
     abstract MaxTensor: unit -> ITensor
+
+    // type-neutral reduction fill to indices operations
+    abstract FillArgMinAxis: ax:int -> src:ITensor -> unit
+    abstract FillArgMaxAxis: ax:int -> src:ITensor -> unit
+
+    // type-neutral reduction to indices operations
     abstract ArgMinAxis: ax:int -> ITensor
     abstract ArgMaxAxis: ax:int -> ITensor
     abstract ArgMin: unit -> int64 list
@@ -273,3 +287,18 @@ type ITensor =
 
     abstract DiffAxis: ax:int -> ITensor
 
+
+
+type internal ITensorInt =
+
+    // type-neutral binary fill comparisons (last argument is target)
+    abstract FillEqual: b:ITensor -> trgt:ITensor -> unit
+    abstract FillNotEqual: b:ITensor -> trgt:ITensor -> unit
+    abstract FillLess: b:ITensor -> trgt:ITensor -> unit
+    abstract FillLessOrEqual: b:ITensor -> trgt:ITensor -> unit
+    abstract FillGreater: b:ITensor -> trgt:ITensor -> unit
+    abstract FillGreaterOrEqual: b:ITensor -> trgt:ITensor -> unit
+    
+    // type-neutral reduction fill to indices operations
+    abstract FillArgMinAxis: ax:int -> trgt:ITensor -> unit
+    abstract FillArgMaxAxis: ax:int -> trgt:ITensor -> unit

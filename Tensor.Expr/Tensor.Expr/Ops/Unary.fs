@@ -490,9 +490,11 @@ type Invert = { X: BaseExprCh } with
         member this.ChStubs data =
             CompileTools.chStubs (data, tryInplace=true)
         member this.Actions data =
-            // TODO: how to handle temporary storage?
+            // TODO: So far temporary storage is allocated at runtime.
+            //       This should be changed to also perform preallocations.
             CompileTools.simpleAction (fun chVals argVals ->
                 (ChValue.onlyX chVals).FillInvert (ArgValue.unaryX argVals))
+                
 
 /// Logical not.
 type Not = { X: BaseExprCh } with
@@ -507,6 +509,13 @@ type Not = { X: BaseExprCh } with
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = ~~~~(ArgValue.unaryX argVals :?> Tensor<bool>) :> ITensor |> Ch.only
+
+    interface ICompilableOp with
+        member this.ChStubs data =
+            CompileTools.chStubs (data, tryInplace=true)
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals :?> Tensor<bool>).FillNegate (ArgValue.unaryX argVals :?> Tensor<bool>))
 
 
 /// Reshape
@@ -736,6 +745,13 @@ type SumAxis = {X: BaseExprCh; Axis: int} with
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.unaryX argVals).SumAxis this.Axis |> Ch.only
 
+    interface ICompilableOp with
+        member this.ChStubs data =
+            CompileTools.chStubs (data)
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillSumAxis this.Axis (ArgValue.unaryX argVals))
+
 
 /// Product over specified axis.
 type ProductAxis = {X: BaseExprCh; Axis: int} with
@@ -750,6 +766,13 @@ type ProductAxis = {X: BaseExprCh; Axis: int} with
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.unaryX argVals).ProductAxis this.Axis |> Ch.only
+
+    interface ICompilableOp with
+        member this.ChStubs data =
+            CompileTools.chStubs (data)
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillProductAxis this.Axis (ArgValue.unaryX argVals))
 
 
 /// Maximum over specified axis.
@@ -766,6 +789,13 @@ type MaxAxis = {X: BaseExprCh; Axis: int} with
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.unaryX argVals).MaxAxis this.Axis |> Ch.only
 
+    interface ICompilableOp with
+        member this.ChStubs data =
+            CompileTools.chStubs (data)
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillMaxAxis this.Axis (ArgValue.unaryX argVals))
+
 
 /// Minimum over specified axis.
 type MinAxis = {X: BaseExprCh; Axis: int} with
@@ -780,6 +810,13 @@ type MinAxis = {X: BaseExprCh; Axis: int} with
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.unaryX argVals).MinAxis this.Axis |> Ch.only
+
+    interface ICompilableOp with
+        member this.ChStubs data =
+            CompileTools.chStubs (data)
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillMinAxis this.Axis (ArgValue.unaryX argVals))
 
 
 /// Maximum over specified axis.
@@ -796,6 +833,13 @@ type ArgMaxAxis = {X: BaseExprCh; Axis: int} with
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.unaryX argVals).ArgMaxAxis this.Axis |> Ch.only
 
+    interface ICompilableOp with
+        member this.ChStubs data =
+            CompileTools.chStubs (data)
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillArgMaxAxis this.Axis (ArgValue.unaryX argVals))
+
 
 /// Minimum over specified axis.
 type ArgMinAxis = {X: BaseExprCh; Axis: int} with
@@ -810,6 +854,13 @@ type ArgMinAxis = {X: BaseExprCh; Axis: int} with
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.unaryX argVals).ArgMinAxis this.Axis |> Ch.only
+
+    interface ICompilableOp with
+        member this.ChStubs data =
+            CompileTools.chStubs (data)
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillArgMinAxis this.Axis (ArgValue.unaryX argVals))
 
 
 /// Select elements according to the specified index tensors

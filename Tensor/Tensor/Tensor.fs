@@ -4067,12 +4067,12 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         member a.Modulo b = a % (b :?> Tensor<'T>) :> ITensor        
         member a.Pow b = a ** (b :?> Tensor<'T>) :> ITensor
 
-        member a.FillEqual b trgt = (trgt :?> Tensor<bool>).FillEqual a (b :?> Tensor<'T>)
-        member a.FillNotEqual b trgt = (trgt :?> Tensor<bool>).FillNotEqual a (b :?> Tensor<'T>)
-        member a.FillLess b trgt = (trgt :?> Tensor<bool>).FillLess a (b :?> Tensor<'T>)
-        member a.FillLessOrEqual b trgt = (trgt :?> Tensor<bool>).FillLessOrEqual a (b :?> Tensor<'T>)
-        member a.FillGreater b trgt = (trgt :?> Tensor<bool>).FillGreater a (b :?> Tensor<'T>)
-        member a.FillGreaterOrEqual b trgt = (trgt :?> Tensor<bool>).FillGreaterOrEqual a (b :?> Tensor<'T>)
+        member trgt.FillEqual a b = (a :?> ITensorInt).FillEqual b trgt
+        member trgt.FillNotEqual a b = (a :?> ITensorInt).FillNotEqual b trgt
+        member trgt.FillLess a b = (a :?> ITensorInt).FillLess b trgt
+        member trgt.FillLessOrEqual a b = (a :?> ITensorInt).FillLessOrEqual b trgt
+        member trgt.FillGreater a b = (a :?> ITensorInt).FillGreater b trgt
+        member trgt.FillGreaterOrEqual a b = (a :?> ITensorInt).FillGreaterOrEqual b trgt
 
         member a.Equal b = a ==== (b :?> Tensor<'T>) :> ITensor
         member a.NotEqual b = a <<>> (b :?> Tensor<'T>) :> ITensor
@@ -4103,15 +4103,23 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
             let relTol = relTol |> Option.map (conv<'T>)
             Tensor<'T>.almostEqual (a, b :?> Tensor<'T>, ?absTol=absTol, ?relTol=relTol) 
 
+        member trgt.FillSumAxis ax src = trgt.FillSumAxis ax (src :?> Tensor<'T>)
+        member trgt.FillProductAxis ax src = trgt.FillProductAxis ax (src :?> Tensor<'T>)
+        member trgt.FillMinAxis ax src = trgt.FillMinAxis ax (src :?> Tensor<'T>)
+        member trgt.FillMaxAxis ax src = trgt.FillMaxAxis ax (src :?> Tensor<'T>)
+
         member a.SumAxis ax = Tensor<'T>.sumAxis ax a :> ITensor
         member a.SumTensor () = Tensor<'T>.sumTensor a :> ITensor
         member a.ProductAxis ax = Tensor<'T>.productAxis ax a :> ITensor
         member a.ProductTensor () = Tensor<'T>.productTensor a :> ITensor
-
         member a.MinAxis ax = Tensor<'T>.minAxis ax a :> ITensor
         member a.MinTensor () = Tensor<'T>.minTensor a :> ITensor
         member a.MaxAxis ax = Tensor<'T>.maxAxis ax a :> ITensor
         member a.MaxTensor () = Tensor<'T>.maxTensor a :> ITensor
+
+        member trgt.FillArgMinAxis ax src = (src :?> ITensorInt).FillArgMinAxis ax trgt
+        member trgt.FillArgMaxAxis ax src = (src :?> ITensorInt).FillArgMaxAxis ax trgt
+
         member a.ArgMinAxis ax = Tensor<'T>.argMinAxis ax a :> ITensor 
         member a.ArgMaxAxis ax = Tensor<'T>.argMaxAxis ax a :> ITensor
         member a.ArgMin () = Tensor<'T>.argMin a
@@ -4127,7 +4135,6 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         member a.FillSymmetricEigenDecomposition part trgtEigVals trgtEigVecs =
             Tensor<'T>.FillSymmetricEigenDecomposition part 
                 (trgtEigVals :?> Tensor<'T>) (trgtEigVecs :?> Tensor<'T>) a
-
 
         member a.Dot b = a .* (b :?> Tensor<'T>) :> ITensor
         member a.TensorProduct b = Tensor<'T>.tensorProduct  a (b :?> Tensor<'T>) :> ITensor
@@ -4148,6 +4155,16 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
 
         member a.DiffAxis ax = Tensor<'T>.diffAxis ax a :> ITensor
 
+    interface ITensorInt with
+        member a.FillEqual b trgt = (trgt :?> Tensor<bool>).FillEqual a (b :?> Tensor<'T>)
+        member a.FillNotEqual b trgt = (trgt :?> Tensor<bool>).FillNotEqual a (b :?> Tensor<'T>)
+        member a.FillLess b trgt = (trgt :?> Tensor<bool>).FillLess a (b :?> Tensor<'T>)
+        member a.FillLessOrEqual b trgt = (trgt :?> Tensor<bool>).FillLessOrEqual a (b :?> Tensor<'T>)
+        member a.FillGreater b trgt = (trgt :?> Tensor<bool>).FillGreater a (b :?> Tensor<'T>)
+        member a.FillGreaterOrEqual b trgt = (trgt :?> Tensor<bool>).FillGreaterOrEqual a (b :?> Tensor<'T>)
+
+        member src.FillArgMinAxis ax trgt = (trgt :?> Tensor<int64>).FillArgMinAxis ax src
+        member src.FillArgMaxAxis ax trgt = (trgt :?> Tensor<int64>).FillArgMaxAxis ax src
 
     /// <summary>Tests for equality to another object.</summary>
     /// <param name="other">The other object.</param>
