@@ -904,6 +904,14 @@ type Gather = {X: BaseExprCh; Indices: BaseExprCh option list} with
             let vIndices = argVals |> ArgValue.naryOptXs this.Indices.Length
             (ArgValue.unaryX argVals).Gather vIndices |> Ch.only
 
+    interface ICompilableOp with
+        member this.ChStubs data =
+            CompileTools.chStubs (data)
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                let vIndices = argVals |> ArgValue.naryOptXs this.Indices.Length
+                (ChValue.onlyX chVals).FillGather vIndices (ArgValue.unaryX argVals))
+
 
 /// Disperses elements according to the specified index tensors.
 type Scatter = {X: BaseExprCh; Indices: BaseExprCh option list; Shape: Shape} with
@@ -939,32 +947,13 @@ type Scatter = {X: BaseExprCh; Indices: BaseExprCh option list; Shape: Shape} wi
             let vIndices = argVals |> ArgValue.naryOptXs this.Indices.Length
             (ArgValue.unaryX argVals).Scatter vIndices (Shape.eval this.Shape) |> Ch.only
 
-
-/// Store value to variable.
-type Store = {X: BaseExprCh; Var: Var} with
-    interface IOp with       
-        member this.Check () = 
-            if this.X.TypeName <> this.Var.TypeName then
-                failwithf "Cannot store expression of type %A into variable of type %A."
-                            this.X.TypeName this.Var.TypeName
-            if not (Shape.equalIgnoringBc this.X.Shape this.Var.Shape) then
-                failwithf "Cannot store expression of shape %A into variable of shape %A." 
-                            this.X.Shape this.Var.Shape   
-        member this.Channels = Ch.onlyOne                            
-        member this.TypeNames = this.X.TypeName |> Ch.only
-        member this.Devs = this.X.Dev |> Ch.only
-        member this.Shapes = Shape.emptyVector |> Ch.only
-        member this.Args = Args.unary this.X
-        member this.ReplaceArgs args = 
-            {this with X=Args.unaryX args} :> _
-        member this.SubstSymSizes env = 
-            {this with Var={this.Var with Shape=Shape.subst env this.Var.Shape}} :> _
-        member this.CanEvalAllSymSizes = Shape.canEval this.Var.Shape
-        member this.Eval env argVals = 
-            let tv = env.VarEnv.[this.Var.Name]
-            let v = ArgValue.unaryX argVals                
-            tv.CopyFrom (v.Transfer tv.Dev)
-            v.ZerosOfSameType v.Dev [0L] |> Ch.only
+    interface ICompilableOp with
+        member this.ChStubs data =
+            CompileTools.chStubs (data)
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                let vIndices = argVals |> ArgValue.naryOptXs this.Indices.Length
+                (ChValue.onlyX chVals).FillScatter vIndices (ArgValue.unaryX argVals))
 
 
 /// Sets the Jacobian of its argument to zero when calculating derivatives.

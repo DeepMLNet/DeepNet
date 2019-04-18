@@ -4087,8 +4087,16 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         member a.MaxElemwise b = Tensor<'T>.maxElemwise a (b :?> Tensor<'T>) :> ITensor
         member a.MinElemwise b = Tensor<'T>.minElemwise a (b :?> Tensor<'T>) :> ITensor
 
+        member trgt.FillIfThenElse cond ifTrue ifFalse =
+            trgt.FillIfThenElse (cond :?> Tensor<bool>) (ifTrue :?> Tensor<'T>) (ifFalse :?> Tensor<'T>)
         member ifTrue.IfThenElse ifFalse cond = 
             Tensor<'T>.ifThenElse (cond :?> Tensor<bool>) ifTrue (ifFalse :?> Tensor<'T>) :> ITensor
+
+        member trgt.FillGather indices src =
+            trgt.FillGather (indices |> List.map (Option.map (fun i -> i :?> Tensor<int64>))) (src :?> Tensor<'T>)
+        member trgt.FillScatter indices src =
+            trgt.FillScatter (indices |> List.map (Option.map (fun i -> i :?> Tensor<int64>))) (src :?> Tensor<'T>)
+
         member a.Gather indices =
             Tensor<'T>.gather (indices |> List.map (Option.map (fun i -> i :?> Tensor<int64>))) a :> ITensor
         member a.Scatter indices trgtShp =

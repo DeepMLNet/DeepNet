@@ -229,7 +229,15 @@ type ITensor =
     abstract MaxElemwise: ITensor -> ITensor
     abstract MinElemwise: ITensor -> ITensor
 
+    // conditional value operations
+    abstract FillIfThenElse: cond:ITensor -> ifTrue:ITensor -> ifFalse:ITensor -> unit
     abstract IfThenElse: ifFalse:ITensor -> cond:ITensor -> ITensor
+
+    // gather/scatter fill operations
+    abstract FillGather: indices:ITensor option list -> src:ITensor -> unit
+    abstract FillScatter: indices:ITensor option list -> src:ITensor -> unit
+
+    // gather/scatter operations
     abstract Gather: indices:ITensor option list -> ITensor
     abstract Scatter: indices:ITensor option list -> trgtShp:int64 list -> ITensor
 

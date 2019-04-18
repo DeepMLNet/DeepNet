@@ -255,11 +255,6 @@ module UExpr =
             Some (this.Shape, indices, UExpr this.X)
         | _ -> None   
 
-    let (|Store|_|) (expr: UExpr) =
-        match expr.Op with
-        | :? Store as this -> Some (this.Var, UExpr this.X)
-        | _ -> None
-
     let (|AssumeZeroDeriv|_|) (expr: UExpr) =
         match expr.Op with
         | :? AssumeZeroDeriv as this -> Some (UExpr this.X)

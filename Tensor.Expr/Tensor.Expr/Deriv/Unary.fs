@@ -352,14 +352,6 @@ type ScatterDeriv(op: Scatter) =
 
 
 [<OpExtender>]
-type StoreDeriv(op: Store) =
-    interface IDerivableOp with       
-        member this.Deriv dOp =
-            let env = DerivTools.Env.make op dOp 
-            Map.empty
-
-
-[<OpExtender>]
 type AssumeZeroDerivDeriv(op: AssumeZeroDeriv) =
     interface IDerivableOp with      
         member this.Deriv dOp =

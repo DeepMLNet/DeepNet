@@ -242,11 +242,6 @@ module Expr =
             Some (this.Shape, indices, Expr<'T> this.X)
         | _ -> None   
 
-    let (|Store|_|) (expr: Expr<'T>) =
-        match expr.Op with
-        | :? Store as this -> Some (Var<'T> this.Var, Expr<'T> this.X)
-        | _ -> None
-
     let (|AssumeZeroDeriv|_|) (expr: Expr<'T>) =
         match expr.Op with
         | :? AssumeZeroDeriv as this -> Some (Expr<'T> this.X)
