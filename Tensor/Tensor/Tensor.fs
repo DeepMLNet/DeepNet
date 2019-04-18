@@ -4050,6 +4050,7 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         member a.Round () = Tensor<'T>.Round a :> ITensor
         member a.Truncate () = Tensor<'T>.Truncate a :> ITensor
         member a.IsFinite () = Tensor<'T>.isFinite a :> ITensor
+
         member a.AllFinite () = Tensor<'T>.allFinite a
 
         member trgt.FillAdd a b = trgt.FillAdd (a :?> Tensor<'T>) (b :?> Tensor<'T>)
@@ -4066,12 +4067,23 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         member a.Modulo b = a % (b :?> Tensor<'T>) :> ITensor        
         member a.Pow b = a ** (b :?> Tensor<'T>) :> ITensor
 
+        member a.FillEqual b trgt = (trgt :?> Tensor<bool>).FillEqual a (b :?> Tensor<'T>)
+        member a.FillNotEqual b trgt = (trgt :?> Tensor<bool>).FillNotEqual a (b :?> Tensor<'T>)
+        member a.FillLess b trgt = (trgt :?> Tensor<bool>).FillLess a (b :?> Tensor<'T>)
+        member a.FillLessOrEqual b trgt = (trgt :?> Tensor<bool>).FillLessOrEqual a (b :?> Tensor<'T>)
+        member a.FillGreater b trgt = (trgt :?> Tensor<bool>).FillGreater a (b :?> Tensor<'T>)
+        member a.FillGreaterOrEqual b trgt = (trgt :?> Tensor<bool>).FillGreaterOrEqual a (b :?> Tensor<'T>)
+
         member a.Equal b = a ==== (b :?> Tensor<'T>) :> ITensor
         member a.NotEqual b = a <<>> (b :?> Tensor<'T>) :> ITensor
         member a.Less b = a <<<< (b :?> Tensor<'T>) :> ITensor
         member a.LessOrEqual b = a <<== (b :?> Tensor<'T>) :> ITensor
         member a.Greater b = a >>>> (b :?> Tensor<'T>) :> ITensor
         member a.GreaterOrEqual b = a >>== (b :?> Tensor<'T>) :> ITensor
+
+        member trgt.FillMaxElemwise a b = trgt.FillMaxElemwise (a :?> Tensor<'T>) (b :?> Tensor<'T>)
+        member trgt.FillMinElemwise a b = trgt.FillMaxElemwise (a :?> Tensor<'T>) (b :?> Tensor<'T>)
+
         member a.MaxElemwise b = Tensor<'T>.maxElemwise a (b :?> Tensor<'T>) :> ITensor
         member a.MinElemwise b = Tensor<'T>.minElemwise a (b :?> Tensor<'T>) :> ITensor
 
@@ -4104,6 +4116,18 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         member a.ArgMaxAxis ax = Tensor<'T>.argMaxAxis ax a :> ITensor
         member a.ArgMin () = Tensor<'T>.argMin a
         member a.ArgMax () = Tensor<'T>.argMax a
+
+        member trgt.FillDot a b = trgt.FillDot (a :?> Tensor<'T>) (b :?> Tensor<'T>)
+        member trgt.FillTensorProduct a b = trgt.FillTensorProduct (a :?> Tensor<'T>) (b :?> Tensor<'T>)
+        member trgt.FillInvert a = trgt.FillInvert (a :?> Tensor<'T>)
+        member trgtS.FillSVD (a, ?trgtUV) = 
+            let trgtUV = trgtUV |> Option.map (fun (u, v) -> u :?> Tensor<'T>, v :?> Tensor<'T>)
+            trgtS.FillSVD (a :?> Tensor<'T>, ?trgtUV=trgtUV)
+        member trgt.FillPseudoInvert a = trgt.FillPseudoInvert (a :?> Tensor<'T>)
+        member a.FillSymmetricEigenDecomposition part trgtEigVals trgtEigVecs =
+            Tensor<'T>.FillSymmetricEigenDecomposition part 
+                (trgtEigVals :?> Tensor<'T>) (trgtEigVecs :?> Tensor<'T>) a
+
 
         member a.Dot b = a .* (b :?> Tensor<'T>) :> ITensor
         member a.TensorProduct b = Tensor<'T>.tensorProduct  a (b :?> Tensor<'T>) :> ITensor
@@ -4753,6 +4777,60 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
             invalidArg "a" "Need at least a two dimensional array for trace but got shape %A." a.Shape
         Tensor.traceAxis (a.NDims-2) (a.NDims-1) a 
 
+    /// Computes the shapes of tensor blocks joined along the specified axis.
+    static member internal joinedBlocksShape (joinDim: int) (bs: BlockTensor<'T>) =
+        let rec commonShape joinDim shps =               
+            match shps with
+            | [shp] -> List.set joinDim -1L shp
+            | shp::rShps ->
+                let commonShp = commonShape joinDim [shp]
+                if commonShp <> commonShape joinDim rShps then
+                    invalidArg "bs" "Block tensor blocks must have same number of dimensions and be 
+                                     identical in all but the join dimension."
+                commonShp
+            | [] -> []
+
+        let joinSize joinDim (shps: int64 list list) =
+            shps |> List.map (fun shp -> shp.[joinDim]) |> List.sum
+
+        let joinShape joinDim shps =
+            commonShape joinDim shps 
+            |> List.set joinDim (joinSize joinDim shps)
+
+        match bs with
+        | SubBlocks blcks ->
+            blcks |> List.map (Tensor<_>.joinedBlocksShape (joinDim + 1)) |> joinShape joinDim
+        | Block ary -> ary.Shape
+
+    /// <summary>Fills a tensor with tensor blocks.</summary>
+    /// <param name="bs">The block tensor specification.</param>    
+    /// <seealso cref="ofBlocks"/>
+    member this.FillBlocks (bs: BlockTensor<'T>) =
+        let joinedShape = Tensor<_>.joinedBlocksShape 0 bs
+        if this.Shape <> joinedShape then
+            invalidArg "bs" "The block specification requires shape %A but target tensor has shape %A."
+                joinedShape this.Shape
+
+        let rec blockPosAndContents (joinDim: int) startPos bs = seq {
+            match bs with
+            | SubBlocks blcks ->
+                let mutable pos = startPos
+                for blck in blcks do
+                    yield! blockPosAndContents (joinDim + 1) pos blck 
+                    let blckShape = Tensor<_>.joinedBlocksShape (joinDim + 1) blck
+                    pos <- List.set joinDim (pos.[joinDim] + blckShape.[joinDim]) pos
+            | Block ary -> yield startPos, ary
+        }
+
+        let startPos = List.replicate (List.length joinedShape) 0L
+        for pos, ary in blockPosAndContents 0 startPos bs do
+            if ary.Dev <> this.Dev then
+                invalidArg "bs" "The block specification contains a tensor stored on %A but target is on %A."
+                    ary.Dev this.Dev
+
+            let slice = (pos, ary.Shape) ||> List.map2 (fun p s -> Rng.Rng (Some p, Some (p + s - 1L))) 
+            this.[slice] <- ary
+
     /// <summary>Builds a tensor out of tensor blocks.</summary>
     /// <param name="bs">The block tensor specification.</param>    
     /// <returns>The resulting tensor.</returns>
@@ -4787,56 +4865,22 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     /// <para>The contents of a sub-block must have equal sizes in all dimensions except for the 
     /// concatenation dimensions.</para>
     /// </remarks>    
-    /// <seealso cref="concat"/>
+    /// <seealso cref="concat"/><seealso cref="FillBlock"/>
     static member ofBlocks (bs: BlockTensor<'T>) =
-        let rec commonShape joinDim shps =               
-            match shps with
-            | [shp] -> List.set joinDim -1L shp
-            | shp::rShps ->
-                let commonShp = commonShape joinDim [shp]
-                if commonShp <> commonShape joinDim rShps then
-                    invalidArg "bs" "Block tensor blocks must have same number of dimensions and be 
-                                     identical in all but the join dimension."
-                commonShp
-            | [] -> []
-
-        let joinSize joinDim (shps: int64 list list) =
-            shps |> List.map (fun shp -> shp.[joinDim]) |> List.sum
-
-        let joinShape joinDim shps =
-            commonShape joinDim shps 
-            |> List.set joinDim (joinSize joinDim shps)
-
-        let rec joinedBlocksShape joinDim bs =
-            match bs with
-            | SubBlocks blcks ->
-                blcks |> List.map (joinedBlocksShape (joinDim + 1)) |> joinShape joinDim
-            | Block ary -> ary.Shape
-
-        let rec blockPosAndContents (joinDim: int) startPos bs = seq {
-            match bs with
-            | SubBlocks blcks ->
-                let mutable pos = startPos
-                for blck in blcks do
-                    yield! blockPosAndContents (joinDim + 1) pos blck 
-                    let blckShape = joinedBlocksShape (joinDim + 1) blck
-                    pos <- List.set joinDim (pos.[joinDim] + blckShape.[joinDim]) pos
-            | Block ary -> yield startPos, ary
-        }
-
+        // Get target device.
         let rec anyArray bs =
             match bs with
             | SubBlocks b -> List.tryPick anyArray b
-            | Block a -> Some a
-                  
+            | Block a -> Some a                  
         let tmplArray = Option.get (anyArray bs)
-        let joinedShape = joinedBlocksShape 0 bs
-        let joined = Tensor<_> (joinedShape, tmplArray.Dev)
-        let startPos = List.replicate (List.length joinedShape) 0L
+        let dev = tmplArray.Dev
 
-        for pos, ary in blockPosAndContents 0 startPos bs do
-            let slice = (pos, ary.Shape) ||> List.map2 (fun p s -> Rng.Rng (Some p, Some (p + s - 1L))) 
-            joined.[slice] <- ary
+        // Compute target shape.
+        let joinedShape = Tensor<_>.joinedBlocksShape 0 bs
+
+        // Build block tensor.
+        let joined = Tensor<_> (joinedShape, dev)
+        joined.FillBlocks bs
         joined
 
     /// <summary>Builds a vector out of vectors blocks.</summary>
@@ -4912,7 +4956,8 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
     static member ofBlocks (bs: Tensor<'T> list list list) =
         bs |> List.map (List.map (List.map Block >> SubBlocks) >> SubBlocks) |> SubBlocks |> Tensor.ofBlocks
 
-    member a.TensorProduct (b: Tensor<'T>) =
+    /// Tensor block specification for tensor product of a and b.
+    static member internal tensorProductBlocks (a: Tensor<'T>) (b: Tensor<'T>) =
         let a, b = Tensor.padToSame (a, b)
         let rec generate (pos: int64 list) = 
             match List.length pos with
@@ -4922,13 +4967,20 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
             | dim ->
                 seq {for p in 0L .. a.Shape.[dim] - 1L -> generate (pos @ [p])}
                 |> Seq.toList |> SubBlocks
-        generate [] |> Tensor.ofBlocks
+        generate [] 
+
+    /// <summary>Fills this with the tensor product between two tensors.</summary>
+    /// <seealso cref="tensorProduct">
+    member this.FillTensorProduct (a: Tensor<'T>) (b: Tensor<'T>) =
+        Tensor<_>.tensorProductBlocks a b |> this.FillBlocks
 
     /// <summary>Computes the tensor product between two tensors.</summary>
     /// <param name="a">The tensor on the left side of this binary operation.</param>
     /// <param name="b">The tensor on the right side of this binary operation.</param>
     /// <returns>A new tensor containing the result of this operation.</returns>    
-    static member tensorProduct (a: Tensor<'T>) (b: Tensor<'T>) = a.TensorProduct b
+    /// <seealso cref="FillTensorProduct">
+    static member tensorProduct (a: Tensor<'T>) (b: Tensor<'T>) =
+        Tensor<_>.tensorProductBlocks a b |> Tensor.ofBlocks
 
     /// <summary>Concatenates tensors along an axis.</summary>
     /// <param name="ax">The concatenation axis.</param>        

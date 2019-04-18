@@ -108,6 +108,13 @@ type Log = { X: BaseExprCh } with
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.unaryX argVals).Log () |> Ch.only
 
+    interface ICompilableOp with
+        member this.ChStubs data =
+            CompileTools.chStubs (data, tryInplace=true)
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillLog (ArgValue.unaryX argVals))
+
 
 /// Logarithm to base 10.
 type Log10 = { X: BaseExprCh } with
@@ -122,6 +129,13 @@ type Log10 = { X: BaseExprCh } with
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.unaryX argVals).Log10 () |> Ch.only
+
+    interface ICompilableOp with
+        member this.ChStubs data =
+            CompileTools.chStubs (data, tryInplace=true)
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillLog10 (ArgValue.unaryX argVals))
 
 
 /// Exponential function.
@@ -138,6 +152,13 @@ type Exp = { X: BaseExprCh } with
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.unaryX argVals).Exp () |> Ch.only
 
+    interface ICompilableOp with
+        member this.ChStubs data =
+            CompileTools.chStubs (data, tryInplace=true)
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillExp (ArgValue.unaryX argVals))
+
 
 /// Sine.
 type Sin = { X: BaseExprCh } with
@@ -152,6 +173,13 @@ type Sin = { X: BaseExprCh } with
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.unaryX argVals).Sin () |> Ch.only
+
+    interface ICompilableOp with
+        member this.ChStubs data =
+            CompileTools.chStubs (data, tryInplace=true)
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillSin (ArgValue.unaryX argVals))
 
 
 /// Cosine.
@@ -168,6 +196,13 @@ type Cos = { X: BaseExprCh } with
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.unaryX argVals).Cos () |> Ch.only
 
+    interface ICompilableOp with
+        member this.ChStubs data =
+            CompileTools.chStubs (data, tryInplace=true)
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillCos (ArgValue.unaryX argVals))
+
 
 /// Tangent.
 type Tan = { X: BaseExprCh } with
@@ -182,6 +217,13 @@ type Tan = { X: BaseExprCh } with
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.unaryX argVals).Tan () |> Ch.only
+
+    interface ICompilableOp with
+        member this.ChStubs data =
+            CompileTools.chStubs (data, tryInplace=true)
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillTan (ArgValue.unaryX argVals))
 
 
 /// Inverse sine.
@@ -198,6 +240,13 @@ type Asin = { X: BaseExprCh } with
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.unaryX argVals).Asin () |> Ch.only
 
+    interface ICompilableOp with
+        member this.ChStubs data =
+            CompileTools.chStubs (data, tryInplace=true)
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillAsin (ArgValue.unaryX argVals))
+
 
 /// Inverse cosine.
 type Acos = { X: BaseExprCh } with
@@ -211,7 +260,14 @@ type Acos = { X: BaseExprCh } with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env argVals = (ArgValue.unaryX argVals).Acos () |> Ch.only       
+        member this.Eval env argVals = (ArgValue.unaryX argVals).Acos () |> Ch.only     
+        
+    interface ICompilableOp with
+        member this.ChStubs data =
+            CompileTools.chStubs (data, tryInplace=true)
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillAcos (ArgValue.unaryX argVals))
 
 
 /// Inverse tangent.
@@ -228,6 +284,13 @@ type Atan = { X: BaseExprCh } with
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.unaryX argVals).Atan () |> Ch.only
 
+    interface ICompilableOp with
+        member this.ChStubs data =
+            CompileTools.chStubs (data, tryInplace=true)
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillAtan (ArgValue.unaryX argVals))
+
 
 /// Hyperbolic sine.
 type Sinh = { X: BaseExprCh } with
@@ -243,6 +306,13 @@ type Sinh = { X: BaseExprCh } with
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.unaryX argVals).Sinh () |> Ch.only      
 
+    interface ICompilableOp with
+        member this.ChStubs data =
+            CompileTools.chStubs (data, tryInplace=true)
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillSinh (ArgValue.unaryX argVals))
+
 
 /// Hyperbolic cosine.
 type Cosh = { X: BaseExprCh } with
@@ -256,7 +326,14 @@ type Cosh = { X: BaseExprCh } with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env argVals = (ArgValue.unaryX argVals).Cosh () |> Ch.only      
+        member this.Eval env argVals = (ArgValue.unaryX argVals).Cosh () |> Ch.only  
+        
+    interface ICompilableOp with
+        member this.ChStubs data =
+            CompileTools.chStubs (data, tryInplace=true)
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillCosh (ArgValue.unaryX argVals))
 
 
 /// Hyperbolic tangent.
@@ -271,7 +348,14 @@ type Tanh = { X: BaseExprCh } with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env argVals = (ArgValue.unaryX argVals).Tanh () |> Ch.only      
+        member this.Eval env argVals = (ArgValue.unaryX argVals).Tanh () |> Ch.only   
+        
+    interface ICompilableOp with
+        member this.ChStubs data =
+            CompileTools.chStubs (data, tryInplace=true)
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillTanh (ArgValue.unaryX argVals))
         
 
 /// Square root.
@@ -286,7 +370,14 @@ type Sqrt = { X: BaseExprCh } with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env argVals = (ArgValue.unaryX argVals).Sqrt () |> Ch.only     
+        member this.Eval env argVals = (ArgValue.unaryX argVals).Sqrt () |> Ch.only    
+        
+    interface ICompilableOp with
+        member this.ChStubs data =
+            CompileTools.chStubs (data, tryInplace=true)
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillSqrt (ArgValue.unaryX argVals))
 
 
 /// Round towards positive infinity.
@@ -301,7 +392,14 @@ type Ceiling = { X: BaseExprCh } with
         member this.ReplaceArgs args = { this with X = Args.unaryX args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env argVals = (ArgValue.unaryX argVals).Ceiling () |> Ch.only      
+        member this.Eval env argVals = (ArgValue.unaryX argVals).Ceiling () |> Ch.only
+        
+    interface ICompilableOp with
+        member this.ChStubs data =
+            CompileTools.chStubs (data, tryInplace=true)
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillCeiling (ArgValue.unaryX argVals))
 
 
 /// Round towards negative infinity.
@@ -318,6 +416,13 @@ type Floor = { X: BaseExprCh } with
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.unaryX argVals).Floor () |> Ch.only
 
+    interface ICompilableOp with
+        member this.ChStubs data =
+            CompileTools.chStubs (data, tryInplace=true)
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillFloor (ArgValue.unaryX argVals))
+
 
 /// Round towards nearest integer.
 type Round = { X: BaseExprCh } with
@@ -333,6 +438,13 @@ type Round = { X: BaseExprCh } with
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.unaryX argVals).Round () |> Ch.only
 
+    interface ICompilableOp with
+        member this.ChStubs data =
+            CompileTools.chStubs (data, tryInplace=true)
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillRound (ArgValue.unaryX argVals))
+
 
 /// Round towards zeros.
 type Truncate = { X: BaseExprCh } with
@@ -347,6 +459,13 @@ type Truncate = { X: BaseExprCh } with
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.unaryX argVals).Truncate () |> Ch.only
+
+    interface ICompilableOp with
+        member this.ChStubs data =
+            CompileTools.chStubs (data, tryInplace=true)
+        member this.Actions data =
+            CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillTruncate (ArgValue.unaryX argVals))
 
 
 /// (Batched) matrix inverse.
@@ -367,6 +486,13 @@ type Invert = { X: BaseExprCh } with
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.unaryX argVals).Invert () |> Ch.only
 
+    interface ICompilableOp with
+        member this.ChStubs data =
+            CompileTools.chStubs (data, tryInplace=true)
+        member this.Actions data =
+            // TODO: how to handle temporary storage?
+            CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillInvert (ArgValue.unaryX argVals))
 
 /// Logical not.
 type Not = { X: BaseExprCh } with

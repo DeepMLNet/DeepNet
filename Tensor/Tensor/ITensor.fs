@@ -202,13 +202,28 @@ type ITensor =
     abstract Divide: ITensor -> ITensor
     abstract Modulo: ITensor -> ITensor
     abstract Pow: ITensor -> ITensor
+
+    // type-neutral binary fill comparisons (last argument is target)
+    abstract FillEqual: b:ITensor -> trgt:ITensor -> unit
+    abstract FillNotEqual: b:ITensor -> trgt:ITensor -> unit
+    abstract FillLess: b:ITensor -> trgt:ITensor -> unit
+    abstract FillLessOrEqual: b:ITensor -> trgt:ITensor -> unit
+    abstract FillGreater: b:ITensor -> trgt:ITensor -> unit
+    abstract FillGreaterOrEqual: b:ITensor -> trgt:ITensor -> unit
     
+    // type-neutral binary comparison
     abstract Equal: ITensor -> ITensor
     abstract NotEqual: ITensor -> ITensor
     abstract Less: ITensor -> ITensor
     abstract LessOrEqual: ITensor -> ITensor
     abstract Greater: ITensor -> ITensor
     abstract GreaterOrEqual: ITensor -> ITensor
+
+    // type-neutral fill max/min
+    abstract FillMaxElemwise: ITensor -> ITensor -> unit
+    abstract FillMinElemwise: ITensor -> ITensor -> unit
+
+    // type-neutral max/min
     abstract MaxElemwise: ITensor -> ITensor
     abstract MinElemwise: ITensor -> ITensor
 
@@ -233,6 +248,15 @@ type ITensor =
     abstract ArgMin: unit -> int64 list
     abstract ArgMax: unit -> int64 list
 
+    // type-neutral tensor fill operations
+    abstract FillDot: ITensor -> ITensor -> unit
+    abstract FillTensorProduct: ITensor -> ITensor -> unit
+    abstract FillInvert: ITensor -> unit
+    abstract FillSVD: a: ITensor * ?trgtUV: (ITensor * ITensor) -> unit
+    abstract FillPseudoInvert: ITensor -> unit
+    abstract FillSymmetricEigenDecomposition: part:MatrixPart -> trgtEigVals:ITensor -> trgtEigVecs:ITensor -> unit
+
+    // type-neutral tensor operations
     abstract Dot: ITensor -> ITensor
     abstract TensorProduct: ITensor -> ITensor
     abstract Invert: unit -> ITensor
