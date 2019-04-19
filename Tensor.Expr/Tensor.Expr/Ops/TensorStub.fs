@@ -117,7 +117,7 @@ type TensorStub = {
     //    ary |> layout |> TensorLayout.isColumnMajor
         
     /// a view of the specified tensor over the given range 
-    static member tryRange (rng: Rng list) ts =
+    static member tryView (rng: Rng list) ts =
         ts |> TensorStub.tryMapLayout (TensorLayout.view rng)
 
     /// Returns true, if no aliasing of elements can occur.
@@ -187,10 +187,10 @@ type TensorStub = {
     static member tryReverseAxis ax (ts: TensorStub) =
         ts |> TensorStub.tryMapLayout (TensorLayout.reverseAxis ax)      
 
-    ///// Returns a view of the diagonal along the given axes.
-    ///// The diagonal replaces the first axis and the second axis is removed.
-    //static member diagAxis ax1 ax2 a =
-    //    a |> TensorStub.relayout (a.Layout |> TensorLayout.diagAxis ax1 ax2)
+    /// Returns a view of the diagonal along the given axes.
+    /// The diagonal replaces the first axis and the second axis is removed.
+    static member tryDiagAxis ax1 ax2 (ts: TensorStub) =
+        ts |> TensorStub.tryMapLayout (TensorLayout.diagAxis ax1 ax2)
 
     /// broadcasts the tensor to the given shape
     static member tryBroadcastTo shp (ts: TensorStub) =

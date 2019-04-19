@@ -10,23 +10,14 @@ type CompileEnv = {
     VarOffsetStrides: Map<VarName, int64 * int64 list> 
 }
 
-type CompileData = {
-    Alloc:              AllocReq -> AllocStub
-    Env:                CompileEnv
-    ArgStubs:           Map<Arg, TensorStub> 
-    OverwritableArgs:   Set<Arg>
-    ChStubWishes:       Map<Ch, TensorStub>
-    Expr:               BaseExpr
-}
 
-
-type ActionData = {
-    Alloc:              AllocReq -> AllocStub
-    Env:                CompileEnv
-    ArgStubs:           Map<Arg, TensorStub> 
-    ChStubs:            Map<Ch, TensorStub>
-    Expr:               BaseExpr
-}
+//type ActionData = {
+//    Alloc:              AllocReq -> AllocStub
+//    Env:                CompileEnv
+//    ArgStubs:           Map<Arg, TensorStub> 
+//    ChStubs:            Map<Ch, TensorStub>
+//    Expr:               BaseExpr
+//}
 
 type ExecuteData = {
     StubValues:         IReadOnlyDictionary<TensorStub, ITensor>
@@ -49,15 +40,37 @@ type ActionGroup = {
 }
 
 
+type CompileData = {
+    Alloc:              AllocReq -> AllocStub
+    Env:                CompileEnv
+    ArgStubs:           Map<Arg, TensorStub> 
+    OverwritableArgs:   Set<Arg>
+    ChStubWishes:       Map<Ch, TensorStub>
+    Expr:               BaseExpr
+}
+
+
+type CompileOutput = {
+    ChStubs:            Map<Ch, TensorStub>
+    Actions:            IAction list
+}
+
+
 type ICompilableOp =
     /// Should compute the channel stubs given the argument stubs.
-    abstract ChStubs: CompileData -> Map<Ch, TensorStub>
+    abstract Compile: CompileData -> CompileOutput
 
-    abstract Actions: ActionData -> IAction list
+    //abstract Actions: ActionData -> IAction list
 
 type ITensorStubWishPropagatingOp =
     /// Should compute argument stub wishes given channel stub wishes.
     abstract PropagateWishes: Map<Ch, TensorStub> -> Map<Arg, TensorStub>
+
+
+type NonCompilableOpAction (expr: BaseExpr, argStubs: Map<Arg, TensorStub>) =
+    interface IAction with
+        member this.Execute data =
+            failwith "TODO"
 
 
 module BaseExprCompiler =
@@ -139,6 +152,9 @@ module BaseExprCompiler =
         /// Assigned tensor stub for each expression channel.
         let tensorStubs = Dictionary<BaseExprCh, TensorStub> ()
 
+        /// Action group for each expression.
+        let actionGroupForExpr = Dictionary<BaseExpr, ActionGroup> ()
+
         /// All expressions that an expression depends on transitively.
         let depending = Dictionary<BaseExpr, Set<BaseExpr>> ()
 
@@ -216,7 +232,7 @@ module BaseExprCompiler =
                 |> Map.ofSeq
 
             // Compute channel stubs given argument stubs.
-            let chStubs =
+            let comp =
                 match expr.Op with
                 | :? ICompilableOp as cop -> 
                     // Let op compute its output stubs given argument stubs.
@@ -228,24 +244,27 @@ module BaseExprCompiler =
                         ChStubWishes = chWishes
                         Expr = expr
                     }
-                    cop.ChStubs data     
+                    cop.Compile data     
                 | _ ->
                     // Op cannot compute stubs, generate dynamic stubs for all
                     // its output channels. 
-                    expr.Channels
-                    |> Set.toSeq
-                    |> Seq.map (fun ch -> 
-                        ch, {
-                            Shape = expr.Shapes.[ch] |> Shape.eval
-                            TypeName = expr.TypeNames.[ch]
-                            Dev = expr.Devs.[ch]
-                            OffsetStride = None
-                            Storage = StorageStub.Dynamic
-                        })
-                    |> Map.ofSeq
+                    let chStubs =
+                        expr.Channels
+                        |> Set.toSeq
+                        |> Seq.map (fun ch -> 
+                            ch, {
+                                Shape = expr.Shapes.[ch] |> Shape.eval
+                                TypeName = expr.TypeNames.[ch]
+                                Dev = expr.Devs.[ch]
+                                OffsetStride = None
+                                Storage = StorageStub.Dynamic
+                            })
+                        |> Map.ofSeq
+                    let actions = [NonCompilableOpAction (expr, argStubs) :> IAction] 
+                    {ChStubs=chStubs; Actions=actions}
 
-            // Check stubs for plausibility.
-            for KeyValue(ch, chStub) in chStubs do
+            // Check channel stubs for plausibility.
+            for KeyValue(ch, chStub) in comp.ChStubs do
                 let exprCh = expr.[ch]
                 if not (chStub.Dev = exprCh.Dev && 
                         chStub.TypeName = exprCh.TypeName &&
@@ -253,8 +272,17 @@ module BaseExprCompiler =
                     failwithf "Tensor stub %A for channel %A is not compatiable with expression %A."
                         chStub ch exprCh    
 
+            // Store action group.
+            actionGroupForExpr.[expr] <- {
+                Actions = comp.Actions
+                DependsOn = 
+                    group.Depending expr
+                    |> Seq.map (fun dep -> actionGroupForExpr.[dep])  
+                    |> HashSet
+            }
+
             // Add expression to users of its channel stubs.
-            for KeyValue(ch, chStub) in chStubs do
+            for KeyValue(ch, chStub) in comp.ChStubs do
                 match chStub.Storage with
                 | StorageStub.Allocated allocStub -> 
                     allocUsers.[allocStub] <- allocUsers.[allocStub] |> Set.add expr 
@@ -262,7 +290,7 @@ module BaseExprCompiler =
                 | _ -> ()
 
             // Store channel stubs.
-            for KeyValue(ch, chStub) in chStubs do
+            for KeyValue(ch, chStub) in comp.ChStubs do
                 tensorStubs.[expr.[ch]] <- chStub
 
         /// Called after all dependencies of an expression have been processed.
@@ -273,79 +301,7 @@ module BaseExprCompiler =
         // Process expression tree.
         group.Iter (processExpr, allDepsOfExprEvaled=clearDepending)
 
-        // Return assigned tensor stub for each expression channel.
-        Map.ofDictionary tensorStubs 
-
-
-    type NonCompilableOpAction (expr: BaseExpr, argStubs: Map<Arg, TensorStub>) =
-        interface IAction with
-            member this.Execute data =
-                failwith "TODO"
-
-
-    /// Generates action items for each expression in the expression tree.
-    let generateActions (env: CompileEnv) (stubs: Map<BaseExprCh, TensorStub>) (group: BaseExprGroup) =
-
-        /// All allocation stubs.
-        let allocStubs = ResizeArray<AllocStub> ()
-        /// Users of an allocation, either as argument, internally or as channel.
-        let allocUsers = Dictionary<AllocStub, Set<BaseExpr>> ()
-
-        /// Allocate memory for the specified expression.
-        let alloc expr req =
-            let alloc = {Req = req}
-            allocUsers.Add (alloc, Set<BaseExpr> [expr])
-            allocStubs.Add alloc
-            alloc
-
-        /// Action group for each expression.
-        let actionGroupForExpr = Dictionary<BaseExpr, ActionGroup> ()
-
-        /// Processes an expression.
-        let generate (expr: BaseExpr) = 
-            /// Stubs for arguments of expression.
-            let argStubs =
-                expr.Args
-                |> Map.map (fun _ argExprCh -> stubs.[argExprCh])
-
-            /// Stubs for channels of expression.
-            let chStubs =
-                expr.Channels
-                |> Seq.map (fun ch -> ch, stubs.[expr.[ch]])
-                |> Map.ofSeq
-
-            /// Action groups this expression depends on.
-            let dependsOn =
-                group.Depending expr
-                |> Seq.map (fun dep -> actionGroupForExpr.[dep])
-
-            // Get actions for op.
-            let data = {
-                Alloc = alloc expr
-                Env = env
-                ArgStubs = argStubs
-                ChStubs = chStubs
-                Expr = expr                    
-            }        
-            let actions = 
-                match expr.Op with
-                | :? ICompilableOp as op ->
-                    // Op is compilable and can provide action.
-                    op.Actions data
-                | _ ->
-                    // Op is not compilable. Use generic executor.
-                    [NonCompilableOpAction (expr, argStubs)]                   
-
-            // Store action group.
-            actionGroupForExpr.[expr] <- {
-                Actions = actions
-                DependsOn = HashSet dependsOn
-            }
-
-        // Walk over expression tree and generate actions for each expression.
-        group.Iter (generate)
-
-        actionGroupForExpr.Values |> List.ofSeq
+        Map.ofDictionary tensorStubs, List.ofSeq actionGroupForExpr.Values
 
 
 
@@ -420,6 +376,34 @@ type CompileTools () =
 
     static member noAction () : IAction list =
         []
+
+
+    static member tryStatic (data: CompileData) (staticFn: TensorStub -> TensorStub option) (dynFn: ITensor -> ITensor) =
+        let op = data.Expr.Op
+        let argStub = ArgValue.unaryX data.ArgStubs 
+
+        match staticFn argStub with
+        | Some chStub -> 
+            {
+                ChStubs = Ch.only chStub
+                Actions = []
+            }
+        | None ->
+            {
+                ChStubs = Ch.only {
+                    Shape = Shape.eval op.Shapes.[Ch.Default]
+                    TypeName = op.TypeNames.[Ch.Default]
+                    Dev = op.Devs.[Ch.Default]
+                    OffsetStride = None
+                    Storage = argStub.Storage    
+                }
+                Actions = [{ new IAction with
+                    member __.Execute execData =                            
+                        ArgValue.unaryX execData.ArgValues
+                        |> dynFn 
+                        |> Ch.only
+                }]     
+            }        
 
 
 

@@ -120,7 +120,7 @@ type BuildTensor = {Shape: Shape; Ranges: BaseRanges list; Xs: BaseExprCh list} 
                     let evaledRng = rng |> List.map (fun (first, last) -> 
                         Rng.Rng (Some (Size.eval first), Some (Size.eval last)))
                     chWish 
-                    |> TensorStub.tryRange evaledRng
+                    |> TensorStub.tryView evaledRng
                     |> Option.map (fun argWish -> Arg.N i, argWish))
                 |> Map.ofSeq
             | _ -> Map.empty

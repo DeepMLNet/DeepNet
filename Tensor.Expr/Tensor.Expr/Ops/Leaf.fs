@@ -22,12 +22,13 @@ type Scalar = { Value: Const; Dev: ITensorDevice } with
             this.Value |> Const.asITensor this.Dev |> Ch.only
 
     interface ICompilableOp with
-        member this.ChStubs data =
-            CompileTools.chStubs data 
-        member this.Actions data =
-            let valueTensor = this.Value |> Const.asITensor this.Dev 
-            CompileTools.simpleAction (fun chVals argVals ->
-                chVals.[Ch.Default].CopyFrom valueTensor)
+        member this.Compile data = {
+            ChStubs = CompileTools.chStubs data 
+            Actions = 
+                let valueTensor = this.Value |> Const.asITensor this.Dev 
+                CompileTools.simpleAction (fun chVals argVals ->
+                    chVals.[Ch.Default].CopyFrom valueTensor)
+        }
 
     interface IOpFormat with
         member this.Text =
@@ -50,12 +51,13 @@ type SizeValue = { Value: Size; Dev: ITensorDevice } with
             Size.eval this.Value |> Tensor.scalar this.Dev :> ITensor |> Ch.only     
 
     interface ICompilableOp with
-        member this.ChStubs data =
-            CompileTools.chStubs data 
-        member this.Actions data =
-            let valueTensor = Size.eval this.Value |> Tensor.scalar this.Dev
-            CompileTools.simpleAction (fun chVals argVals ->
-                chVals.[Ch.Default].CopyFrom valueTensor)
+        member this.Compile data = {
+            ChStubs = CompileTools.chStubs data 
+            Actions = 
+                let valueTensor = Size.eval this.Value |> Tensor.scalar this.Dev
+                CompileTools.simpleAction (fun chVals argVals ->
+                    chVals.[Ch.Default].CopyFrom valueTensor)
+        }
 
     interface IOpFormat with
         member this.Text =
@@ -79,11 +81,11 @@ type Identity = { Size: Size; Type: TypeName; Dev: ITensorDevice } with
             |> Ch.only
 
     interface ICompilableOp with
-        member this.ChStubs data =
-            CompileTools.chStubs data 
-        member this.Actions data =
-            CompileTools.simpleAction (fun chVals argVals ->
+        member this.Compile data = {
+            ChStubs = CompileTools.chStubs data 
+            Actions = CompileTools.simpleAction (fun chVals argVals ->
                 chVals.[Ch.Default].FillIdentity ())
+        }
 
     interface IOpFormat with
         member this.Text =
@@ -115,12 +117,12 @@ type Counting = { Size: Size; Dev: ITensorDevice } with
             |> Ch.only
 
     interface ICompilableOp with
-        member this.ChStubs data =
-            CompileTools.chStubs data 
-        member this.Actions data =
-            CompileTools.simpleAction (fun chVals argVals ->
+        member this.Compile data = {
+            ChStubs = CompileTools.chStubs data 
+            Actions = CompileTools.simpleAction (fun chVals argVals ->
                 let t = chVals.[Ch.Default] :?> Tensor<int64>
                 t.FillIncrementing (0L, 1L))
+        }
 
     interface IOpFormat with
         member this.Text =
@@ -147,18 +149,18 @@ type VarArg = { Var: Var } with
         member this.Var = this.Var
 
     interface ICompilableOp with
-        member this.ChStubs data =
-            Ch.only {
+        member this.Compile data = {
+            // Variable value is read directly from its storage, thus 
+            // no actions need to be performed.
+            ChStubs = Ch.only {
                 Shape = Shape.eval this.Var.Shape
                 TypeName = this.Var.TypeName
                 Dev = this.Var.Dev
                 OffsetStride = data.Env.VarOffsetStrides |> Map.tryFind this.Var.Name 
                 Storage = StorageStub.VarStorage this.Var.Name
             }
-        member this.Actions data =
-            // Variable value is read directly from its storage, thus 
-            // no actions need to be performed.
-            []
+            Actions = []
+        }   
 
     interface IOpFormat with
         member this.Text =
@@ -184,18 +186,18 @@ type DataArg = { Data: OrdRef<ITensor> } with
             this.Data.Value |> Ch.only       
 
     interface ICompilableOp with
-        member this.ChStubs data =
-            Ch.only {
+        member this.Compile data = {
+            // Data value is read directly from its storage, thus 
+            // no actions need to be performed.
+            ChStubs = Ch.only {
                 Shape = this.Data.Value.Shape
                 TypeName = TypeName.ofTypeInst this.Data.Value.DataType
                 Dev = this.Data.Value.Dev
                 OffsetStride = Some (this.Data.Value.Layout.Offset, this.Data.Value.Layout.Stride) 
                 Storage = StorageStub.Fixed this.Data.Value.Storage
             }
-        member this.Actions data =
-            // Data value is read directly from its storage, thus 
-            // no actions need to be performed.
-            []
+            Actions = []
+        }   
 
     interface IOpFormat with
         member this.Text = 

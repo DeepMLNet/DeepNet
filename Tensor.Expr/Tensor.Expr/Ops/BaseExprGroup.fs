@@ -106,9 +106,7 @@ type BaseExprGroup (exprs: BaseExpr list) =
     /// Walks over an expression tree in such a way that all arguments of an
     /// expression are processed first before that expression itself is evaluated.
     /// I.e. the expression tree is processed from leafs to roots.
-    member group.Iter (fn: BaseExpr -> unit,
-                       ?allDepsOfExprChEvaled: BaseExprCh -> unit,
-                       ?allDepsOfExprEvaled: BaseExpr -> unit)  =
+    member group.Iter (fn: BaseExpr -> unit, ?allDepsOfExprChEvaled: BaseExprCh -> unit, ?allDepsOfExprEvaled: BaseExpr -> unit)  =
 
         let allDepsOfExprChEvaled = defaultArg allDepsOfExprChEvaled (fun _ -> ())
         let allDepsOfExprEvaled = defaultArg allDepsOfExprEvaled (fun _ -> ())
