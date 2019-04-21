@@ -19,6 +19,13 @@ type Add = { X: BaseExprCh; Y: BaseExprCh } with
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.binaryX argVals).Add (ArgValue.binaryY argVals) |> Ch.only
 
+    interface ICompilableOp with
+        member this.Compile data = {
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.All)
+            Actions = CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillAdd (ArgValue.binaryX argVals) (ArgValue.binaryY argVals))
+        }
+
 
 /// Subtraction.
 type Subtract = { X: BaseExprCh; Y: BaseExprCh } with
@@ -33,6 +40,13 @@ type Subtract = { X: BaseExprCh; Y: BaseExprCh } with
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.binaryX argVals).Subtract (ArgValue.binaryY argVals) |> Ch.only
+
+    interface ICompilableOp with
+        member this.Compile data = {
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.All)
+            Actions = CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillSubtract (ArgValue.binaryX argVals) (ArgValue.binaryY argVals))
+        }
 
 
 /// Multiplication.
@@ -49,6 +63,13 @@ type Multiply = { X: BaseExprCh; Y: BaseExprCh } with
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.binaryX argVals).Multiply (ArgValue.binaryY argVals) |> Ch.only
 
+    interface ICompilableOp with
+        member this.Compile data = {
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.All)
+            Actions = CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillMultiply (ArgValue.binaryX argVals) (ArgValue.binaryY argVals))
+        }
+
 
 /// Division.
 type Divide = { X: BaseExprCh; Y: BaseExprCh } with
@@ -63,6 +84,13 @@ type Divide = { X: BaseExprCh; Y: BaseExprCh } with
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.binaryX argVals).Divide (ArgValue.binaryY argVals) |> Ch.only      
+
+    interface ICompilableOp with
+        member this.Compile data = {
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.All)
+            Actions = CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillDivide (ArgValue.binaryX argVals) (ArgValue.binaryY argVals))
+        }
 
 
 /// Exponentiation.
@@ -79,6 +107,13 @@ type Pow = { X: BaseExprCh; Y: BaseExprCh } with
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.binaryX argVals).Pow (ArgValue.binaryY argVals) |> Ch.only
 
+    interface ICompilableOp with
+        member this.Compile data = {
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.All)
+            Actions = CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillPow (ArgValue.binaryX argVals) (ArgValue.binaryY argVals))
+        }
+
 
 /// Modulo.
 type Modulo = { X: BaseExprCh; Y: BaseExprCh } with
@@ -93,6 +128,13 @@ type Modulo = { X: BaseExprCh; Y: BaseExprCh } with
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.binaryX argVals).Modulo (ArgValue.binaryY argVals) |> Ch.only       
+
+    interface ICompilableOp with
+        member this.Compile data = {
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.All)
+            Actions = CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillModulo (ArgValue.binaryX argVals) (ArgValue.binaryY argVals))
+        }
 
 
 /// Elementwise maximum.
@@ -109,6 +151,13 @@ type MaxElemwise = { X: BaseExprCh; Y: BaseExprCh } with
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.binaryX argVals).MaxElemwise (ArgValue.binaryY argVals) |> Ch.only
 
+    interface ICompilableOp with
+        member this.Compile data = {
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.All)
+            Actions = CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillMaxElemwise (ArgValue.binaryX argVals) (ArgValue.binaryY argVals))
+        }
+
 
 /// Elementwise minimum.
 type MinElemwise = { X: BaseExprCh; Y: BaseExprCh } with
@@ -124,9 +173,20 @@ type MinElemwise = { X: BaseExprCh; Y: BaseExprCh } with
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.binaryX argVals).MinElemwise (ArgValue.binaryY argVals) |> Ch.only       
 
+    interface ICompilableOp with
+        member this.Compile data = {
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.All)
+            Actions = CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillMinElemwise (ArgValue.binaryX argVals) (ArgValue.binaryY argVals))
+        }
+
 
 /// Element-wise if-then-else.
 type IfThenElse = {Cond: BaseExprCh; IfTrue: BaseExprCh; IfFalse: BaseExprCh} with
+    static member private argCond = Arg.Custom "Cond"
+    static member private argIfTrue = Arg.Custom "IfTrue"
+    static member private argIfFalse = Arg.Custom "IfFalse"
+
     interface IOp with       
         member this.Check () = 
             Check.sameType [this.IfTrue; this.IfFalse]
@@ -138,18 +198,29 @@ type IfThenElse = {Cond: BaseExprCh; IfTrue: BaseExprCh; IfFalse: BaseExprCh} wi
         member this.Devs = this.Cond.Dev |> Ch.only
         member this.Shapes = this.IfTrue.Shape |> Ch.only
         member this.Args = 
-            Map [Arg.Custom "Cond", this.Cond
-                 Arg.Custom "IfTrue", this.IfTrue
-                 Arg.Custom "IfFalse", this.IfFalse]
+            Map [IfThenElse.argCond, this.Cond
+                 IfThenElse.argIfTrue, this.IfTrue
+                 IfThenElse.argIfFalse, this.IfFalse]
         member this.ReplaceArgs args = 
-            {this with Cond=args.[Arg.Custom "Cond"]
-                       IfTrue=args.[Arg.Custom "IfTrue"]
-                       IfFalse=args.[Arg.Custom "IfFalse"]} :> _
+            {this with Cond=args.[IfThenElse.argCond]
+                       IfTrue=args.[IfThenElse.argIfTrue]
+                       IfFalse=args.[IfThenElse.argIfFalse]} :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = 
-            argVals.[Arg.Custom "IfTrue"].IfThenElse argVals.[Arg.Custom "IfFalse"] argVals.[Arg.Custom "Cond"]
+            argVals.[IfThenElse.argIfTrue].IfThenElse 
+                argVals.[IfThenElse.argIfFalse] argVals.[IfThenElse.argCond]
             |> Ch.only
+
+    interface ICompilableOp with
+        member this.Compile data = {
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.All)
+            Actions = CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillIfThenElse 
+                    argVals.[IfThenElse.argCond] 
+                    argVals.[IfThenElse.argIfTrue] 
+                    argVals.[IfThenElse.argIfFalse])
+        }
 
 
 /// Logical And.
@@ -168,6 +239,15 @@ type And = { X: BaseExprCh; Y: BaseExprCh } with
             (ArgValue.binaryX argVals :?> Tensor<bool>) &&&& (ArgValue.binaryY argVals :?> Tensor<bool>) :> ITensor       
             |> Ch.only
 
+    interface ICompilableOp with
+        member this.Compile data = {
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.All)
+            Actions = CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals :?> Tensor<bool>).FillAnd 
+                    (ArgValue.binaryX argVals :?> Tensor<bool>) 
+                    (ArgValue.binaryY argVals :?> Tensor<bool>))
+        }
+
 
 /// Logical Or.
 type Or = { X: BaseExprCh; Y: BaseExprCh } with
@@ -184,6 +264,15 @@ type Or = { X: BaseExprCh; Y: BaseExprCh } with
         member this.Eval env argVals = 
             (ArgValue.binaryX argVals :?> Tensor<bool>) |||| (ArgValue.binaryY argVals :?> Tensor<bool>) :> ITensor       
             |> Ch.only
+
+    interface ICompilableOp with
+        member this.Compile data = {
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.All)
+            Actions = CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals :?> Tensor<bool>).FillOr
+                    (ArgValue.binaryX argVals :?> Tensor<bool>) 
+                    (ArgValue.binaryY argVals :?> Tensor<bool>))
+        }
 
 
 /// Logical Xor.
@@ -202,6 +291,15 @@ type Xor = { X: BaseExprCh; Y: BaseExprCh } with
             (ArgValue.binaryX argVals :?> Tensor<bool>) ^^^^ (ArgValue.binaryY argVals :?> Tensor<bool>) :> ITensor       
              |> Ch.only
 
+    interface ICompilableOp with
+        member this.Compile data = {
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.All)
+            Actions = CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals :?> Tensor<bool>).FillXor
+                    (ArgValue.binaryX argVals :?> Tensor<bool>) 
+                    (ArgValue.binaryY argVals :?> Tensor<bool>))
+        }
+
 
 /// Equal.
 type Equal = { X: BaseExprCh; Y: BaseExprCh } with
@@ -216,6 +314,13 @@ type Equal = { X: BaseExprCh; Y: BaseExprCh } with
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.binaryX argVals).Equal (ArgValue.binaryY argVals) |> Ch.only       
+
+    interface ICompilableOp with
+        member this.Compile data = {
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.None)
+            Actions = CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillEqual (ArgValue.binaryX argVals) (ArgValue.binaryY argVals))
+        }
 
 
 /// Not equal.
@@ -232,6 +337,13 @@ type NotEqual = { X: BaseExprCh; Y: BaseExprCh } with
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.binaryX argVals).NotEqual (ArgValue.binaryY argVals) |> Ch.only       
 
+    interface ICompilableOp with
+        member this.Compile data = {
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.None)
+            Actions = CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillNotEqual (ArgValue.binaryX argVals) (ArgValue.binaryY argVals))
+        }
+
 
 /// Less than.
 type Less = { X: BaseExprCh; Y: BaseExprCh } with
@@ -246,6 +358,13 @@ type Less = { X: BaseExprCh; Y: BaseExprCh } with
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.binaryX argVals).Less (ArgValue.binaryY argVals) |> Ch.only       
+
+    interface ICompilableOp with
+        member this.Compile data = {
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.None)
+            Actions = CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillLess (ArgValue.binaryX argVals) (ArgValue.binaryY argVals))
+        }
 
 
 /// Less then or equal.
@@ -262,6 +381,13 @@ type LessOrEqual = { X: BaseExprCh; Y: BaseExprCh } with
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.binaryX argVals).LessOrEqual (ArgValue.binaryY argVals) |> Ch.only       
 
+    interface ICompilableOp with
+        member this.Compile data = {
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.None)
+            Actions = CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillLessOrEqual (ArgValue.binaryX argVals) (ArgValue.binaryY argVals))
+        }
+
 
 /// Greater than.
 type Greater = { X: BaseExprCh; Y: BaseExprCh } with
@@ -277,6 +403,13 @@ type Greater = { X: BaseExprCh; Y: BaseExprCh } with
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.binaryX argVals).Greater (ArgValue.binaryY argVals) |> Ch.only       
 
+    interface ICompilableOp with
+        member this.Compile data = {
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.None)
+            Actions = CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillGreater (ArgValue.binaryX argVals) (ArgValue.binaryY argVals))
+        }
+
 
 /// Greater than or equal.
 type GreaterOrEqual = { X: BaseExprCh; Y: BaseExprCh } with
@@ -291,6 +424,13 @@ type GreaterOrEqual = { X: BaseExprCh; Y: BaseExprCh } with
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.binaryX argVals).GreaterOrEqual (ArgValue.binaryY argVals) |> Ch.only
+
+    interface ICompilableOp with
+        member this.Compile data = {
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.None)
+            Actions = CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillGreaterOrEqual (ArgValue.binaryX argVals) (ArgValue.binaryY argVals))
+        }
 
 
 /// Dot product.
@@ -323,7 +463,14 @@ type Dot = { X: BaseExprCh; Y: BaseExprCh } with
         member this.ReplaceArgs args = { this with X = Args.binaryX args; Y = Args.binaryY args } :> _
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
-        member this.Eval env argVals = (ArgValue.binaryX argVals).Dot (ArgValue.binaryY argVals) |> Ch.only     
+        member this.Eval env argVals = (ArgValue.binaryX argVals).Dot (ArgValue.binaryY argVals) |> Ch.only    
+        
+    interface ICompilableOp with
+        member this.Compile data = {
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.None)
+            Actions = CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillDot (ArgValue.binaryX argVals) (ArgValue.binaryY argVals))
+        }
 
 
 /// Tensor product.
@@ -345,6 +492,13 @@ type TensorProduct = { X: BaseExprCh; Y: BaseExprCh } with
         member this.SubstSymSizes env = this :> _
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.binaryX argVals).TensorProduct (ArgValue.binaryY argVals) |> Ch.only      
+
+    interface ICompilableOp with
+        member this.Compile data = {
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.None)
+            Actions = CompileTools.simpleAction (fun chVals argVals ->
+                (ChValue.onlyX chVals).FillTensorProduct (ArgValue.binaryX argVals) (ArgValue.binaryY argVals))
+        }
 
 
 /// Replace a slice of a tensor with another tensor.
@@ -373,29 +527,50 @@ type SetSubtensor = {X: BaseExprCh; Y: BaseExprCh; Range: SimpleRanges} with
         member this.SubstSymSizes env = {this with Range = SimpleRanges.subst env this.Range} :> _
         member this.CanEvalAllSymSizes = SimpleRanges.canEvalSymbols this.Range
         member this.Eval env argVals = 
-            // TODO: dynamic range is always copied to host
-            let dynVals = 
-                argVals 
-                |> Map.filter (fun arg _ -> 
-                    match arg with
-                    | Arg.N _ -> true
-                    | _ -> false)
-                |> Map.map (fun _ v -> Tensor.value (v :?> Tensor<int64>) |> Size.fix)
-            let range = 
-                this.Range 
-                |> SimpleRangesArgs.resolveDynElems dynVals 
-                |> SimpleRanges.eval
+            let range = Subtensor.evalRange this.Range argVals
             let trgt = ArgValue.binaryX argVals |> ITensor.copy
             trgt.[range] <- ArgValue.binaryY argVals
             trgt |> Ch.only
 
-    interface ITensorStubWishPropagatingOp with
-        member this.PropagateWishes chWishes =
-            // Wish for base tensor to be evaluated into channel wish.
-            match chWishes |> Map.tryFind Ch.Default with
-            | Some chWish -> Map [Arg.X, chWish]
-            | None -> Map.empty
+    // No wishing or wish propagation of argument stubs is possible at the moment,
+    // since our argument may be shared and we thus cannot overwrite parts of
+    // its contents.
 
+    interface ICompilableOp with
+        member this.Compile data = 
+            // Try to use first argument in-place and overwrite the part of
+            // the tensor we have to set.
+            let chStubs = CompileTools.chStubs (data, tryInplace=TryInplace.Limited (Set [Arg.X]))
+
+            let copyActions = 
+                if data.ArgStubs.[Arg.X] = data.ChStubs.[Ch.Default] then
+                    // We are operation in-place the first argument.
+                    // Thus it does not need to be copied.
+                    []
+                else 
+                    // We are not operating in-place first argument.
+                    // Thus we need to copy it into result tensor.
+                    CompileTools.simpleAction (fun chVals argVals ->
+                        (ChValue.onlyX chVals).CopyFrom (ArgValue.binaryX argVals))
+
+            let setActions = 
+                if SimpleRanges.isDynamic this.Range then
+                    CompileTools.simpleAction (fun chVals argVals ->
+                        let range = Subtensor.evalRange this.Range argVals
+                        (ChValue.onlyX chVals).[range] <- ArgValue.binaryY argVals)
+                else
+                    let range = SimpleRanges.eval this.Range 
+                    // TODO: The range tensor stub could be pre-computed at compile-time,
+                    //       but at the moment there is no method to lookup a tensor
+                    //       corresponding to a stub at execution time.
+                    CompileTools.simpleAction (fun chVals argVals ->
+                        (ChValue.onlyX chVals).[range] <- ArgValue.binaryY argVals)                   
+        
+            {
+                ChStubs = chStubs
+                Actions = copyActions @ setActions
+            }
+       
     interface IOpFormat with
         member this.Text =
             sprintf "SetSubtensor%A" this.Range

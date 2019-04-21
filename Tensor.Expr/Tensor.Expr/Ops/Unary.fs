@@ -22,7 +22,7 @@ type UnaryPlus = { X: BaseExprCh } with
 
     interface ICompilableOp with
         member this.Compile data = {
-            ChStubs = CompileTools.chStubs (data, tryInplace=true)
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.All)
             Actions = CompileTools.simpleAction (fun chVals argVals ->
                 (ChValue.onlyX chVals).FillUnaryPlus (ArgValue.unaryX argVals))
         }
@@ -44,7 +44,7 @@ type Negate = { X: BaseExprCh } with
 
     interface ICompilableOp with
         member this.Compile data = {
-            ChStubs = CompileTools.chStubs (data, tryInplace=true)
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.All)
             Actions = CompileTools.simpleAction (fun chVals argVals ->
                 (ChValue.onlyX chVals).FillUnaryMinus (ArgValue.unaryX argVals))
         }
@@ -66,7 +66,7 @@ type Abs = { X: BaseExprCh } with
         
     interface ICompilableOp with
         member this.Compile data = {
-            ChStubs = CompileTools.chStubs (data, tryInplace=true)
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.All)
             Actions = CompileTools.simpleAction (fun chVals argVals ->
                 (ChValue.onlyX chVals).FillAbs (ArgValue.unaryX argVals))
         }
@@ -88,7 +88,7 @@ type SignT = { X: BaseExprCh } with
 
     interface ICompilableOp with
         member this.Compile data = {
-            ChStubs = CompileTools.chStubs (data, tryInplace=true)
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.All)
             Actions = CompileTools.simpleAction (fun chVals argVals ->
                 (ChValue.onlyX chVals).FillSgn (ArgValue.unaryX argVals))
         }
@@ -110,7 +110,7 @@ type Log = { X: BaseExprCh } with
 
     interface ICompilableOp with
         member this.Compile data = {
-            ChStubs = CompileTools.chStubs (data, tryInplace=true)
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.All)
             Actions = CompileTools.simpleAction (fun chVals argVals ->
                 (ChValue.onlyX chVals).FillLog (ArgValue.unaryX argVals))
         }
@@ -132,7 +132,7 @@ type Log10 = { X: BaseExprCh } with
 
     interface ICompilableOp with
         member this.Compile data = {
-            ChStubs = CompileTools.chStubs (data, tryInplace=true)
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.All)
             Actions = CompileTools.simpleAction (fun chVals argVals ->
                 (ChValue.onlyX chVals).FillLog10 (ArgValue.unaryX argVals))
         }
@@ -154,7 +154,7 @@ type Exp = { X: BaseExprCh } with
 
     interface ICompilableOp with
         member this.Compile data = {
-            ChStubs = CompileTools.chStubs (data, tryInplace=true)
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.All)
             Actions = CompileTools.simpleAction (fun chVals argVals ->
                 (ChValue.onlyX chVals).FillExp (ArgValue.unaryX argVals))
         }
@@ -176,7 +176,7 @@ type Sin = { X: BaseExprCh } with
 
     interface ICompilableOp with
         member this.Compile data = {
-            ChStubs = CompileTools.chStubs (data, tryInplace=true)
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.All)
             Actions = CompileTools.simpleAction (fun chVals argVals ->
                 (ChValue.onlyX chVals).FillSin (ArgValue.unaryX argVals))
         }
@@ -198,7 +198,7 @@ type Cos = { X: BaseExprCh } with
 
     interface ICompilableOp with
         member this.Compile data = {
-            ChStubs = CompileTools.chStubs (data, tryInplace=true)
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.All)
             Actions = CompileTools.simpleAction (fun chVals argVals ->
                 (ChValue.onlyX chVals).FillCos (ArgValue.unaryX argVals))
         }
@@ -220,7 +220,7 @@ type Tan = { X: BaseExprCh } with
 
     interface ICompilableOp with
         member this.Compile data = {
-            ChStubs = CompileTools.chStubs (data, tryInplace=true)
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.All)
             Actions = CompileTools.simpleAction (fun chVals argVals ->
                 (ChValue.onlyX chVals).FillTan (ArgValue.unaryX argVals))
         }
@@ -242,7 +242,7 @@ type Asin = { X: BaseExprCh } with
 
     interface ICompilableOp with
         member this.Compile data = {
-            ChStubs = CompileTools.chStubs (data, tryInplace=true)
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.All)
             Actions = CompileTools.simpleAction (fun chVals argVals ->
                 (ChValue.onlyX chVals).FillAsin (ArgValue.unaryX argVals))
         }
@@ -264,7 +264,7 @@ type Acos = { X: BaseExprCh } with
         
     interface ICompilableOp with
         member this.Compile data = {
-            ChStubs = CompileTools.chStubs (data, tryInplace=true)
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.All)
             Actions = CompileTools.simpleAction (fun chVals argVals ->
                 (ChValue.onlyX chVals).FillAcos (ArgValue.unaryX argVals))
         }
@@ -286,7 +286,7 @@ type Atan = { X: BaseExprCh } with
 
     interface ICompilableOp with
         member this.Compile data = {
-            ChStubs = CompileTools.chStubs (data, tryInplace=true)
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.All)
             Actions = CompileTools.simpleAction (fun chVals argVals ->
                 (ChValue.onlyX chVals).FillAtan (ArgValue.unaryX argVals))
         }
@@ -308,7 +308,7 @@ type Sinh = { X: BaseExprCh } with
 
     interface ICompilableOp with
         member this.Compile data = {
-            ChStubs = CompileTools.chStubs (data, tryInplace=true)
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.All)
             Actions = CompileTools.simpleAction (fun chVals argVals ->
                 (ChValue.onlyX chVals).FillSinh (ArgValue.unaryX argVals))
         }
@@ -330,7 +330,7 @@ type Cosh = { X: BaseExprCh } with
         
     interface ICompilableOp with
         member this.Compile data = {
-            ChStubs = CompileTools.chStubs (data, tryInplace=true)
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.All)
             Actions = CompileTools.simpleAction (fun chVals argVals ->
                 (ChValue.onlyX chVals).FillCosh (ArgValue.unaryX argVals))
         }
@@ -352,7 +352,7 @@ type Tanh = { X: BaseExprCh } with
         
     interface ICompilableOp with
         member this.Compile data = {
-            ChStubs = CompileTools.chStubs (data, tryInplace=true)
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.All)
             Actions = CompileTools.simpleAction (fun chVals argVals ->
                 (ChValue.onlyX chVals).FillTanh (ArgValue.unaryX argVals))
         }
@@ -374,7 +374,7 @@ type Sqrt = { X: BaseExprCh } with
         
     interface ICompilableOp with
         member this.Compile data = {
-            ChStubs = CompileTools.chStubs (data, tryInplace=true)
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.All)
             Actions = CompileTools.simpleAction (fun chVals argVals ->
                 (ChValue.onlyX chVals).FillSqrt (ArgValue.unaryX argVals))
         }
@@ -396,7 +396,7 @@ type Ceiling = { X: BaseExprCh } with
         
     interface ICompilableOp with
         member this.Compile data = {
-            ChStubs = CompileTools.chStubs (data, tryInplace=true)
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.All)
             Actions = CompileTools.simpleAction (fun chVals argVals ->
                 (ChValue.onlyX chVals).FillCeiling (ArgValue.unaryX argVals))
         }
@@ -418,7 +418,7 @@ type Floor = { X: BaseExprCh } with
 
     interface ICompilableOp with
         member this.Compile data = {
-            ChStubs = CompileTools.chStubs (data, tryInplace=true)
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.All)
             Actions = CompileTools.simpleAction (fun chVals argVals ->
                 (ChValue.onlyX chVals).FillFloor (ArgValue.unaryX argVals))
         }
@@ -440,7 +440,7 @@ type Round = { X: BaseExprCh } with
 
     interface ICompilableOp with
         member this.Compile data = {
-            ChStubs = CompileTools.chStubs (data, tryInplace=true)
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.All)
             Actions = CompileTools.simpleAction (fun chVals argVals ->
                 (ChValue.onlyX chVals).FillRound (ArgValue.unaryX argVals))
         }
@@ -462,7 +462,7 @@ type Truncate = { X: BaseExprCh } with
 
     interface ICompilableOp with
         member this.Compile data = {
-            ChStubs = CompileTools.chStubs (data, tryInplace=true)
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.All)
             Actions = CompileTools.simpleAction (fun chVals argVals ->
                 (ChValue.onlyX chVals).FillTruncate (ArgValue.unaryX argVals))
         }
@@ -488,7 +488,7 @@ type Invert = { X: BaseExprCh } with
 
     interface ICompilableOp with
         member this.Compile data = {
-            ChStubs = CompileTools.chStubs (data, tryInplace=true)
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.All)
             Actions = CompileTools.simpleAction (fun chVals argVals ->
                 // TODO: So far temporary storage is allocated at runtime.
                 //       This should be changed to also perform preallocations.
@@ -512,7 +512,7 @@ type Not = { X: BaseExprCh } with
 
     interface ICompilableOp with
         member this.Compile data = {
-            ChStubs = CompileTools.chStubs (data, tryInplace=true)
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.All)
             Actions = CompileTools.simpleAction (fun chVals argVals ->
                 (ChValue.onlyX chVals :?> Tensor<bool>).FillNegate (ArgValue.unaryX argVals :?> Tensor<bool>))
         }
@@ -539,47 +539,67 @@ type Reshape = { X: BaseExprCh; Shape: Shape } with
             (ArgValue.unaryX argVals) |> ITensor.reshape (Shape.eval this.Shape) |> Ch.only
 
     interface ITensorStubWishPropagatingOp with
-        member this.PropagateWishes chWishes =
-            chWishes |> CompileTools.propUnaryWish (fun wish ->
+        member this.PropagateWishes data =
+            CompileTools.propUnaryWish data (fun wish ->
                 wish |> TensorStub.tryReshape (Shape.eval this.Shape))
 
     interface ICompilableOp with
         member this.Compile data =
             let shape = Shape.eval this.Shape
             let argStub = ArgValue.unaryX data.ArgStubs 
-            if argStub.HasLayout then
-                // Layout is known, check if in-place reshape is possible.
-                match argStub |> TensorStub.tryReshape shape with
-                | Some chStub -> 
-                    // Perform in-place reshape, return reshaped tensor.
-                    {
-                        ChStubs = Ch.only chStub
-                        Actions = []
-                    }
-                | None -> 
-                    // in-place reshape is impossible, allocate channel stub for copy
-                    {
-                        ChStubs = CompileTools.chStubs data
-                        Actions = CompileTools.simpleAction (fun chVals argVals ->
-                            (ChValue.onlyX chVals).CopyFrom (ArgValue.unaryX argVals))
-                    }
-            else
-                // Layout is unknown, decide during execution.
+            
+            // Check if we made a wish for the argument stub.
+            match data.ArgStubWishes |> Map.tryFind Arg.Only with
+            | Some argStubWish when argStubWish = argStub ->
+                // We propagated a tensor stub as a wish to our argument and it was accepted.
+                // Thus our channel stub is already assigned and no actions need to be performed.
                 {
-                    ChStubs = Ch.only {
-                        Shape = shape
-                        TypeName = argStub.TypeName
-                        Dev = argStub.Dev
-                        OffsetStride = None
-                        Storage = StorageStub.Dynamic
-                    }
-                    Actions = [{ new IAction with
-                        member __.Execute execData =                            
-                            let argVal = ArgValue.unaryX execData.ArgValues
-                            let chVal = argVal |> ITensor.reshape shape
-                            Ch.only chVal                    
-                    }]
-                }          
+                    ChStubs = data.ChStubs
+                    Actions = []
+                }
+            | Some argStubWish ->
+                // We propagated a tensor stub as a wish to our argument, but it was not accepeted.
+                // Thus we need to copy the arguments output to our assigned channel stub.
+                {
+                    ChStubs = data.ChStubs
+                    Actions = CompileTools.simpleAction (fun chVals argVals ->
+                        (ChValue.onlyX chVals).CopyFrom (ArgValue.unaryX argVals))
+                }
+            | None ->
+                // No wish was propagated, we have to compute a channel stub.
+                if argStub.HasLayout then
+                    // Layout is known, check if in-place reshape is possible.
+                    match argStub |> TensorStub.tryReshape shape with
+                    | Some chStub -> 
+                        // Perform in-place reshape, return reshaped tensor.
+                        {
+                            ChStubs = Ch.only chStub
+                            Actions = []
+                        }
+                    | None -> 
+                        // in-place reshape is impossible, allocate channel stub for copy
+                        {
+                            ChStubs = CompileTools.chStubs data
+                            Actions = CompileTools.simpleAction (fun chVals argVals ->
+                                (ChValue.onlyX chVals).CopyFrom (ArgValue.unaryX argVals))
+                        }
+                else
+                    // Layout is unknown, decide during execution.
+                    {
+                        ChStubs = Ch.only {
+                            Shape = shape
+                            TypeName = argStub.TypeName
+                            Dev = argStub.Dev
+                            OffsetStride = None
+                            Storage = StorageStub.Dynamic
+                        }
+                        Actions = [{ new IAction with
+                            member __.Execute execData =                            
+                                let argVal = ArgValue.unaryX execData.ArgValues
+                                let chVal = argVal |> ITensor.reshape shape
+                                Ch.only chVal                    
+                        }]
+                    }          
 
     interface IOpFormat with
         member this.Text =
@@ -645,8 +665,8 @@ type PermuteAxes = {X: BaseExprCh; Permutation: int list} with
         member this.Eval env argVals = (ArgValue.unaryX argVals) |> ITensor.permuteAxes this.Permutation |> Ch.only
 
     interface ITensorStubWishPropagatingOp with
-        member this.PropagateWishes chWishes =
-            chWishes |> CompileTools.propUnaryWish (fun wish ->
+        member this.PropagateWishes data =
+            CompileTools.propUnaryWish data (fun wish ->
                 wish |> TensorStub.tryPermuteAxes (Permutation.invert this.Permutation))
 
     interface ICompilableOp with
@@ -663,7 +683,7 @@ type PermuteAxes = {X: BaseExprCh; Permutation: int list} with
 /// Read a slice from a tensor.
 type Subtensor = {X: BaseExprCh; Range: SimpleRanges} with
     
-    member this.EvalRange (argVals: Map<Arg, ITensor>) =
+    static member internal evalRange (range: SimpleRanges) (argVals: Map<Arg, ITensor>) =
         let dynVals = 
             argVals 
             |> Map.filter (fun arg _ -> 
@@ -671,7 +691,7 @@ type Subtensor = {X: BaseExprCh; Range: SimpleRanges} with
                 | Arg.N _ -> true
                 | _ -> false)
             |> Map.map (fun _ v -> Tensor.value (v :?> Tensor<int64>) |> Size.fix)         
-        this.Range 
+        range 
         |> SimpleRangesArgs.resolveDynElems dynVals 
         |> SimpleRanges.eval   
 
@@ -701,7 +721,7 @@ type Subtensor = {X: BaseExprCh; Range: SimpleRanges} with
         member this.SubstSymSizes env = {this with Range = SimpleRanges.subst env this.Range} :> _
         member this.CanEvalAllSymSizes = SimpleRanges.canEvalSymbols this.Range
         member this.Eval env argVals = 
-            let range = this.EvalRange argVals
+            let range = Subtensor.evalRange this.Range argVals
             (ArgValue.unaryX argVals).[range] |> Ch.only
 
     interface ICompilableOp with
@@ -723,7 +743,7 @@ type Subtensor = {X: BaseExprCh; Range: SimpleRanges} with
                     ChStubs = dynamicChStub
                     Actions = [{ new IAction with
                         member __.Execute execData =
-                            let range = this.EvalRange execData.ArgValues
+                            let range = Subtensor.evalRange this.Range execData.ArgValues
                             (ArgValue.unaryX execData.ArgValues).[range] |> Ch.only
                     }]
                 }
@@ -769,8 +789,8 @@ type ReverseAxis = {X: BaseExprCh; Axis: int} with
         member this.Eval env argVals = (ArgValue.unaryX argVals) |> ITensor.reverseAxis this.Axis |> Ch.only
 
     interface ITensorStubWishPropagatingOp with
-        member this.PropagateWishes chWishes =
-            chWishes |> CompileTools.propUnaryWish (fun wish ->
+        member this.PropagateWishes data =
+            CompileTools.propUnaryWish data (fun wish ->
                 wish |> TensorStub.tryReverseAxis this.Axis)
 
     interface ICompilableOp with
@@ -842,7 +862,7 @@ type DiagMat = {X: BaseExprCh; Axis1: int; Axis2: int} with
 
     interface ICompilableOp with
         member this.Compile data = {
-            ChStubs = CompileTools.chStubs (data, tryInplace=false)
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.None)
             Actions = CompileTools.simpleAction (fun chVals argVals ->
                 let res = ChValue.onlyX chVals
                 res.FillZero ()
@@ -871,7 +891,7 @@ type SumAxis = {X: BaseExprCh; Axis: int} with
 
     interface ICompilableOp with
         member this.Compile data = {
-            ChStubs = CompileTools.chStubs (data, tryInplace=false)
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.None)
             Actions = CompileTools.simpleAction (fun chVals argVals ->
                 (ChValue.onlyX chVals).FillSumAxis this.Axis (ArgValue.unaryX argVals))
         }
@@ -893,7 +913,7 @@ type ProductAxis = {X: BaseExprCh; Axis: int} with
 
     interface ICompilableOp with
         member this.Compile data = {
-            ChStubs = CompileTools.chStubs (data, tryInplace=false)
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.None)
             Actions = CompileTools.simpleAction (fun chVals argVals ->
                 (ChValue.onlyX chVals).FillProductAxis this.Axis (ArgValue.unaryX argVals))
         }
@@ -915,7 +935,7 @@ type MaxAxis = {X: BaseExprCh; Axis: int} with
 
     interface ICompilableOp with
         member this.Compile data = {
-            ChStubs = CompileTools.chStubs (data, tryInplace=false)
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.None)
             Actions = CompileTools.simpleAction (fun chVals argVals ->
                 (ChValue.onlyX chVals).FillMaxAxis this.Axis (ArgValue.unaryX argVals))
         }
@@ -937,7 +957,7 @@ type MinAxis = {X: BaseExprCh; Axis: int} with
 
     interface ICompilableOp with
         member this.Compile data = {
-            ChStubs = CompileTools.chStubs (data, tryInplace=false)
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.None)
             Actions = CompileTools.simpleAction (fun chVals argVals ->
                 (ChValue.onlyX chVals).FillMinAxis this.Axis (ArgValue.unaryX argVals))
         }
@@ -959,7 +979,7 @@ type ArgMaxAxis = {X: BaseExprCh; Axis: int} with
 
     interface ICompilableOp with
         member this.Compile data = {
-            ChStubs = CompileTools.chStubs (data, tryInplace=false)
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.None)
             Actions = CompileTools.simpleAction (fun chVals argVals ->
                 (ChValue.onlyX chVals).FillArgMaxAxis this.Axis (ArgValue.unaryX argVals))
         }
@@ -981,7 +1001,7 @@ type ArgMinAxis = {X: BaseExprCh; Axis: int} with
 
     interface ICompilableOp with
         member this.Compile data = {
-            ChStubs = CompileTools.chStubs (data, tryInplace=false)
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.None)
             Actions = CompileTools.simpleAction (fun chVals argVals ->
                 (ChValue.onlyX chVals).FillArgMinAxis this.Axis (ArgValue.unaryX argVals))
         }
@@ -1030,7 +1050,7 @@ type Gather = {X: BaseExprCh; Indices: BaseExprCh option list} with
 
     interface ICompilableOp with
         member this.Compile data = {
-            ChStubs = CompileTools.chStubs (data, tryInplace=false)
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.None)
             Actions = CompileTools.simpleAction (fun chVals argVals ->
                 let vIndices = argVals |> ArgValue.naryOptXs this.Indices.Length
                 (ChValue.onlyX chVals).FillGather vIndices (ArgValue.unaryX argVals))
@@ -1073,7 +1093,7 @@ type Scatter = {X: BaseExprCh; Indices: BaseExprCh option list; Shape: Shape} wi
 
     interface ICompilableOp with
         member this.Compile data = {
-            ChStubs = CompileTools.chStubs (data, tryInplace=false)
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.None)
             Actions = CompileTools.simpleAction (fun chVals argVals ->
                 let vIndices = argVals |> ArgValue.naryOptXs this.Indices.Length
                 (ChValue.onlyX chVals).FillScatter vIndices (ArgValue.unaryX argVals))
@@ -1263,7 +1283,7 @@ type Convert = {ToType: TypeName; X: BaseExprCh} with
 
     interface ICompilableOp with
         member this.Compile data = {
-            ChStubs = CompileTools.chStubs (data, tryInplace=false)
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.None)
             Actions = CompileTools.simpleAction (fun chVals argVals ->
                 (ChValue.onlyX chVals).FillConvert (ArgValue.unaryX argVals))
         }
@@ -1287,7 +1307,7 @@ type Transfer = {ToDev: ITensorDevice; X: BaseExprCh} with
 
     interface ICompilableOp with
         member this.Compile data = {
-            ChStubs = CompileTools.chStubs (data, tryInplace=false)
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.None)
             Actions = CompileTools.simpleAction (fun chVals argVals ->
                 // TODO: Do we need to take care about cross-device synchronization here? 
                 (ChValue.onlyX chVals).TransferFrom (ArgValue.unaryX argVals))

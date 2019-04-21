@@ -43,16 +43,45 @@ type ActionGroup = {
 type CompileData = {
     Alloc:              AllocReq -> AllocStub
     Env:                CompileEnv
+    Expr:               BaseExpr
     ArgStubs:           Map<Arg, TensorStub> 
     OverwritableArgs:   Set<Arg>
     ChStubWishes:       Map<Ch, TensorStub>
-    Expr:               BaseExpr
+    ChStubs:            Map<Ch, TensorStub>
+    ArgStubWishes:      Map<Arg, TensorStub>
 }
 
 
 type CompileOutput = {
     ChStubs:            Map<Ch, TensorStub>
     Actions:            IAction list
+}
+
+type CompileResult = {
+    Allocs:             AllocStub list
+    ChStubs:            Map<BaseExprCh, TensorStub>
+    ActionGroups:       ActionGroup list
+}
+
+
+type UpPropData = {
+    Alloc:              AllocReq -> AllocStub
+    Env:                CompileEnv    
+    Expr:               BaseExpr
+    ChStubWishes:       Map<Ch, TensorStub>
+}
+
+type UpPropOutput = {
+    ChStubs:            Map<Ch, TensorStub>
+    ArgStubWishes:      Map<Arg, TensorStub>
+}
+
+
+type UpPropResult = {
+    Allocs:             AllocStub list
+    ChStubs:            Map<BaseExprCh, TensorStub>
+    ChStubWishes:       Map<BaseExprCh, TensorStub>
+    ArgStubWishes:      Map<BaseExpr, Map<Arg, TensorStub>>
 }
 
 
@@ -64,7 +93,7 @@ type ICompilableOp =
 
 type ITensorStubWishPropagatingOp =
     /// Should compute argument stub wishes given channel stub wishes.
-    abstract PropagateWishes: Map<Ch, TensorStub> -> Map<Arg, TensorStub>
+    abstract PropagateWishes: UpPropData -> UpPropOutput
 
 
 type NonCompilableOpAction (expr: BaseExpr, argStubs: Map<Arg, TensorStub>) =
@@ -77,13 +106,29 @@ module BaseExprCompiler =
 
     /// Propagates tensor stub wishes from the roots of the expression tree towards its nodes.
     /// Only wishes for non-aliased tensor stubs are honored.
-    let propagateStubWishes (env: CompileEnv) (stubWish: Map<BaseExprCh, TensorStub>) (group: BaseExprGroup) =
+    let propagateStubWishes (env: CompileEnv) (chStubWishes: Map<BaseExprCh, TensorStub>) (group: BaseExprGroup) =
+
+        /// All allocation stubs.
+        let allocStubs = ResizeArray<AllocStub> ()
+
+        /// Allocate memory for the specified expression.
+        let alloc expr req =
+            let alloc = {Req = req}
+            allocStubs.Add alloc
+            alloc
+
+        let filterWishes stubWishes =
+            stubWishes
+            |> Map.filter (fun _ ts -> TensorStub.isNotAliased ts)            
 
         /// Tensor stub wishes for an expression channel.
-        let stubWish = 
-            stubWish
-            |> Map.filter (fun _ ts -> TensorStub.isNotAliased ts)
-            |> Dictionary<BaseExprCh, TensorStub> 
+        let chStubWishes = chStubWishes |> filterWishes |> Dictionary<BaseExprCh, TensorStub> 
+
+        /// Tensor stubs for an expression channel.
+        let chStubs = Dictionary<BaseExprCh, TensorStub> ()
+
+        /// Tensor stub wishes made by an expression for its arguments.
+        let allArgWishes = Dictionary<BaseExpr, Map<Arg, TensorStub>> ()
 
         /// Propagates wishes from an expression to its arguments.
         let propagate (expr: BaseExpr) =
@@ -95,31 +140,46 @@ module BaseExprCompiler =
                 let chWishes =
                     expr.Channels
                     |> Seq.choose (fun ch ->
-                        stubWish.TryFind expr.[ch]
+                        chStubWishes.TryFind expr.[ch]
                         |> Option.map (fun wish -> ch, wish))
                     |> Map.ofSeq
 
                 // Let op calculate wishes for its arguments.
-                let argWishes = op.PropagateWishes chWishes
+                let comp = op.PropagateWishes  {
+                    Alloc = alloc expr
+                    Env = env
+                    Expr = expr
+                    ChStubWishes = chWishes
+                }
 
-                // Filter wishes with aliased layouts.
-                let argWishes = argWishes |> Map.filter (fun _ argWish -> TensorStub.isNotAliased argWish)
+                // Store argument stub wishes.
+                allArgWishes.[expr] <- comp.ArgStubWishes
 
-                // Store argument wishes.
-                for KeyValue(arg, argWish) in argWishes do
+                // Store channel stubs.
+                for KeyValue(ch, chStub) in comp.ChStubs do
+                    let exprCh = expr.[ch]
+                    if not (chStub.Dev = exprCh.Dev && 
+                            chStub.TypeName = exprCh.TypeName &&
+                            chStub.Shape = Shape.eval exprCh.Shape) then
+                        failwithf "Tensor stub %A for channel %A is not compatiable with expression %A."
+                            chStub ch exprCh    
+                    chStubs.[exprCh] <- chStub
+
+                // Propagate wishes to argument expressions.
+                for KeyValue(arg, argWish) in filterWishes comp.ArgStubWishes do
                     let argExprCh = expr.Args.[arg]
 
                     // Check wish for plausibility.
                     if not (argWish.Dev = argExprCh.Dev && 
                             argWish.TypeName = argExprCh.TypeName &&
                             argWish.Shape = Shape.eval argExprCh.Shape) then
-                        failwithf "Tensor stub wish %A for argument %A is not compatiable with channel %A."
+                        failwithf "Tensor stub wish %A for argument %A is not compatiable with %A."
                             argWish arg argExprCh
 
                     // The first wish for an expression channel wins and subsequent 
                     // wishes are ignored.
-                    if not (stubWish.ContainsKey argExprCh) then
-                        stubWish.[argExprCh] <- argWish
+                    if not (chStubWishes.ContainsKey argExprCh) then
+                        chStubWishes.[argExprCh] <- argWish
 
             | _ -> 
                 // Op does not support wish propagation. Do nothing.
@@ -128,14 +188,19 @@ module BaseExprCompiler =
         // Walk over expression tree from roots to leafs and propagate wishes.
         group.RevIter propagate
 
-        stubWish |> Map.ofDictionary
+        {
+            Allocs = List.ofSeq allocStubs
+            ChStubs =  Map.ofDictionary chStubs 
+            ChStubWishes =  Map.ofDictionary chStubWishes 
+            ArgStubWishes =  Map.ofDictionary allArgWishes 
+        }
 
 
     /// Assigns a tensor stub to each expression channel in the expression tree.
-    let assignStubs (env: CompileEnv) (stubWish: Map<BaseExprCh, TensorStub>) (group: BaseExprGroup) =
+    let assignStubs (env: CompileEnv) (upProp: UpPropResult) (group: BaseExprGroup) =
 
         /// All allocation stubs.
-        let allocStubs = ResizeArray<AllocStub> ()
+        let allocStubs = ResizeArray<AllocStub> upProp.Allocs
         /// Users of an allocation, either as argument, internally or as channel.
         let allocUsers = Dictionary<AllocStub, Set<BaseExpr>> ()
         /// Expression channels that use an allocation.
@@ -149,6 +214,10 @@ module BaseExprCompiler =
             allocStubs.Add alloc
             alloc
 
+        let addAllocUserCh allocStub exprCh =
+            let users = allocUserChs.GetOrDefault allocStub Set.empty
+            allocUserChs.[allocStub] <- users |> Set.add exprCh 
+
         /// Assigned tensor stub for each expression channel.
         let tensorStubs = Dictionary<BaseExprCh, TensorStub> ()
 
@@ -157,6 +226,13 @@ module BaseExprCompiler =
 
         /// All expressions that an expression depends on transitively.
         let depending = Dictionary<BaseExpr, Set<BaseExpr>> ()
+
+        // Store channel stubs from stub propagation towards leafs. 
+        for KeyValue(exprCh, stub) in upProp.ChStubs do
+            tensorStubs.[exprCh] <- stub
+            match stub.Storage with
+            | StorageStub.Allocated allocStub -> addAllocUserCh allocStub exprCh
+            | _ -> ()
 
         /// Processes an expression.
         let processExpr (expr: BaseExpr) =    
@@ -223,12 +299,31 @@ module BaseExprCompiler =
                 |> Seq.map fst
                 |> Set.ofSeq
                 
+            // Assemble all pre-assigned channels for the expression.
+            let preassignedChStubs =
+                expr.Channels
+                |> Seq.choose (fun ch ->
+                    upProp.ChStubs.TryFind expr.[ch]
+                    |> Option.map (fun wish -> ch, wish))
+                |> Map.ofSeq
+
             // Assemble all channel wishes for the expression.
             let chWishes =
                 expr.Channels
                 |> Seq.choose (fun ch ->
-                    stubWish.TryFind expr.[ch]
+                    upProp.ChStubWishes.TryFind expr.[ch]
                     |> Option.map (fun wish -> ch, wish))
+                |> Map.ofSeq
+
+            // Assemble all argument wishes that the expression has made.
+            let argWishes =
+                expr.Args
+                |> Map.keys
+                |> Seq.choose (fun arg ->
+                    upProp.ArgStubWishes
+                    |> Map.tryFind expr
+                    |> Option.bind (Map.tryFind arg)
+                    |> Option.map (fun wish -> arg, wish))
                 |> Map.ofSeq
 
             // Compute channel stubs given argument stubs.
@@ -236,15 +331,16 @@ module BaseExprCompiler =
                 match expr.Op with
                 | :? ICompilableOp as cop -> 
                     // Let op compute its output stubs given argument stubs.
-                    let data = {
+                    cop.Compile {
                         Alloc = alloc expr
                         Env = env
                         ArgStubs = argStubs
                         OverwritableArgs = overwritableArgs
+                        ChStubs = preassignedChStubs
                         ChStubWishes = chWishes
+                        ArgStubWishes = argWishes
                         Expr = expr
-                    }
-                    cop.Compile data     
+                    } 
                 | _ ->
                     // Op cannot compute stubs, generate dynamic stubs for all
                     // its output channels. 
@@ -262,6 +358,14 @@ module BaseExprCompiler =
                         |> Map.ofSeq
                     let actions = [NonCompilableOpAction (expr, argStubs) :> IAction] 
                     {ChStubs=chStubs; Actions=actions}
+
+            // Check that pre-assigned channel stubs were accepted.
+            for KeyValue(ch, preassignedChStub) in preassignedChStubs do
+                match comp.ChStubs |> Map.tryFind ch with
+                | Some stub when stub = preassignedChStub -> ()
+                | _ ->
+                    failwithf "Expression %A did not accept pre-assigned channel stub %A." 
+                        expr preassignedChStub
 
             // Check channel stubs for plausibility.
             for KeyValue(ch, chStub) in comp.ChStubs do
@@ -301,8 +405,18 @@ module BaseExprCompiler =
         // Process expression tree.
         group.Iter (processExpr, allDepsOfExprEvaled=clearDepending)
 
-        Map.ofDictionary tensorStubs, List.ofSeq actionGroupForExpr.Values
+        {
+            Allocs = List.ofSeq allocStubs
+            ChStubs = Map.ofDictionary tensorStubs
+            ActionGroups = List.ofSeq actionGroupForExpr.Values
+        }
 
+
+[<RequireQualifiedAccess>]
+type TryInplace =
+    | All
+    | Limited of Set<Arg>
+    | None
 
 
 type CompileTools () =
@@ -310,8 +424,8 @@ type CompileTools () =
     /// Allocates tensor stubs for all output channels of the op.
     /// Argument stubs will be reused, if tryInplace is true.
     /// Channel wishes will be honored, if honorWishes is true.
-    static member chStubs (data: CompileData, ?tryInplace: bool, ?honorWishes: bool) =
-        let tryInplace = defaultArg tryInplace false
+    static member chStubs (data: CompileData, ?tryInplace: TryInplace, ?honorWishes: bool) =
+        let tryInplace = defaultArg tryInplace TryInplace.None
         let honorWishes = defaultArg honorWishes true
 
         let op = data.Expr.Op
@@ -322,6 +436,13 @@ type CompileTools () =
         let tryUseArg typeName dev shape =
             overwritableArgs
             |> Set.toSeq
+            |> Seq.filter (fun arg ->
+                // check that argument may be overridden
+                match tryInplace with
+                | TryInplace.All -> true
+                | TryInplace.Limited allowed when allowed.Contains arg -> true
+                | TryInplace.Limited _allowed -> false
+                | TryInplace.None -> false)
             |> Seq.tryFind (fun arg ->
                 // match type, device and shape
                 let argExpr = op.Args.[arg]
@@ -342,11 +463,10 @@ type CompileTools () =
             let stub = 
                 match data.ChStubWishes |> Map.tryFind ch with
                 | Some chStubWish when honorWishes -> chStubWish
-                | _ when tryInplace ->
+                | _ ->
                     match tryUseArg typeName dev shape with
                     | Some inplaceStub -> inplaceStub
                     | None -> TensorStub.alloc (data.Alloc, typeName, shape, dev)
-                | _ -> TensorStub.alloc (data.Alloc, typeName, shape, dev)
             ch, stub)
         |> Map.ofSeq
 
@@ -355,13 +475,23 @@ type CompileTools () =
         Map [Ch.Default, data.ArgStubs.[Arg.Only]]
 
     /// Propagates a tensor stub wish for an unary operation.
-    static member propUnaryWish (fn: TensorStub -> TensorStub option) (chWishes: Map<Ch, TensorStub>) =
-        match chWishes |> Map.tryFind Ch.Default with
-        | Some chWish ->
-            match fn chWish with 
-            | Some argWish -> Map [Arg.Only, argWish]
-            | None -> Map.empty
-        | None -> Map.empty
+    static member propUnaryWish (data: UpPropData) (fn: TensorStub -> TensorStub option)  =
+        let chWishOpt = data.ChStubWishes |> Map.tryFind Ch.Default
+        let argWishOpt = chWishOpt |> Option.bind fn
+        match chWishOpt, argWishOpt with
+        | Some chWish, Some argWish -> 
+            // We had a wish for our channel stub and propagated it to our argument.
+            // Thus we must commit to the wish and assign it to our channel.
+            {
+                ChStubs = Map [Ch.Default, chWish]
+                ArgStubWishes = Map [Arg.Only, argWish]
+            }
+        | _ -> 
+            // We had not wish or did not propagate it.
+            {
+                ChStubs = Map.empty
+                ArgStubWishes = Map.empty
+            }
 
 
     static member simpleAction (actFn: Map<Ch, ITensor> -> Map<Arg, ITensor> -> unit) =
@@ -382,28 +512,48 @@ type CompileTools () =
         let op = data.Expr.Op
         let argStub = ArgValue.unaryX data.ArgStubs 
 
-        match staticFn argStub with
-        | Some chStub -> 
+        match data.ArgStubWishes |> Map.tryFind Arg.Only with
+        | Some argStubWish when argStubWish = argStub ->
+            // We propagated a tensor stub as a wish to our argument and it was accepted.
+            // Thus our channel stub is already assigned and no actions need to be performed.
             {
-                ChStubs = Ch.only chStub
+                ChStubs = data.ChStubs
                 Actions = []
             }
-        | None ->
+        | Some argStubWish ->
+            // We propagated a tensor stub as a wish to our argument, but it was not accepeted.
+            // Thus we need to copy the arguments output to our assigned channel stub.
             {
-                ChStubs = Ch.only {
-                    Shape = Shape.eval op.Shapes.[Ch.Default]
-                    TypeName = op.TypeNames.[Ch.Default]
-                    Dev = op.Devs.[Ch.Default]
-                    OffsetStride = None
-                    Storage = argStub.Storage    
+                ChStubs = data.ChStubs
+                Actions = CompileTools.simpleAction (fun chVals argVals ->
+                    (ChValue.onlyX chVals).CopyFrom (ArgValue.unaryX argVals))
+            }
+        | None ->
+            // No wish was propagated, we have to compute a channel stub.
+            match staticFn argStub with
+            | Some chStub -> 
+                // Channel stub could be calculated at compile-time.
+                {
+                    ChStubs = Ch.only chStub
+                    Actions = []
                 }
-                Actions = [{ new IAction with
-                    member __.Execute execData =                            
-                        ArgValue.unaryX execData.ArgValues
-                        |> dynFn 
-                        |> Ch.only
-                }]     
-            }        
+            | None ->
+                // Channel stub must be calculated at run-time.
+                {
+                    ChStubs = Ch.only {
+                        Shape = Shape.eval op.Shapes.[Ch.Default]
+                        TypeName = op.TypeNames.[Ch.Default]
+                        Dev = op.Devs.[Ch.Default]
+                        OffsetStride = None
+                        Storage = argStub.Storage    
+                    }
+                    Actions = [{ new IAction with
+                        member __.Execute execData =                            
+                            ArgValue.unaryX execData.ArgValues
+                            |> dynFn 
+                            |> Ch.only
+                    }]     
+                }        
 
 
 
