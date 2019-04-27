@@ -44,8 +44,44 @@ type Bundle = {ChExprs: Map<Ch, BaseExprCh>} with
             argVals |> Map.mapKeyValue (fun arg value -> Bundle.argToCh arg, value)
 
     interface IMultiChannelOp
-        
 
+    interface ITensorStubWishPropagatingOp with
+        member this.PropagateWishes data = {           
+            ChStubs = data.ChStubWishes
+            ArgStubWishes =
+                data.ChStubWishes
+                |> Map.mapKeyValue (fun ch wish -> 
+                    Bundle.chToArg ch, wish)
+        }
+                
+    interface ICompilableOp with
+        member this.Compile data =
+            let chStubs, actions =
+                data.ArgStubs
+                |> Map.toSeq
+                |> Seq.map (fun (arg, argStub) ->
+                    let ch = Bundle.argToCh arg
+                    match data.ArgStubWishes |> Map.tryFind arg with
+                    | Some argStubWish when argStubWish = argStub ->
+                        // The stub wish we propagated has been accepted by our argument.
+                        (ch, argStub), []
+                    | Some argStubWish ->
+                        // The stub wish has not been accepeted by our argument.
+                        // We need the copy from the argument to the channel stub wish.
+                        let copyActions = CompileTools.simpleAction (fun chVals argVals ->
+                            chVals.[ch].CopyFrom argVals.[arg]) 
+                        (ch, argStubWish), copyActions
+                    | None ->
+                        // No wish was made.
+                        // We propagate the argument stub.
+                        (ch, argStub), [])
+                |> List.ofSeq
+                |> List.unzip
+            {
+                ChStubs = Map.ofList chStubs
+                Actions = List.concat actions
+            }
+        
 
 /// Discards the results of all arguments.
 type Discard = {Xs: BaseExprCh list} with
