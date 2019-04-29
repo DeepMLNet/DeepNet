@@ -98,6 +98,11 @@ type Discard = {Xs: BaseExprCh list} with
         member this.Eval env argVals = 
             HostTensor.zeros<int32> [0L] :> ITensor |> Ch.only
 
+    interface ICompilableOp with
+        member this.Compile data = {
+            ChStubs = CompileTools.chStubs data
+            Actions = []
+        }
 
 
 /// Build tensor using numeric ranges.
@@ -147,25 +152,67 @@ type BuildTensor = {Shape: Shape; Ranges: BaseRanges list; Xs: BaseExprCh list} 
 
     interface ITensorStubWishPropagatingOp with
         member this.PropagateWishes data =
-            let notOverlapped = BaseRanges.areCoveringWithoutOverlap this.Shape this.Ranges
-            let argWishes = 
+            let chStub =
                 match data.ChStubWishes |> Map.tryFind Ch.Default with
-                | Some chWish when notOverlapped && TensorStub.isNotAliased chWish ->
+                | Some chWish -> chWish
+                | None -> 
+                    TensorStub.alloc (data.Alloc, (this :> IOp).TypeNames.[Ch.Default],
+                        Shape.eval (this :> IOp).Shapes.[Ch.Default], (this :> IOp).Devs.[Ch.Default])
+            let argWishes = 
+                if BaseRanges.areCoveringWithoutOverlap this.Shape this.Ranges then
+                    // Ranges are not overlapping, we can evaluate our arguments
+                    // directly into the channel tensor.
                     this.Ranges 
                     |> Seq.indexed
                     |> Seq.choose (fun (i, rng) ->
                         let evaledRng = rng |> List.map (fun (first, last) -> 
                             Rng.Rng (Some (Size.eval first), Some (Size.eval last)))
-                        chWish 
+                        chStub 
                         |> TensorStub.tryView evaledRng
                         |> Option.map (fun argWish -> Arg.N i, argWish))
                     |> Map.ofSeq
-                | _ -> Map.empty
+                else
+                    // Ranges are overlapping, we need to copy argument values.
+                    Map.empty
             {
-                ChStubs = failwith "TODO"
+                ChStubs = Map [Ch.Default, chStub]
                 ArgStubWishes = argWishes
             }
 
+    interface ICompilableOp with
+        member this.Compile data =
+            let chStub = data.ChStubs.[Ch.Default]
+            let actions =
+                this.Ranges
+                |> List.indexed
+                |> List.choose (fun (i, rng) ->
+                    let arg = Arg.N i
+                    let argStub = data.ArgStubs.[arg]
+                    match data.ArgStubWishes |> Map.tryFind arg with
+                    | Some argStubWish when argStubWish = argStub ->
+                        // Argument was evaluated directly into channel range.
+                        None
+                    | _ ->
+                        // Argument must be copied into channel range.
+                        let aryRng = rng |> List.map (fun (first, last) -> 
+                            Rng.Rng (Some (Size.eval first), Some (Size.eval last)))
+                        match chStub |> TensorStub.tryView aryRng with
+                        | Some chRngView ->
+                            Some { new IAction with
+                                member __.Execute execData =
+                                    execData.StubValues.[chRngView].CopyFrom execData.ArgValues.[arg]
+                                    Map.empty }
+                        | None ->
+                            Some { new IAction with
+                                member __.Execute execData =
+                                    let trgt = execData.ChValues.[Ch.Default]
+                                    trgt.[aryRng] <- execData.ArgValues.[arg]
+                                    Map.empty })
+            {
+                ChStubs = data.ChStubs
+                Actions = actions
+            }            
+                
 
 
 /// Elementwise calculated tensor.
@@ -195,6 +242,12 @@ type Elements = {Shape: Shape; ElemExpr: Elem.Expr; Xs: BaseExprCh list} with
             let nResShape = Shape.eval this.Shape
             Elem.Interpreter.evalUntyped this.ElemExpr esv nResShape 
             |> Ch.only
+
+    interface ICompilableOp with
+        member this.Compile data = {
+            ChStubs = CompileTools.chStubs data
+            Actions = failwith "TODO"
+        }
 
 
 
@@ -233,5 +286,13 @@ type Interpolate = {Interpolator: Interpolator; Xs: BaseExprCh list} with
             let esv = ArgValue.naryXs argVals
             Interpolator.interpolateUntyped this.Interpolator esv |> Ch.only
 
+    interface ICompilableOp with
+        member this.Compile data = {
+            ChStubs = CompileTools.chStubs (data, tryInplace=TryInplace.All)
+            Actions = failwith "TODO"
+        }
+        // TODO: handle interpolator
+        // Interpolator should be moved into tensor.
+        // As such it will be treated as a normal tensor operation.
 
 
