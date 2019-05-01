@@ -229,6 +229,7 @@ module internal CollectionExtensions =
     // allow access to common collections without having to open System.Collections
     type IReadOnlyDictionary<'TKey, 'TValue> = System.Collections.Generic.IReadOnlyDictionary<'TKey, 'TValue>
     type IReadOnlyCollection<'T> = System.Collections.Generic.IReadOnlyCollection<'T>
+    type IDictionary<'TKey, 'TValue> = System.Collections.Generic.IDictionary<'TKey, 'TValue>
     type Dictionary<'TKey, 'TValue> = System.Collections.Generic.Dictionary<'TKey, 'TValue>
     type ConcurrentDictionary<'TKey, 'TValue> = System.Collections.Concurrent.ConcurrentDictionary<'TKey, 'TValue>
     type ConcurrentQueue<'T> = System.Collections.Concurrent.ConcurrentQueue<'T>

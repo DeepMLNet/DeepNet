@@ -12,12 +12,16 @@ open DeepNet.Utils
 
 /// Tensor storage (type neutral).
 type ITensorStorage =
+    /// The device this tensor storage resides on.
     abstract Dev:               ITensorDevice
+
 
 /// Tensor storage.
 and ITensorStorage<'T> =
     inherit ITensorStorage
+    /// The backend to work with this tensor storage.
     abstract Backend:           TensorLayout -> ITensorBackend<'T>
+
 
 /// Tensor device.
 and ITensorDevice =
@@ -25,9 +29,15 @@ and ITensorDevice =
     inherit IComparable<ITensorDevice>
     inherit IEquatable<ITensorDevice>
 
+    /// Unique id of this tensor device.
     abstract Id:                string
+    /// Allocate memory for the specified number of elements and return the tensor storage.
     abstract Create:            nElems:int64 -> ITensorStorage<'T>
+    /// Allocate memory for the specified number of elements and return the tensor storage.
+    abstract CreateUntyped:     dataType:Type -> nElems:int64 -> ITensorStorage
+    /// True, if freshly allocated memory is zeroed.
     abstract Zeroed:            bool
+
 
 /// Tensor frontend access (for use from backend).
 and ITensorFrontend<'T> =
@@ -59,6 +69,7 @@ and ITensorFrontend<'T> =
     abstract Transfer:          dev:ITensorDevice -> ITensorFrontend<'T>
     /// Transpose
     abstract T:                 ITensorFrontend<'T>
+
 
 /// Tensor backend.
 and ITensorBackend<'T> =
@@ -145,6 +156,7 @@ and ITensorBackend<'T> =
     abstract SymmetricEigenDecomposition: part:MatrixPart * trgtEigVals:ITensorFrontend<'T> * trgtEigVecs:ITensorFrontend<'T> * 
                                           src:ITensorFrontend<'T> -> unit
 
+
 /// Base tensor device.
 [<AbstractClass>]
 [<StructuredFormatDisplay("{Id}")>]
@@ -156,6 +168,8 @@ type BaseTensorDevice() =
     interface ITensorDevice with
         member this.Id = this.Id
         member this.Create nElems = this.Create nElems
+        member this.CreateUntyped dataType nElems =
+            callGenericInst<BaseTensorDevice, ITensorStorage> this "Create" [dataType] nElems
         member this.Zeroed = this.Zeroed
 
     interface IComparable<ITensorDevice> with
@@ -178,3 +192,6 @@ type BaseTensorDevice() =
     override this.GetHashCode () =
         hash (this :> ITensorDevice).Id
     override this.ToString () = this.Id
+
+
+

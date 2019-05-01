@@ -31,32 +31,43 @@ type ITensorCudaStorage =
 type TensorCudaStorage<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
                     (data: CudaDeviceVariable<'T>, dev: TensorCudaDevice) =
 
+    let mutable disposed = false
+    let checkDisposed () =
+        if disposed then
+            raise (ObjectDisposedException ("Storage of CUDA tensor has been disposed."))
+
     new (nElems: int64, dev: TensorCudaDevice) =
         // CUDA cannot allocate memory of size zero
         let nElems = if nElems > 0L then nElems else 1L
         let devVar = Cuda.newDevVar dev.Context nElems
-        TensorCudaStorage<'T> (devVar, dev)
+        new TensorCudaStorage<'T> (devVar, dev)
      
     /// data device variable
-    member this.Data = data
+    member this.Data = checkDisposed(); data
 
     /// data device
     member this.Dev = dev
 
     /// data size in elements
-    member this.DataSize = int64 data.Size
+    member this.DataSize = checkDisposed(); int64 data.Size
 
     /// data size in bytes
-    member this.DataSizeInBytes = int64 data.SizeInBytes
+    member this.DataSizeInBytes = checkDisposed(); int64 data.SizeInBytes
 
     /// data device variable as CudaDeviceVariable<byte>
     member this.ByteData =
+        checkDisposed()
         new CudaDeviceVariable<byte> (data.DevicePointer, data.SizeInBytes)        
 
     override this.Finalize() = 
-        if data <> null then 
-            use _dev = dev.Use()
-            data.Dispose()
+        (this :> IDisposable).Dispose ()
+
+    interface IDisposable with
+        member this.Dispose () =
+            if data <> null && not disposed then 
+                use _dev = dev.Use()
+                data.Dispose()            
+            disposed <- true
 
     /// data item access
     member this.Item 
@@ -81,9 +92,10 @@ type TensorCudaStorage<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sy
 
     interface ITensorStorage<'T> with
         member this.Backend layout = 
+            checkDisposed()
             TensorCudaBackend<'T> (layout, this) :> ITensorBackend<_>
         member this.Dev = 
-            dev :> ITensorDevice
+            this.Dev :> ITensorDevice
 
     interface ITensorCudaStorage with
         member this.ByteData = this.ByteData
@@ -107,7 +119,7 @@ type TensorCudaStorage<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sy
         let reader (rs: ReadState) =
             let hostData = xp.Read rs "Data"
             let dev = dp.Read rs "Dev"
-            let storage = TensorCudaStorage<'T> (hostData.LongLength, dev)
+            let storage = new TensorCudaStorage<'T> (hostData.LongLength, dev)
             use _dev = storage.Dev.Use()
             storage.Data.CopyToDevice (hostData)
             storage
