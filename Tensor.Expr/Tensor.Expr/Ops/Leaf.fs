@@ -26,7 +26,7 @@ type Scalar = { Value: Const; Dev: ITensorDevice } with
             ChStubs = CompileTools.chStubs data 
             Actions = 
                 let valueTensor = this.Value |> Const.asITensor this.Dev 
-                CompileTools.simpleAction (fun chVals argVals ->
+                CompileTools.simpleAction data (fun chVals argVals ->
                     chVals.[Ch.Default].CopyFrom valueTensor)
         }
 
@@ -55,7 +55,7 @@ type SizeValue = { Value: Size; Dev: ITensorDevice } with
             ChStubs = CompileTools.chStubs data 
             Actions = 
                 let valueTensor = Size.eval this.Value |> Tensor.scalar this.Dev
-                CompileTools.simpleAction (fun chVals argVals ->
+                CompileTools.simpleAction data (fun chVals argVals ->
                     chVals.[Ch.Default].CopyFrom valueTensor)
         }
 
@@ -83,7 +83,7 @@ type Identity = { Size: Size; Type: TypeName; Dev: ITensorDevice } with
     interface ICompilableOp with
         member this.Compile data = {
             ChStubs = CompileTools.chStubs data 
-            Actions = CompileTools.simpleAction (fun chVals argVals ->
+            Actions = CompileTools.simpleAction data (fun chVals argVals ->
                 chVals.[Ch.Default].FillIdentity ())
         }
 
@@ -119,7 +119,7 @@ type Counting = { Size: Size; Dev: ITensorDevice } with
     interface ICompilableOp with
         member this.Compile data = {
             ChStubs = CompileTools.chStubs data 
-            Actions = CompileTools.simpleAction (fun chVals argVals ->
+            Actions = CompileTools.simpleAction data (fun chVals argVals ->
                 let t = chVals.[Ch.Default] :?> Tensor<int64>
                 t.FillIncrementing (0L, 1L))
         }
@@ -159,7 +159,7 @@ type VarArg = { Var: Var } with
                 OffsetStride = data.Env.VarOffsetStrides |> Map.tryFind this.Var.Name 
                 Storage = StorageStub.VarStorage this.Var.Name
             }
-            Actions = []
+            Actions = CompileTools.noAction data
         }   
 
     interface IOpFormat with
@@ -196,7 +196,7 @@ type DataArg = { Data: OrdRef<ITensor> } with
                 OffsetStride = Some (this.Data.Value.Layout.Offset, this.Data.Value.Layout.Stride) 
                 Storage = StorageStub.Fixed this.Data.Value.Storage
             }
-            Actions = []
+            Actions = CompileTools.noAction data
         }   
 
     interface IOpFormat with
