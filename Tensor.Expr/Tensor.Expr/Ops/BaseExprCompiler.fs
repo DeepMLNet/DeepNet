@@ -80,7 +80,7 @@ type CompileOutput = {
 type CompileResult = {
     Allocs:             AllocStub list
     ChStubs:            Map<BaseExprCh, TensorStub>
-    ActionGroups:       ActionGroup list
+    ActionGroups:       Map<BaseExpr, ActionGroup>
 }
 
 
@@ -114,9 +114,6 @@ type ITensorStubWishPropagatingOp =
     /// Should compute argument stub wishes given channel stub wishes.
     abstract PropagateWishes: UpPropData -> UpPropOutput
 
-
-type IDevHandler =
-    abstract ProcessActionGroup: ActionGroup -> IActionDeviceData option
 
 
 type NonCompilableOpAction (expr: BaseExpr, argStubs: Map<Arg, TensorStub>) =
@@ -222,8 +219,7 @@ module BaseExprCompiler =
 
 
     /// Assigns a tensor stub to each expression channel in the expression tree.
-    let assignStubs (env: CompileEnv) (upProp: UpPropResult) (devHandlers: IDictionary<ITensorDevice, IDevHandler>) 
-                    (group: BaseExprGroup) =
+    let assignStubs (env: CompileEnv) (upProp: UpPropResult) (group: BaseExprGroup) =
 
         /// All allocation stubs.
         let allocStubs = ResizeArray<AllocStub> upProp.Allocs
@@ -251,7 +247,7 @@ module BaseExprCompiler =
         let actionGroupForExpr = Dictionary<BaseExpr, ActionGroup> ()
 
         /// All expressions that an expression depends on transitively.
-        let depending = Dictionary<BaseExpr, Set<BaseExpr>> ()
+        let depending = BaseExprTransitiveDependencies ()
 
         // Store channel stubs from stub propagation towards leafs. 
         for KeyValue(exprCh, stub) in upProp.ChStubs do
@@ -268,15 +264,7 @@ module BaseExprCompiler =
             /// All expression channels this expression transitively depends on.
             /// Due to the walk order over the expression tree all these expressions
             /// have already been processed.
-            let exprDepending =
-                if Map.isEmpty expr.Args then 
-                    Set.empty
-                else
-                    expr.Args
-                    |> Map.toSeq
-                    |> Seq.map (fun (_arg, argExpr) -> Set.add argExpr.Expr depending.[argExpr.Expr])
-                    |> Set.unionMany
-            depending.[expr] <- exprDepending
+            depending.Process expr
 
             // Add expression to users of its argument stubs.
             for KeyValue(_, argStub) in argStubs do
@@ -318,7 +306,7 @@ module BaseExprCompiler =
                         // Check if we depend on all their dependants *and* that they have been processed,
                         // i.e. if they exposed the allocation via an output channel it would already have been
                         // added to allocUserChs.
-                        deps |> Seq.forall exprDepending.Contains
+                        deps |> Seq.forall depending.[expr].Contains
                     | _ -> 
                         // Argument uses other storage. Do not overwrite it.
                         false)
@@ -408,21 +396,14 @@ module BaseExprCompiler =
                 |> Seq.map (fun dep -> actionGroupForExpr.[dep])  
                 |> HashSet
 
-            // Generate preliminary action group and extend with device-specific information.
-            let prelimActGrp = {
+            // Store action group.
+            let actGrp = {
                 Expr = expr
                 Action = comp.Actions
                 DependsOn = dependsOn
                 ChStubs = comp.ChStubs
                 DevData = None
             }
-            let devData =
-                match devHandlers.TryGetValue prelimActGrp.Dev with
-                | true, devHandler -> devHandler.ProcessActionGroup prelimActGrp
-                | _ -> None
-            let actGrp = {prelimActGrp with DevData = devData}
-
-            // Store action group.
             actionGroupForExpr.[expr] <- actGrp
 
             // Add expression to users of its channel stubs.
@@ -438,16 +419,17 @@ module BaseExprCompiler =
                 tensorStubs.[expr.[ch]] <- chStub
 
         /// Called after all dependencies of an expression have been processed.
-        let clearDepending (expr: BaseExpr) =
+        let allDepsProcessed (expr: BaseExpr) =
             // Clear dependency set of expression to save memory.
-            depending.Remove expr |> ignore
+            depending.Remove expr 
 
         // Process expression tree.
-        group.Iter (processExpr, allDepsOfExprEvaled=clearDepending)
+        group.Iter (processExpr, allDepsOfExprEvaled=allDepsProcessed)
 
         {
             Allocs = List.ofSeq allocStubs
             ChStubs = Map.ofDictionary tensorStubs
-            ActionGroups = List.ofSeq actionGroupForExpr.Values
+            ActionGroups = Map.ofDictionary actionGroupForExpr
         }
+
 

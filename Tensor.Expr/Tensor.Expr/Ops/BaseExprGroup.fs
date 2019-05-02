@@ -225,3 +225,32 @@ type BaseExprGroup (exprs: BaseExpr list) =
                 if mv.Remove expr && mv.Count = 0 then
                     // Enqueue, if all dependants have evaluated values.
                     evalQueue.Enqueue argExpr
+
+
+
+/// Incrementally builds transitive expression dependencies when iterating
+/// over an expression tree.
+type BaseExprTransitiveDependencies () =
+    let depending = Dictionary<BaseExpr, Set<BaseExpr>> ()
+
+    /// Call for each expression when iterating over an expression tree.
+    member this.Process (expr: BaseExpr) =
+        depending.[expr] <-
+            if Map.isEmpty expr.Args then 
+                Set.empty
+            else
+                expr.Args
+                |> Map.toSeq
+                |> Seq.map (fun (_arg, argExpr) -> Set.add argExpr.Expr depending.[argExpr.Expr])
+                |> Set.unionMany
+
+    /// Call once all the dependencies of an expression have been processed
+    /// and its dependency information are no longer needed.
+    member this.Remove (expr: BaseExpr) =
+        depending.Remove expr |> ignore
+
+    /// Gets the transitive dependencies for the specified expression.
+    member this.Item
+        with get (expr: BaseExpr) =
+            depending.[expr]
+
