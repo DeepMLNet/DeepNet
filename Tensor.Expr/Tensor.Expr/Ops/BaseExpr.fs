@@ -356,7 +356,7 @@ type BaseExpr private (op: IOp) =
     static member mapOpRec (fn: IOp -> IOp) (expr: BaseExpr) =
         let replacement = Dictionary<BaseExpr, BaseExpr> ()
         let rec mapStep (subExpr: BaseExpr) =
-            replacement.GetOrAdd subExpr (fun _ ->
+            replacement.IGetOrAdd subExpr (fun _ ->
                 subExpr.Op.Args
                 |> Map.map (fun _ arg -> arg |> BaseExprCh.map mapStep)
                 |> subExpr.Op.ReplaceArgs 

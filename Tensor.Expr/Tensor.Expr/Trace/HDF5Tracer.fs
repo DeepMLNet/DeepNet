@@ -16,7 +16,7 @@ type HDF5Tracer (hdf: HDF5, ?prefix: string) =
     let mutable nextExprId = 0
 
     let getExprId (expr: BaseExpr) =
-        exprId.GetOrAdd expr (fun _ ->
+        exprId.IGetOrAdd expr (fun _ ->
             nextExprId <- nextExprId + 1
             nextExprId)
 

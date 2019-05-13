@@ -23,17 +23,17 @@ type ExecuteData = {
     StubValue:          TensorStub -> ITensor
     //ArgValues:          Map<Arg, ITensor>
     //ChValues:           Map<Ch, ITensor>
-    AsyncResultSubmit:  ExecuteResultData -> unit
+    //AsyncResultSubmit:  ExecuteResultData -> unit
 }
 
-and ExecuteResultData = {
+and ExecuteResult = {
     DynamicChValues:    Map<Ch, ITensor>  
 }
 
-[<RequireQualifiedAccess>]
-type ExecuteResult =
-    | Done of ExecuteResultData
-    | Async 
+//[<RequireQualifiedAccess>]
+//type ExecuteResult =
+//    | Done of ExecuteResultData
+//    | Async 
 
 type IAction =
     /// Execute actions and return resulting tensor for dynamic stubs.
@@ -53,9 +53,11 @@ type IActionDeviceData =
 type ActionGroup = {
     Expr:               BaseExpr
     DependsOn:          HashSet<ActionGroup>
+    Dependants:         HashSet<ActionGroup>
     Action:             IAction 
     ChStubs:            Map<Ch, TensorStub>
     DevData:            IActionDeviceData option
+    DynamicStubUsers:   Dictionary<Ch, HashSet<ActionGroup>>
 } with
     member this.Dev = this.Action.Dev
 
@@ -401,10 +403,15 @@ module BaseExprCompiler =
                 Expr = expr
                 Action = comp.Actions
                 DependsOn = dependsOn
+                Dependants = HashSet<_> ()
                 ChStubs = comp.ChStubs
                 DevData = None
             }
             actionGroupForExpr.[expr] <- actGrp
+
+            // Add this action group to dependants of the action group it depends on.
+            for dep in dependsOn do
+                dep.Dependants.Add actGrp |> ignore
 
             // Add expression to users of its channel stubs.
             for KeyValue(ch, chStub) in comp.ChStubs do

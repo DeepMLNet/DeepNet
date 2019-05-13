@@ -1,6 +1,7 @@
 ﻿namespace Tensor.Expr.Ops
 
 open System
+open System.Threading
 
 open DeepNet.Utils
 open Tensor
@@ -9,7 +10,7 @@ open Tensor.Backend
 
 
 
-type BaseExprWorkspace (recipe: CompileResult) =
+type BaseExprWorkspace (recipe: CompileResult, execThreadCount: int) =
 
     let mutable _disposed = false
 
@@ -27,44 +28,181 @@ type BaseExprWorkspace (recipe: CompileResult) =
 
     let storages = allocStorage recipe.Allocs
 
-    let tensorForStub (stub: TensorStub) =
-        // Also what to do when OffsetStride is unknown?
-        // So how to do the propagation actually?
-        // Obviously we chose to work with static and dynamic tensors.
-        // So?
-        // How to perform the evaluation?
-        // Well, run the action groups.
-        // So what can happen is that we get dynamic tensors returned from an action.
-        // These dynamic tensors must somehow be stored?
-        // We can store them as a result of an expression.
-        // Yes, but how to attach them to the arguments?
-        // Not necessarily a problem.
-        // Try to write the execution code and see what happens.
-        ()
+    /// Iterates over a set of action groups. 
+    let iter (fn: ActionGroup -> unit) (actGrps: ActionGroup list) =
+        /// Action groups missing for execution of an execution group.
+        let missing = Dictionary<ActionGroup, HashSet<ActionGroup>> ()
+        /// Action groups that can be executed.
+        let ready = ConcurrentQueue<ActionGroup> ()
 
-    let execute (actGrps: ActionGroup list) =
-        ()
-        // So what do we want to support?
-        // Best execution model is a step-by-step model, where we
-        // execute all action groups that become available, until
-        // no execution is possible anymore, due to external factors.
-        // But this is a bit conflicting with the requirement of
-        // overwritable args.
-        // Also how to determine of part of the graph can be preexecuted?
-        // Perhaps preexecution is not a good idea and should not be done?
-        // Yes.
-        // We could replace this idea by using the interpreted evaluator to
-        // evaluate parts of the graph and replace them by Data.
-        // So, pre-execution support is killed.
-        // Do we want to have step-wise execution?
-        // I.e. run this whole thing step-by-step for some reasons?
-        // Useful for debuggers maybe?
-        // maybe, but we have trace for that, so maybe don't worry about that for now.
-        // Okay, so how to do this parallel execution?
-        // Well...
-        // That was not straight-forward with CUDA.
-        // For host we just use dispatch the actions to worker threads?
-        // 
+        /// Initialize list of missing action groups.
+        for actGrp in actGrps do
+            missing.[actGrp] <- HashSet actGrp.DependsOn
+            if actGrp.DependsOn.Count = 0 then
+                ready.Enqueue actGrp
+              
+        /// Stop notification.
+        let mutable stop = false
+        /// Number of action groups remaining to execute.
+        let mutable remaining = actGrps.Length
+        /// Lock for number of remaining action groups.
+        let remainingLock = obj ()
+
+        /// Event to notify workers of new available work.
+        let workEvent = Array.init execThreadCount (fun _ -> new AutoResetEvent (true))
+        /// Notifies all workers that new work is available.
+        let notifyAll () =
+            for evt in workEvent do
+                evt.Set() |> ignore
+        
+        /// Worker thread function.
+        let workerFn (threadId: int) =
+            while not stop do                
+                // Wait for new work to become available.
+                workEvent.[threadId].WaitOne() |> ignore
+
+                // Process work until no work is available.
+                let mutable hasWork = true
+                while hasWork do
+                    match ready.TryDequeue () with
+                    | Some actGrp ->
+                        // Execute action group.
+                        fn actGrp
+                                                                   
+                        // Notify dependants that result is available.
+                        for dep in actGrp.Dependants do
+                            let missingForDep = missing.[dep]
+                            let noMissingDeps = 
+                                lock missingForDep (fun () ->
+                                    missingForDep.Remove actGrp |> ignore
+                                    missingForDep.Count = 0)
+                            if noMissingDeps then
+                                ready.Enqueue dep
+                                notifyAll ()
+
+                        // Check if all action groups have been executed.
+                        stop <-
+                            lock remainingLock (fun () ->
+                                remaining <- remaining - 1
+                                remaining = 0)  
+                        if stop then
+                            notifyAll ()
+
+                        hasWork <- true
+                    | None ->
+                        hasWork <- false
+
+        // Start worker threads.
+        let workers =
+            Array.init execThreadCount (fun threadId ->
+                Thread (fun () -> workerFn threadId))
+        for worker in workers do
+            worker.Start ()
+
+        // Wait until work is finished.
+        for worker in workers do
+            worker.Join ()
+
+        // Clean up events.
+        for evt in workEvent do
+            (evt :> IDisposable).Dispose ()
+
+
+    /// Executes a set of action groups.
+    let execute (varValues: Map<VarName, ITensor>) (actGrps: ActionGroup list) =
+
+        /// Tensor values for ops that returned dynamic values.
+        let dynStubVals = ConcurrentDictionary<TensorStub, ITensor> () 
+        /// Users of dynamic tensor storages.
+        let dynStubUsers = ConcurrentDictionary<ITensorStorage, HashSet<ActionGroup>> ()
+
+
+        /// Gets the tensor for the specified tensor stub.
+        let tensorForStub (stub: TensorStub) : ITensor =
+            // Construct value for tensor stub.
+            let value =
+                match stub.Storage with
+                | StorageStub.Dynamic ->
+                    dynStubVals.TryFind stub
+                    |> Option.defaultWith (fun () ->
+                        failwithf "Value for tensor stub %A with dynamic storage is unknown." stub)
+                | StorageStub.Allocated allocStub ->
+                    let storage =
+                        storages.TryFind allocStub 
+                        |> Option.defaultWith (fun () ->
+                            failwithf "Storage for tensor stub %A with allocated storage is unknown." stub)
+                    match stub.Layout with
+                    | Some layout -> Tensor.NewOfType (layout, storage)
+                    | None ->
+                        dynStubVals.TryFind stub
+                        |> Option.defaultWith (fun () ->
+                            failwithf "Value for tensor stub %A with dynamic layout is unknown." stub)                        
+                | StorageStub.VarStorage varName ->
+                    // Lookup variable from variable storage.
+                    match varValues |> Map.tryFind varName with
+                    | Some value -> value
+                    | None -> failwithf "Variable for tensor stub %A was not specified." stub
+                | StorageStub.Fixed storage ->
+                    match stub.Layout with
+                    | Some layout -> Tensor.NewOfType (layout, storage)
+                    | None ->
+                        dynStubVals.TryFind stub
+                        |> Option.defaultWith (fun () ->
+                            failwithf "Value for tensor stub %A with dynamic layout is unknown." stub)                     
+
+            // Check that layout matches, if the stub specified one.
+            match stub.OffsetStride with
+            | Some (offset, stride) when offset <> value.Layout.Offset || 
+                                         stride <> value.Layout.Stride ->
+                failwithf "Value for tensor stub %A with layout %A has incompatiable layout %A."
+                    stub stub.Layout.Value value.Layout
+            | _ -> ()
+
+            value
+
+
+        let execData: ExecuteData = {
+            StubValue = tensorForStub
+        }
+
+        let execFn (actGrp: ActionGroup) =
+            let result = actGrp.Action.Execute execData
+
+            // Now handle the dynamic channel data.
+            for KeyValue(ch, value) in result.DynamicChValues do
+                match actGrp.ChStubs |> Map.tryFind ch with
+                | Some stub ->
+                    // Check that channel is expected to be dynamic.
+                    match stub.OffsetStride, stub.Storage with
+                    | None, _ -> ()
+                    | _, StorageStub.Dynamic -> ()
+                    | _ -> 
+                        failwithf "Action group %A returned a dynamic value for non-dynamic channel %A."
+                            actGrp ch
+
+                    // Store value.
+                    dynStubVals.[stub] <- value
+
+                    // Mark it as unused.
+                    // How does that work multi-threaded?
+                    // Have to use concurrent dictionaries for that to work.
+                    // Yes, sounds good.
+                    // Problem is yet that tensor stubs are compared using structured equality.
+
+
+
+                | None ->
+                    failwithf "Action group %A returned a dynamic value for a non-existant channel %A."
+                        actGrp ch
+
+            ()
+
+        iter execFn actGrps
+        
+    // should variables be replaceable from run to run?
+    // Yes, why not?
+
+
 
     interface IDisposable with
         member this.Dispose () =
