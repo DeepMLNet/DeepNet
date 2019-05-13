@@ -14,6 +14,8 @@ open DeepNet.Utils
 type ITensorStorage =
     /// The device this tensor storage resides on.
     abstract Dev:               ITensorDevice
+    /// The type of the stored data.
+    abstract DataType:          Type
 
 
 /// Tensor storage.

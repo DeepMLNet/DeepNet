@@ -78,6 +78,8 @@ type TensorHostStorage<'T> (data: 'T []) =
             TensorHostBackend<'T> (layout, this) :> ITensorBackend<_>
         member this.Dev = 
             TensorHostDevice.Instance :> ITensorDevice
+        member this.DataType =
+            typeof<'T>
 
     interface ITensorHostStorage with
         member this.Data = this.Data :> Array

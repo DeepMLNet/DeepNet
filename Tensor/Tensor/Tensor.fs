@@ -4234,6 +4234,19 @@ type [<StructuredFormatDisplay("{Pretty}"); DebuggerDisplay("{Shape}-Tensor: {Pr
         let gt = typedefof<Tensor<_>>.MakeGenericType (dataType)
         Activator.CreateInstance (gt, [|box shape; box dev; box order|]) :?> ITensor
 
+    /// <summary>Type-neutral function for creating a tensor from layout and storage.</summary>
+    /// <param name="layout">The tensor layout to use.</param>
+    /// <param name="storage">The tensor storage to use.</param>
+    /// <returns>The tensor with data type inferred from the storage.</returns>
+    /// <remarks>
+    /// <para>Use this function only if you require a type-neutral function.
+    /// The recommended way is to use <see cref="zeros"/> to create a typed tensor.</para>
+    /// </remarks>
+    /// <seealso cref="#ctor"/>
+    static member NewOfType (layout: TensorLayout, storage: ITensorStorage) =
+        let gt = typedefof<Tensor<_>>.MakeGenericType (storage.DataType)
+        Activator.CreateInstance (gt, [|box layout; box storage|]) :?> ITensor
+
     /// <summary>Creates a new, empty tensor with the given number of dimensions.</summary>
     /// <param name="dev">The device to create the tensor on.</param>
     /// <param name="nDims">The number of dimensions of the new, empty tensor.</param>

@@ -96,6 +96,8 @@ type TensorCudaStorage<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sy
             TensorCudaBackend<'T> (layout, this) :> ITensorBackend<_>
         member this.Dev = 
             this.Dev :> ITensorDevice
+        member this.DataType =
+            typeof<'T>
 
     interface ITensorCudaStorage with
         member this.ByteData = this.ByteData
