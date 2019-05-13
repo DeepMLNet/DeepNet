@@ -163,27 +163,27 @@ module internal Permutation =
 [<AutoOpen>]
 module internal CollectionExtensions =
 
-    type System.Collections.Generic.Dictionary<'TKey, 'TValue> with
+    type System.Collections.Generic.IDictionary<'TKey, 'TValue> with
         member this.TryFind key =
-            let value = ref (Unchecked.defaultof<'TValue>)
-            if this.TryGetValue (key, value) then Some !value
-            else None
-
-        member this.LockedTryFind key =
-            lock this (fun () -> this.TryFind key)
+            match this.TryGetValue key with
+            | true, value -> Some value
+            | false, _ -> None
 
         member this.GetOrDefault key dflt =
             match this.TryFind key with
             | Some v -> v
             | None -> dflt
 
-        member this.GetOrAdd key createFn =
+        member this.IGetOrAdd key createFn =
             match this.TryFind key with
             | Some v -> v
             | None ->
                 let v = createFn key
                 this.[key] <- v
                 v
+
+        member this.LockedTryFind key =
+            lock this (fun () -> this.TryFind key)
 
         member this.LockedAdd (key, value) =
             lock this (fun () -> this.Add (key, value))
