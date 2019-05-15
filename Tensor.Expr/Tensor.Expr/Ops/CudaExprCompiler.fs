@@ -59,8 +59,8 @@ let assignStreams (dev: TensorCudaDevice) (group: BaseExprGroup) (actionGroups: 
                 actGrp.DependsOn
                 |> Seq.tryPick (fun arg ->
                     match arg.DevData with
-                    | Some (:? ActionCudaData as devData) when not streamReused.[arg.Expr] ->
-                        streamReused.[arg.Expr] <- true
+                    | Some (:? ActionCudaData as devData) when not streamReused.[arg.Expr.Value] ->
+                        streamReused.[arg.Expr.Value] <- true
                         Some devData.Stream
                     | _ -> None)
                 

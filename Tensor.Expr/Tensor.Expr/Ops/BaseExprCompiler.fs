@@ -66,7 +66,6 @@ type ActionGroup = {
     Dependants:         HashSet<ActionGroup>
     Action:             IAction 
     ChStubs:            Map<Ch, TensorStub>
-    RuntimeChStubUsers: Dictionary<Ch, HashSet<ActionGroup>>
     DevData:            IActionDeviceData option
 } with
     member this.Dev = this.Action.Dev
@@ -397,7 +396,6 @@ module BaseExprCompiler =
                         expr preassignedChStub
 
             // Check channel stubs for plausibility and initialize dynamic stub users.
-            let runtimeChStubUsers = Dictionary<Ch, HashSet<ActionGroup>> ()
             for KeyValue(ch, chStub) in comp.ChStubs do
                 let exprCh = expr.[ch]
                 if not (chStub.Dev = exprCh.Dev && 
@@ -405,8 +403,6 @@ module BaseExprCompiler =
                         chStub.Shape = Shape.eval exprCh.Shape) then
                     failwithf "Tensor stub %A for channel %A is not compatiable with expression %A."
                         chStub ch exprCh    
-                if chStub.IsRuntime then
-                    runtimeChStubUsers.[ch] <- HashSet<ActionGroup> ()
 
             // Compute dependencies.
             let dependsOn =
@@ -421,7 +417,6 @@ module BaseExprCompiler =
                 DependsOn = dependsOn
                 Dependants = HashSet<_> ()
                 ChStubs = comp.ChStubs
-                RuntimeChStubUsers = runtimeChStubUsers
                 DevData = None
             }
             actionGroupForExpr.[expr] <- actGrp
@@ -437,12 +432,6 @@ module BaseExprCompiler =
                     allocUsers.[allocStub] <- allocUsers.[allocStub] |> Set.add expr 
                     allocUserChs.[allocStub] <- allocUserChs.[allocStub] |> Set.add expr.[ch]
                 | _ -> ()
-
-            // Add expression to users of the channels with runtime stubs of its arguments.
-            for KeyValue(arg, argStub) in argStubs do
-                if argStub.IsRuntime then
-                    let (BaseExprCh (argCh, argExpr)) = expr.Args.[arg]
-                    actionGroupForExpr.[argExpr].RuntimeChStubUsers.[argCh].Add actGrp |> ignore
 
             // Store channel stubs.
             for KeyValue(ch, chStub) in comp.ChStubs do
@@ -469,13 +458,11 @@ module BaseExprCompiler =
             DependsOn = leafActGrps
             Dependants = HashSet<_> ()
             ChStubs = Map.empty
-            RuntimeChStubUsers = new _ ()
             DevData = None
         }
         // Add finish action group as dependant.
         for leafActGrp in leafActGrps do
             leafActGrp.Dependants.Add finishActGrp |> ignore
-
 
         {
             Allocs = List.ofSeq allocStubs

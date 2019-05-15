@@ -95,7 +95,7 @@ type CompileTools () =
                 let chValues = data.ChStubs |> Map.map (fun _ stub -> execData.StubValue stub) 
                 let argValues = data.ArgStubs |> Map.map (fun _ stub -> execData.StubValue stub)
                 actFn chValues argValues 
-                ExecuteResult.Done {DynamicChValues=Map.empty}
+                {RuntimeChValues=Map.empty}
             member __.Dev = dev
         }
 
@@ -150,15 +150,15 @@ type CompileTools () =
                         Shape = Shape.eval op.Shapes.[Ch.Default]
                         TypeName = op.TypeNames.[Ch.Default]
                         Dev = op.Devs.[Ch.Default]
-                        OffsetStride = None
+                        OffsetStride = OffsetStride.Runtime (RuntimeStub ())
                         Storage = argStub.Storage    
                     }
                     Actions = 
                         {new IAction with
                             member __.Execute execData =
                                 let argVal = execData.StubValue argStub
-                                let chVal = dynFn argVal
-                                ExecuteResult.Done {DynamicChValues = Map [Ch.Default, chVal]}
+                                let chVal = dynFn argVal                                
+                                {RuntimeChValues = Map [Ch.Default, {Value=chVal; Temporary=false}]}
                             member __.Dev =
                                 op.Devs.[Ch.Default]
                         }
