@@ -24,19 +24,32 @@ type AllocStub = {
 type AllocFn = AllocReq -> AllocStub
 
     
+/// Placeholder for values unknown at compile-time.
+/// It has reference equality semantics, i.e. each instance is unique.
+type RuntimeStub () = 
+    class end
+
+
 [<RequireQualifiedAccess>]
 type StorageStub =
     /// Storage will be known at run-time.
-    | Dynamic
+    | Runtime of RuntimeStub
     /// Allocated for internal results in the expression tree.
     | Allocated of AllocStub
-    /// Storage of a variable.
-    | VarStorage of VarName
     /// Fixed storage (already allocated before compilation).
     | Fixed of ITensorStorage
 
 
+/// Offset and stride for a tensor stub.
+[<RequireQualifiedAccess>]
+type OffsetStride =
+    /// Fixed offset and stride.
+    | Fixed of offset:int64 * stride:int64 list
+    /// Unknown offset and stride.
+    | Runtime of RuntimeStub
+
    
+/// A stub representing a tensor.
 type TensorStub = {
     /// Shape (always known).
     Shape:          int64 list
@@ -45,7 +58,7 @@ type TensorStub = {
     /// Storage device (always known).
     Dev:            ITensorDevice
     /// Offset and strides (may be unknown at compile-time).
-    OffsetStride:   (int64 * int64 list) option
+    OffsetStride:   OffsetStride
     /// Storage (may be unknown at compile-time).
     Storage:        StorageStub
 } with
@@ -53,25 +66,32 @@ type TensorStub = {
     member this.DataType = this.TypeName.Type
     static member dataType (ts: TensorStub) = ts.DataType
 
+    member this.IsRuntime =
+        match this.OffsetStride, this.Storage with
+        | OffsetStride.Runtime _, _ -> true
+        | _, StorageStub.Runtime _ -> true
+        | _ -> false
+    static member isRuntime (ts: TensorStub) = ts.IsRuntime
+
     member this.Layout =
         match this.OffsetStride with
-        | Some (offset, stride) ->
+        | OffsetStride.Fixed (offset, stride) ->
             Some {
                 Shape = this.Shape
                 Offset = offset
                 Stride = stride
             }
-        | None -> None
+        | OffsetStride.Runtime _ -> None
     static member layout (ts: TensorStub) = ts.Layout
 
     /// True, if layout (offset and strides) are known.
-    member this.HasLayout = this.OffsetStride.IsSome
+    member this.HasLayout = this.Layout.IsSome
 
     /// Apply a new layout to the tensor stub.
     static member relayout (layout: TensorLayout) (ts: TensorStub) =
         {ts with
             Shape = layout.Shape
-            OffsetStride = Some (layout.Offset, layout.Stride)
+            OffsetStride = OffsetStride.Fixed (layout.Offset, layout.Stride)
         }
 
     static member tryMapLayout (fn: TensorLayout -> TensorLayout) (ts: TensorStub) =
@@ -88,7 +108,7 @@ type TensorStub = {
         Shape = layout.Shape
         TypeName = alloc.TypeName
         Dev = alloc.Dev
-        OffsetStride = Some (layout.Offset, layout.Stride)
+        OffsetStride = OffsetStride.Fixed (layout.Offset, layout.Stride)
         Storage = StorageStub.Allocated alloc
     }    
 

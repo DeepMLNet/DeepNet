@@ -10,6 +10,12 @@ open Tensor.Backend
 
 
 
+[<RequireQualifiedAccess>]
+type internal RuntimeStorageTrack =
+    | Untracked
+    | Tracked of HashSet<ActionGroup>
+   
+
 type BaseExprWorkspace (recipe: CompileResult, execThreadCount: int) =
 
     let mutable _disposed = false
@@ -111,97 +117,113 @@ type BaseExprWorkspace (recipe: CompileResult, execThreadCount: int) =
     /// Executes a set of action groups.
     let execute (varValues: Map<VarName, ITensor>) (actGrps: ActionGroup list) =
 
-        /// Tensor values for ops that returned dynamic values.
-        let dynStubVals = ConcurrentDictionary<TensorStub, ITensor> () 
-        /// Users of dynamic tensor storages.
-        let dynStubUsers = ConcurrentDictionary<ITensorStorage, HashSet<ActionGroup>> ()
-
-
+        /// Tensor values for ops that return run-time values.
+        let rtStubVals = ConcurrentDictionary<TensorStub, ITensor> () 
+        /// Tracking of users of the storage of run-time values.
+        let rtStorageTrack = ConcurrentDictionary<ITensorStorage, RuntimeStorageTrack> ()
+        
         /// Gets the tensor for the specified tensor stub.
         let tensorForStub (stub: TensorStub) : ITensor =
-            // Construct value for tensor stub.
-            let value =
-                match stub.Storage with
-                | StorageStub.Dynamic ->
-                    dynStubVals.TryFind stub
-                    |> Option.defaultWith (fun () ->
-                        failwithf "Value for tensor stub %A with dynamic storage is unknown." stub)
-                | StorageStub.Allocated allocStub ->
-                    let storage =
+            if stub.IsRuntime then
+                // Lookup value for runtime tensor stub.
+                rtStubVals.TryFind stub
+                |> Option.defaultWith (fun () ->
+                    failwithf "Value for runtime tensor stub %A is unknown." stub)  
+            else
+                // Construct value for compile-time tensor stub.
+                let storage =
+                    match stub.Storage with
+                    | StorageStub.Allocated allocStub ->
                         storages.TryFind allocStub 
                         |> Option.defaultWith (fun () ->
-                            failwithf "Storage for tensor stub %A with allocated storage is unknown." stub)
-                    match stub.Layout with
-                    | Some layout -> Tensor.NewOfType (layout, storage)
-                    | None ->
-                        dynStubVals.TryFind stub
-                        |> Option.defaultWith (fun () ->
-                            failwithf "Value for tensor stub %A with dynamic layout is unknown." stub)                        
-                | StorageStub.VarStorage varName ->
-                    // Lookup variable from variable storage.
-                    match varValues |> Map.tryFind varName with
-                    | Some value -> value
-                    | None -> failwithf "Variable for tensor stub %A was not specified." stub
-                | StorageStub.Fixed storage ->
-                    match stub.Layout with
-                    | Some layout -> Tensor.NewOfType (layout, storage)
-                    | None ->
-                        dynStubVals.TryFind stub
-                        |> Option.defaultWith (fun () ->
-                            failwithf "Value for tensor stub %A with dynamic layout is unknown." stub)                     
-
-            // Check that layout matches, if the stub specified one.
-            match stub.OffsetStride with
-            | Some (offset, stride) when offset <> value.Layout.Offset || 
-                                         stride <> value.Layout.Stride ->
-                failwithf "Value for tensor stub %A with layout %A has incompatiable layout %A."
-                    stub stub.Layout.Value value.Layout
-            | _ -> ()
-
-            value
-
+                            failwithf "Storage for tensor stub %A with allocated storage is unknown." stub)                   
+                    | StorageStub.Fixed storage -> storage
+                    | StorageStub.Runtime _ -> 
+                        failwith "Runtime storage was specified for compile-time tensor stub."
+                Tensor.NewOfType (stub.Layout.Value, storage)
+                    
 
         let execData: ExecuteData = {
             StubValue = tensorForStub
         }
 
         let execFn (actGrp: ActionGroup) =
+            // Execute op.
             let result = actGrp.Action.Execute execData
 
-            // Now handle the dynamic channel data.
-            for KeyValue(ch, value) in result.DynamicChValues do
+            // Handle run-time channel data.
+            for KeyValue(ch, chValue) in result.RuntimeChValues do
                 match actGrp.ChStubs |> Map.tryFind ch with
                 | Some stub ->
-                    // Check that channel is expected to be dynamic.
-                    match stub.OffsetStride, stub.Storage with
-                    | None, _ -> ()
-                    | _, StorageStub.Dynamic -> ()
-                    | _ -> 
-                        failwithf "Action group %A returned a dynamic value for non-dynamic channel %A."
+                    // Check that channel has a runtime stub.
+                    if not stub.IsRuntime then
+                        failwithf "Action group %A returned a runtime value for non-runtime channel %A."
                             actGrp ch
 
+                    // Check that returned value matches layout, if stub specifies one.
+                    match stub.Layout with
+                    | Some layout when layout <> chValue.Value.Layout ->
+                        failwithf "Value for tensor stub %A has incompatiable layout %A."
+                            stub chValue.Value.Layout
+                    | _ -> ()
+
+                    // Check that shape, data type and device match stub.
+                    if stub.Shape <> chValue.Value.Shape then
+                        failwithf "Value for tensor stub %A has wrong shape %A." stub chValue.Value.Shape
+                    if stub.TypeName.Type <> chValue.Value.DataType then
+                        failwithf "Value for tensor stub %A has wrong data type %A." stub chValue.Value.DataType
+                    if stub.Dev <> chValue.Value.Dev then
+                        failwithf "Value for tensor stub %A has wrong device %A." stub chValue.Value.Dev
+
                     // Store value.
-                    dynStubVals.[stub] <- value
+                    rtStubVals.[stub] <- chValue.Value
 
-                    // Mark it as unused.
-                    // How does that work multi-threaded?
-                    // Have to use concurrent dictionaries for that to work.
-                    // Yes, sounds good.
-                    // Problem is yet that tensor stubs are compared using structured equality.
+                    // Set up tracking, if op allocated storage for its result.
+                    let storage = chValue.Value.Storage
+                    if chValue.Temporary then
+                        // Create tracker, if value is marked as temporary.
+                        let tracker = RuntimeStorageTrack.Tracked (HashSet<_> ())
+                        let prevTracker = rtStorageTrack.GetOrAdd (storage, tracker)
+                        match prevTracker with
+                        | RuntimeStorageTrack.Untracked ->
+                            failwithf "Action group %A tried marking non-new storage %A of channel %A as temporary."
+                                actGrp storage ch
+                        | RuntimeStorageTrack.Tracked _ -> ()
+                    else
+                        // Mark value's storage as untracked, if it is not temporary.
+                        rtStorageTrack.TryAdd (storage, RuntimeStorageTrack.Untracked) |> ignore
 
-
+                    // Perform tracking.
+                    match rtStorageTrack.TryGetValue storage with
+                    | true, (RuntimeStorageTrack.Tracked users) ->
+                        let unused = 
+                            lock users (fun () ->
+                                // Add channel users to storage users.
+                                for chUser in actGrp.RuntimeChStubUsers.[ch] do
+                                    users.Add chUser |> ignore
+                                // Remove executed action group.
+                                // TODO: This does not work.
+                                // Removal must be performed over arguments not channels.
+                                users.Remove actGrp |> ignore
+                                // Check if empty.
+                                users.Count = 0)
+                        
+                        // Dispose storage if it is not needed anymore.
+                        if unused then
+                            rtStorageTrack.TryRemove storage |> ignore
+                            match storage with
+                            | :? IDisposable as disp -> disp.Dispose ()
+                            | _ -> ()
+                    | _ -> ()
 
                 | None ->
-                    failwithf "Action group %A returned a dynamic value for a non-existant channel %A."
+                    failwithf "Action group %A returned a runtime value for a non-existant channel %A."
                         actGrp ch
 
             ()
 
         iter execFn actGrps
         
-    // should variables be replaceable from run to run?
-    // Yes, why not?
-
 
 
     interface IDisposable with

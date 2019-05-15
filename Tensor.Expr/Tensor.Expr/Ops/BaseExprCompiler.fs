@@ -26,14 +26,16 @@ type ExecuteData = {
     //AsyncResultSubmit:  ExecuteResultData -> unit
 }
 
-and ExecuteResult = {
-    DynamicChValues:    Map<Ch, ITensor>  
+and RuntimeChValue = {
+    Value:              ITensor
+    /// True, if storage of tensor should be disposed when it is not longer required.
+    Temporary:          bool
 }
 
-//[<RequireQualifiedAccess>]
-//type ExecuteResult =
-//    | Done of ExecuteResultData
-//    | Async 
+and ExecuteResult = {
+    RuntimeChValues:    Map<Ch, RuntimeChValue>  
+}
+
 
 type IAction =
     /// Execute actions and return resulting tensor for dynamic stubs.
@@ -49,15 +51,23 @@ type IActionDeviceData =
     interface end
 
 
+/// Action that marks the end of execution.
+/// This action is put into an ActionGroup that depends on all ActionGroup without dependants.
+type FinishAction () =
+    interface IAction with
+        member __.Execute _ = failwith "Not to be executed."
+        member __.Dev = HostTensor.Dev
+
+
 [<ReferenceEquality>]
 type ActionGroup = {
-    Expr:               BaseExpr
+    Expr:               BaseExpr option
     DependsOn:          HashSet<ActionGroup>
     Dependants:         HashSet<ActionGroup>
     Action:             IAction 
     ChStubs:            Map<Ch, TensorStub>
+    RuntimeChStubUsers: Dictionary<Ch, HashSet<ActionGroup>>
     DevData:            IActionDeviceData option
-    DynamicStubUsers:   Dictionary<Ch, HashSet<ActionGroup>>
 } with
     member this.Dev = this.Action.Dev
 
@@ -82,7 +92,7 @@ type CompileOutput = {
 type CompileResult = {
     Allocs:             AllocStub list
     ChStubs:            Map<BaseExprCh, TensorStub>
-    ActionGroups:       Map<BaseExpr, ActionGroup>
+    ActionGroups:       ActionGroup list
 }
 
 
@@ -251,6 +261,9 @@ module BaseExprCompiler =
         /// All expressions that an expression depends on transitively.
         let depending = BaseExprTransitiveDependencies ()
 
+        /// Action groups that have no dependants.
+        let leafActGrps = HashSet<ActionGroup> ()
+
         // Store channel stubs from stub propagation towards leafs. 
         for KeyValue(exprCh, stub) in upProp.ChStubs do
             tensorStubs.[exprCh] <- stub
@@ -260,13 +273,13 @@ module BaseExprCompiler =
 
         /// Processes an expression.
         let processExpr (expr: BaseExpr) =    
-            /// Stubs for the arguments of the expression.
-            let argStubs = expr.Args |> Map.map (fun _ argExpr -> tensorStubs.[argExpr])
-
             /// All expression channels this expression transitively depends on.
             /// Due to the walk order over the expression tree all these expressions
             /// have already been processed.
             depending.Process expr
+
+            /// Stubs for the arguments of the expression.
+            let argStubs = expr.Args |> Map.map (fun _ argExprCh -> tensorStubs.[argExprCh])
 
             // Add expression to users of its argument stubs.
             for KeyValue(_, argStub) in argStubs do
@@ -368,8 +381,8 @@ module BaseExprCompiler =
                                 Shape = expr.Shapes.[ch] |> Shape.eval
                                 TypeName = expr.TypeNames.[ch]
                                 Dev = expr.Devs.[ch]
-                                OffsetStride = None
-                                Storage = StorageStub.Dynamic
+                                OffsetStride = OffsetStride.Runtime (RuntimeStub ())
+                                Storage = StorageStub.Runtime (RuntimeStub ())
                             })
                         |> Map.ofSeq
                     let action = NonCompilableOpAction (expr, argStubs) :> IAction
@@ -383,7 +396,8 @@ module BaseExprCompiler =
                     failwithf "Expression %A did not accept pre-assigned channel stub %A." 
                         expr preassignedChStub
 
-            // Check channel stubs for plausibility.
+            // Check channel stubs for plausibility and initialize dynamic stub users.
+            let runtimeChStubUsers = Dictionary<Ch, HashSet<ActionGroup>> ()
             for KeyValue(ch, chStub) in comp.ChStubs do
                 let exprCh = expr.[ch]
                 if not (chStub.Dev = exprCh.Dev && 
@@ -391,6 +405,8 @@ module BaseExprCompiler =
                         chStub.Shape = Shape.eval exprCh.Shape) then
                     failwithf "Tensor stub %A for channel %A is not compatiable with expression %A."
                         chStub ch exprCh    
+                if chStub.IsRuntime then
+                    runtimeChStubUsers.[ch] <- HashSet<ActionGroup> ()
 
             // Compute dependencies.
             let dependsOn =
@@ -400,11 +416,12 @@ module BaseExprCompiler =
 
             // Store action group.
             let actGrp = {
-                Expr = expr
+                Expr = Some expr
                 Action = comp.Actions
                 DependsOn = dependsOn
                 Dependants = HashSet<_> ()
                 ChStubs = comp.ChStubs
+                RuntimeChStubUsers = runtimeChStubUsers
                 DevData = None
             }
             actionGroupForExpr.[expr] <- actGrp
@@ -421,22 +438,49 @@ module BaseExprCompiler =
                     allocUserChs.[allocStub] <- allocUserChs.[allocStub] |> Set.add expr.[ch]
                 | _ -> ()
 
+            // Add expression to users of the channels with runtime stubs of its arguments.
+            for KeyValue(arg, argStub) in argStubs do
+                if argStub.IsRuntime then
+                    let (BaseExprCh (argCh, argExpr)) = expr.Args.[arg]
+                    actionGroupForExpr.[argExpr].RuntimeChStubUsers.[argCh].Add actGrp |> ignore
+
             // Store channel stubs.
             for KeyValue(ch, chStub) in comp.ChStubs do
                 tensorStubs.[expr.[ch]] <- chStub
 
         /// Called after all dependencies of an expression have been processed.
         let allDepsProcessed (expr: BaseExpr) =
+            // Check if generated action group has no dependants.
+            let actGrp = actionGroupForExpr.[expr]
+            if actGrp.Dependants.Count = 0 then
+                leafActGrps.Add actGrp |> ignore
+
             // Clear dependency set of expression to save memory.
             depending.Remove expr 
 
         // Process expression tree.
         group.Iter (processExpr, allDepsOfExprEvaled=allDepsProcessed)
 
+        // Create action group that depends on all action groups that have not dependants.
+        // It signals that all action groups have been evaluated.
+        let finishActGrp = {
+            Expr = None
+            Action = FinishAction ()
+            DependsOn = leafActGrps
+            Dependants = HashSet<_> ()
+            ChStubs = Map.empty
+            RuntimeChStubUsers = new _ ()
+            DevData = None
+        }
+        // Add finish action group as dependant.
+        for leafActGrp in leafActGrps do
+            leafActGrp.Dependants.Add finishActGrp |> ignore
+
+
         {
             Allocs = List.ofSeq allocStubs
             ChStubs = Map.ofDictionary tensorStubs
-            ActionGroups = Map.ofDictionary actionGroupForExpr
+            ActionGroups = actionGroupForExpr.Values |> Seq.toList
         }
 
 
