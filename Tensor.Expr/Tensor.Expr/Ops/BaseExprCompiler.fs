@@ -26,20 +26,9 @@ type ExecuteEnv = {
 }
 
 
-//type ActionData = {
-//    Alloc:              AllocReq -> AllocStub
-//    Env:                CompileEnv
-//    ArgStubs:           Map<Arg, TensorStub> 
-//    ChStubs:            Map<Ch, TensorStub>
-//    Expr:               BaseExpr
-//}
-
 type ExecuteData = {
     StubValue:          TensorStub -> ITensor
     Env:                ExecuteEnv
-    //ArgValues:          Map<Arg, ITensor>
-    //ChValues:           Map<Ch, ITensor>
-    //AsyncResultSubmit:  ExecuteResultData -> unit
 }
 
 and ExecuteResult = {

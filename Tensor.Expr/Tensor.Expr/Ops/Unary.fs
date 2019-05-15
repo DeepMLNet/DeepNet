@@ -546,7 +546,14 @@ type Reshape = { X: BaseExprCh; Shape: Shape } with
     interface ICompilableOp with
         member this.Compile data =
             let shape = Shape.eval this.Shape
+            let argShape = Shape.eval this.X.Shape
             let argStub = ArgValue.unaryX data.ArgStubs 
+
+            let performCopy chVals argVals =
+                let chVal = ChValue.onlyX chVals
+                let argVal = ArgValue.unaryX argVals
+                let trgtView = chVal |> ITensor.reshapeView argShape
+                trgtView.CopyFrom argVal
             
             // Check if we made a wish for the argument stub.
             match data.ArgStubWishes |> Map.tryFind Arg.Only with
@@ -562,8 +569,7 @@ type Reshape = { X: BaseExprCh; Shape: Shape } with
                 // Thus we need to copy the arguments output to our assigned channel stub.
                 {
                     ChStubs = data.ChStubs
-                    Actions = CompileTools.simpleAction data (fun chVals argVals ->
-                        (ChValue.onlyX chVals).CopyFrom (ArgValue.unaryX argVals))
+                    Actions = CompileTools.simpleAction data performCopy
                 }
             | None ->
                 // No wish was propagated, we have to compute a channel stub.
@@ -580,27 +586,37 @@ type Reshape = { X: BaseExprCh; Shape: Shape } with
                         // in-place reshape is impossible, allocate channel stub for copy
                         {
                             ChStubs = CompileTools.chStubs data
-                            Actions = CompileTools.simpleAction data (fun chVals argVals ->
-                                (ChValue.onlyX chVals).CopyFrom (ArgValue.unaryX argVals))
+                            Actions = CompileTools.simpleAction data performCopy
                         }
                 else
-                    // Layout is unknown, decide during execution.
-                    {
-                        ChStubs = Ch.only {
-                            Shape = shape
-                            TypeName = argStub.TypeName
-                            Dev = argStub.Dev
-                            OffsetStride = None
-                            Storage = StorageStub.Dynamic
+                    // Layout is unknown.
+                    match argStub.Storage with
+                    | StorageStub.Temporary _
+                    | StorageStub.External _ ->
+                        // Decide during execution, if copy must be performed.
+                        {
+                            ChStubs = Ch.only {
+                                Shape = shape
+                                TypeName = argStub.TypeName
+                                Dev = argStub.Dev
+                                OffsetStride = OffsetStride.Runtime (RuntimeStub ())
+                                Storage = StorageStub.External (RuntimeStub ())
+                            }
+                            Actions = {new IAction with
+                                member __.Execute execData =                            
+                                    let argVal = execData.StubValue argStub
+                                    let chVal = argVal |> ITensor.reshape shape
+                                    {RuntimeChValues = Ch.only chVal}  
+                                member __.Dev = argStub.Dev
+                            }
+                        }          
+                    | StorageStub.Allocated _
+                    | StorageStub.Fixed _ ->
+                        // Allocate target storage and perform copy.
+                        {
+                            ChStubs = CompileTools.chStubs data
+                            Actions = CompileTools.simpleAction data performCopy
                         }
-                        Actions = {new IAction with
-                            member __.Execute execData =                            
-                                let argVal = execData.StubValue argStub
-                                let chVal = argVal |> ITensor.reshape shape
-                                ExecuteResult.Done {DynamicChValues = Map [Ch.Default, chVal]}  
-                            member __.Dev = argStub.Dev
-                        }
-                    }          
 
     interface IOpFormat with
         member this.Text =
@@ -731,7 +747,7 @@ type Subtensor = {X: BaseExprCh; Range: SimpleRanges} with
                 Shape = (this :> IOp).Shapes.[Ch.Default] |> Shape.eval
                 TypeName = (this :> IOp).TypeNames.[Ch.Default]
                 Dev = (this :> IOp).Devs.[Ch.Default]
-                OffsetStride = None
+                OffsetStride = OffsetStride.Runtime (RuntimeStub ())
                 Storage = data.ArgStubs.[Arg.Only].Storage                       
             }
             if SimpleRanges.isDynamic this.Range then
@@ -740,24 +756,14 @@ type Subtensor = {X: BaseExprCh; Range: SimpleRanges} with
                 // are copied to host to calculate the offset and strides of the result.
                 // An alternative would be to copy the tensor range to avoid the
                 // transfer of the indices to the host.
-
-                // Here we require the value of the arguments.
-                // But, is this possible?
-                // Generally it should be.
-                // What is required?
-                // If action is sequenced, all dependencies have been sequenced.
-                // So if we initiate transfer in stream we should be okay.
-                // But we should not wait actually.
-                // Let's see what is involved here.
-
-
                 {
                     ChStubs = dynamicChStub
-                    Actions = [{ new IAction with
+                    Actions = { new IAction with
                         member __.Execute execData =
                             let range = Subtensor.evalRange this.Range execData.ArgValues
                             (ArgValue.unaryX execData.ArgValues).[range] |> Ch.only
-                    }]
+                        member __.Dev = this.X.Dev // TODO: correct?
+                    }
                 }
             else
                 // Static range allows to slice argument during compilation, when
