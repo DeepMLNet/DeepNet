@@ -149,18 +149,38 @@ type VarArg = { Var: Var } with
         member this.Var = this.Var
 
     interface ICompilableOp with
-        member this.Compile data = {
-            // Variable value is read directly from its storage, thus 
-            // no actions need to be performed.
-            ChStubs = Ch.only {
-                Shape = Shape.eval this.Var.Shape
-                TypeName = this.Var.TypeName
-                Dev = this.Var.Dev
-                OffsetStride = data.Env.VarOffsetStrides |> Map.tryFind this.Var.Name 
-                Storage = StorageStub.VarStorage this.Var.Name
-            }
-            Actions = CompileTools.noAction data
-        }   
+        member this.Compile data = 
+            // The offset and stride of the variable are not known during compile-time.
+            // Thus we return a runtime tensor stub that is then evaluated at run-time.
+            let shape = Shape.eval this.Var.Shape            
+            {
+                ChStubs = Ch.only {
+                    Shape = shape
+                    TypeName = this.Var.TypeName
+                    Dev = this.Var.Dev
+                    OffsetStride = OffsetStride.Runtime (RuntimeStub ())
+                    Storage = StorageStub.External (RuntimeStub ())
+                }
+                Actions = {new IAction with
+                    member __.Execute execData =
+                        let value =
+                            execData.Env.VarValues 
+                            |> Map.tryFind this.Var.Name 
+                            |> Option.defaultWith (fun () ->
+                                failwithf "Value for variable %A was not specified." this.Var.Name)
+                        if value.Shape <> shape then
+                            failwithf "Value for variable %A has shape %A but %A was expected." 
+                                this.Var.Name value.Shape shape
+                        if value.DataType <> this.Var.DataType then
+                            failwithf "Value for variable %A has data type %A but %A was expected."
+                                this.Var.Name value.DataType this.Var.DataType
+                        if value.Dev <> this.Var.Dev then
+                            failwithf "Value for variable %A is stored on device %A but %A was expected."
+                                this.Var.Name value.Dev this.Var.Dev
+                        {RuntimeChValues = Ch.only value}
+                    member __.Dev = this.Var.Dev
+                }
+            }   
 
     interface IOpFormat with
         member this.Text =
@@ -193,7 +213,7 @@ type DataArg = { Data: OrdRef<ITensor> } with
                 Shape = this.Data.Value.Shape
                 TypeName = TypeName.ofTypeInst this.Data.Value.DataType
                 Dev = this.Data.Value.Dev
-                OffsetStride = Some (this.Data.Value.Layout.Offset, this.Data.Value.Layout.Stride) 
+                OffsetStride = OffsetStride.Fixed (this.Data.Value.Layout.Offset, this.Data.Value.Layout.Stride) 
                 Storage = StorageStub.Fixed this.Data.Value.Storage
             }
             Actions = CompileTools.noAction data

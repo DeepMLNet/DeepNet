@@ -7,7 +7,22 @@ open Tensor.Expr
 
 
 type CompileEnv = {
-    VarOffsetStrides: Map<VarName, int64 * int64 list> 
+    //VarOffsetStrides: Map<VarName, int64 * int64 list> 
+    Unused: unit
+}
+
+type ExecuteEnv = {
+    /// Values for each variable.
+    VarValues:          Map<VarName, ITensor>
+    /// Number of execution threads.
+    /// If None, one thread is used per processor core.
+    ThreadCount:        int option
+    /// If true, results can use allocated or external storage, which might
+    /// be shared with other data (variable values) or be overwritten when
+    /// the workspace is executed again.
+    /// If false, results are guaranteed to have an exclusive storage and
+    /// may be overwritten by the caller.
+    RawResults:         bool
 }
 
 
@@ -21,19 +36,14 @@ type CompileEnv = {
 
 type ExecuteData = {
     StubValue:          TensorStub -> ITensor
+    Env:                ExecuteEnv
     //ArgValues:          Map<Arg, ITensor>
     //ChValues:           Map<Ch, ITensor>
     //AsyncResultSubmit:  ExecuteResultData -> unit
 }
 
-and RuntimeChValue = {
-    Value:              ITensor
-    /// True, if storage of tensor should be disposed when it is not longer required.
-    Temporary:          bool
-}
-
 and ExecuteResult = {
-    RuntimeChValues:    Map<Ch, RuntimeChValue>  
+    RuntimeChValues:    Map<Ch, ITensor>  
 }
 
 
@@ -92,6 +102,7 @@ type CompileResult = {
     Allocs:             AllocStub list
     ChStubs:            Map<BaseExprCh, TensorStub>
     ActionGroups:       ActionGroup list
+    ResultStubs:        Map<BaseExprCh, TensorStub>
 }
 
 
@@ -381,9 +392,11 @@ module BaseExprCompiler =
                                 TypeName = expr.TypeNames.[ch]
                                 Dev = expr.Devs.[ch]
                                 OffsetStride = OffsetStride.Runtime (RuntimeStub ())
-                                Storage = StorageStub.Runtime (RuntimeStub ())
+                                Storage = StorageStub.Temporary (RuntimeStub ())
                             })
                         |> Map.ofSeq
+                    // TODO: ensure that channels do not use any argument storage
+                    //       if they do, copy them.
                     let action = NonCompilableOpAction (expr, argStubs) :> IAction
                     {ChStubs=chStubs; Actions=action}
 
@@ -464,10 +477,21 @@ module BaseExprCompiler =
         for leafActGrp in leafActGrps do
             leafActGrp.Dependants.Add finishActGrp |> ignore
 
+        // Compose compilation result.
+        let chStubs = Map.ofDictionary tensorStubs
+        let resultStubs =
+            group.Exprs
+            |> Seq.collect (fun resExpr -> 
+                resExpr.Channels
+                |> Seq.map (fun ch -> 
+                    let resExprCh = resExpr.[ch]
+                    resExprCh, chStubs.[resExprCh]))
+            |> Map.ofSeq
         {
             Allocs = List.ofSeq allocStubs
             ChStubs = Map.ofDictionary tensorStubs
             ActionGroups = actionGroupForExpr.Values |> Seq.toList
+            ResultStubs = resultStubs 
         }
 
 

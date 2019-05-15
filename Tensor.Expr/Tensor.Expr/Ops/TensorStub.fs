@@ -32,8 +32,12 @@ type RuntimeStub () =
 
 [<RequireQualifiedAccess>]
 type StorageStub =
-    /// Storage will be known at run-time.
-    | Runtime of RuntimeStub
+    /// Temporary storage will be allocated by op at run-time.
+    /// It will be disposed by the executor.
+    | Temporary of RuntimeStub
+    /// External storage will be returned by op at run-time.
+    /// The executor will not dispose it.
+    | External of RuntimeStub
     /// Allocated for internal results in the expression tree.
     | Allocated of AllocStub
     /// Fixed storage (already allocated before compilation).
@@ -69,7 +73,8 @@ type TensorStub = {
     member this.IsRuntime =
         match this.OffsetStride, this.Storage with
         | OffsetStride.Runtime _, _ -> true
-        | _, StorageStub.Runtime _ -> true
+        | _, StorageStub.Temporary _ -> true
+        | _, StorageStub.External _ -> true
         | _ -> false
     static member isRuntime (ts: TensorStub) = ts.IsRuntime
 

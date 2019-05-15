@@ -41,43 +41,45 @@ type internal RuntimeValues () =
             
     /// Adds a value for a runtime tensor stub and starts tracking its storage, 
     /// if the value is temporary.
-    member __.AddValue (stub: TensorStub) (chValue: RuntimeChValue) (owner: ActionGroup) =
+    member __.AddValue (stub: TensorStub) (chValue: ITensor) (owner: ActionGroup) =
         checkRuntime stub
 
         // Check that returned value matches layout, if stub specifies one.
         match stub.Layout with
-        | Some layout when layout <> chValue.Value.Layout ->
+        | Some layout when layout <> chValue.Layout ->
             failwithf "Value for tensor stub %A has incompatiable layout %A."
-                stub chValue.Value.Layout
+                stub chValue.Layout
         | _ -> ()
 
         // Check that shape, data type and device match stub.
-        if stub.Shape <> chValue.Value.Shape then
-            failwithf "Value for tensor stub %A has wrong shape %A." stub chValue.Value.Shape
-        if stub.TypeName.Type <> chValue.Value.DataType then
-            failwithf "Value for tensor stub %A has wrong data type %A." stub chValue.Value.DataType
-        if stub.Dev <> chValue.Value.Dev then
-            failwithf "Value for tensor stub %A has wrong device %A." stub chValue.Value.Dev
+        if stub.Shape <> chValue.Shape then
+            failwithf "Value for tensor stub %A has wrong shape %A." stub chValue.Shape
+        if stub.TypeName.Type <> chValue.DataType then
+            failwithf "Value for tensor stub %A has wrong data type %A." stub chValue.DataType
+        if stub.Dev <> chValue.Dev then
+            failwithf "Value for tensor stub %A has wrong device %A." stub chValue.Dev
 
         // Store value.
-        stubVals.[stub] <- chValue.Value
+        stubVals.[stub] <- chValue
 
         // Set up tracking, if op allocated storage for its result.
-        let storage = chValue.Value.Storage
-        if chValue.Temporary then
+        match stub.Storage with
+        | StorageStub.Temporary _ ->
             // Create tracker, if value is marked as temporary.
             let tracker = RuntimeStorageTrack.Tracked (HashSet<_> ())
-            let prevTracker = storageTrack.GetOrAdd (storage, tracker)
+            let prevTracker = storageTrack.GetOrAdd (chValue.Storage, tracker)
             match prevTracker with
             | RuntimeStorageTrack.Untracked ->
-                failwithf "It was tried to mark already known non-temporary storage %A as temporary." storage 
+                failwithf "Already known external storage %A cannot be returned as temporary." 
+                    chValue.Storage
             | RuntimeStorageTrack.Tracked _ -> ()
-        else
+        | StorageStub.External _ ->
             // Mark value's storage as untracked, if it is not temporary.
-            storageTrack.TryAdd (storage, RuntimeStorageTrack.Untracked) |> ignore
+            storageTrack.TryAdd (chValue.Storage, RuntimeStorageTrack.Untracked) |> ignore
+        | _ -> failwith "Unknown storage stub for runtime tensor stub."
 
         // Add action group as owner if its runtime value.
-        match storageTrack.TryGetValue storage with
+        match storageTrack.TryGetValue chValue.Storage with
         | true, (RuntimeStorageTrack.Tracked users) ->
             lock users (fun () -> 
                 users.Add owner |> ignore)  
@@ -112,18 +114,22 @@ type internal RuntimeValues () =
 
 
 
-type BaseExprWorkspace (recipe: CompileResult, execThreadCount: int) =
-
+type BaseExprWorkspace (recipe: CompileResult) =
     let mutable _disposed = false
+    let checkDisposed () =
+        if _disposed then
+            raise (ObjectDisposedException ("BaseExprWorkSpace"))
 
+    /// Allocate and return storage for the specified storage stubs.
     let allocStorage (stubs: AllocStub list) =
         stubs
         |> List.map (fun stub ->
             stub, stub.Dev.CreateUntyped stub.TypeName.Type stub.Size)
         |> dict
 
+    /// Disposes the storage.
     let disposeStorage (storages: IDictionary<AllocStub, ITensorStorage>) =
-        for KeyValue (stub, stor) in storages do
+        for KeyValue (_stub, stor) in storages do
             match stor with
             | :? IDisposable as d -> d.Dispose()
             | _ -> ()
@@ -132,7 +138,13 @@ type BaseExprWorkspace (recipe: CompileResult, execThreadCount: int) =
     let storages = allocStorage recipe.Allocs
 
     /// Iterates over a set of action groups. 
-    let iter (fn: ActionGroup -> unit) (allDepsExecedFn: ActionGroup -> unit) (actGrps: ActionGroup list) =
+    let iter (fn: ActionGroup -> unit) (allDepsExecedFn: ActionGroup -> unit) 
+            (execThreadCount: int option) (actGrps: ActionGroup list) =
+
+        let execThreadCount = defaultArg execThreadCount Environment.ProcessorCount
+        if execThreadCount < 1 then 
+            failwith "Execution thread count must be at least 1."
+
         /// Action groups missing for execution of an execution group.
         let missing = Dictionary<ActionGroup, HashSet<ActionGroup>> ()
         /// Dependants of an action group that have not yet beed executed.
@@ -167,41 +179,40 @@ type BaseExprWorkspace (recipe: CompileResult, execThreadCount: int) =
                 while hasWork do
                     match ready.TryDequeue () with
                     | Some actGrp ->
-                        // Execute action group, if it is not the finish marker.
-                        match actGrp.Action with
-                        | :? FinishAction -> ()
-                        | _ -> fn actGrp
-                                        
-                        // Remove action group from list of not executed dependants
-                        // and check if all its dependants have been executed.
-                        for dep in actGrp.DependsOn do
-                            let unexeced = unexecedDeps.[dep]
-                            let allDepsExeced =
-                                lock unexeced (fun () ->
-                                    unexeced.Remove actGrp |> ignore
-                                    unexeced.Count = 0) 
-                            if allDepsExeced then
-                                allDepsExecedFn actGrp
-
-                        // Notify dependants that result is available.
-                        for dep in actGrp.Dependants do
-                            let missingForDep = missing.[dep]
-                            let noMissingDeps = 
-                                lock missingForDep (fun () ->
-                                    missingForDep.Remove actGrp |> ignore
-                                    missingForDep.Count = 0)
-                            if noMissingDeps then
-                                ready.Enqueue dep
-                                notifyAll ()
-
-                        // Stop execution if finish action group is reached.
+                        // Check for finish marker.
                         match actGrp.Action with
                         | :? FinishAction -> 
+                            // Stop execution.
                             stop <- true
+                            hasWork <- false
                             notifyAll ()
-                        | _ -> ()
+                        | _ -> 
+                            // Execute op.
+                            fn actGrp
+                                        
+                            // Remove action group from list of not executed dependants
+                            // and check if all its dependants have been executed.
+                            for dep in actGrp.DependsOn do
+                                let unexeced = unexecedDeps.[dep]
+                                let allDepsExeced =
+                                    lock unexeced (fun () ->
+                                        unexeced.Remove actGrp |> ignore
+                                        unexeced.Count = 0) 
+                                if allDepsExeced then
+                                    allDepsExecedFn actGrp
 
-                        hasWork <- true
+                            // Notify dependants that result is available.
+                            for dep in actGrp.Dependants do
+                                let missingForDep = missing.[dep]
+                                let noMissingDeps = 
+                                    lock missingForDep (fun () ->
+                                        missingForDep.Remove actGrp |> ignore
+                                        missingForDep.Count = 0)
+                                if noMissingDeps then
+                                    ready.Enqueue dep
+                                    notifyAll ()
+
+                            hasWork <- true
                     | None ->
                         hasWork <- false
 
@@ -222,7 +233,7 @@ type BaseExprWorkspace (recipe: CompileResult, execThreadCount: int) =
 
 
     /// Executes a set of action groups.
-    let execute (varValues: Map<VarName, ITensor>) (actGrps: ActionGroup list) =
+    let execute (execEnv: ExecuteEnv) (actGrps: ActionGroup list) =
         let rtValues = RuntimeValues ()
 
         /// Gets the tensor for the specified tensor stub.
@@ -239,14 +250,18 @@ type BaseExprWorkspace (recipe: CompileResult, execThreadCount: int) =
                         |> Option.defaultWith (fun () ->
                             failwithf "Storage for tensor stub %A with allocated storage is unknown." stub)                   
                     | StorageStub.Fixed storage -> storage
-                    | StorageStub.Runtime _ -> 
+                    | StorageStub.Temporary _ 
+                    | StorageStub.External _ -> 
                         failwith "Runtime storage was specified for compile-time tensor stub."
                 Tensor.NewOfType (stub.Layout.Value, storage)
                     
+        /// Execution data.
         let execData: ExecuteData = {
+            Env = execEnv
             StubValue = tensorForStub
         }
 
+        /// Executes the action group.
         let exec (actGrp: ActionGroup) =
             // Execute op.
             let result = actGrp.Action.Execute execData
@@ -269,14 +284,32 @@ type BaseExprWorkspace (recipe: CompileResult, execThreadCount: int) =
             if notProcessed.Count > 0 then
                 failwithf "Action group %A did not return runtime values for channels %A." actGrp notProcessed
 
+        /// Called when all dependencies of the specified action group have been executed.
         let allDepsExeced (actGrp: ActionGroup) = 
             // Notify storage that runtime channel values of action group are no longer needed.
             for KeyValue(_ch, chStub) in actGrp.ChStubs do
                 if chStub.IsRuntime then
                     rtValues.DoneWithValue chStub actGrp
 
-        iter exec allDepsExeced actGrps
-        
+        // Perform parallel execution of action groups.
+        iter exec allDepsExeced execEnv.ThreadCount actGrps
+
+        // Get result values.
+        // These may point into allocated storage or variables.
+        let resultVals =
+            recipe.ResultStubs
+            |> Map.map (fun _exprCh stub -> 
+                let value = tensorForStub stub
+                if execEnv.RawResults then value
+                else ITensor.copy value)
+        resultVals
+
+
+    /// Executes the workspace and returns the values of the root expressions.
+    member this.Execute (env: ExecuteEnv) : Map<BaseExprCh, ITensor> =
+        checkDisposed ()
+        execute env recipe.ActionGroups
+
 
     interface IDisposable with
         member this.Dispose () =

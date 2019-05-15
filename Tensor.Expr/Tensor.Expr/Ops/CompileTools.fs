@@ -158,7 +158,7 @@ type CompileTools () =
                             member __.Execute execData =
                                 let argVal = execData.StubValue argStub
                                 let chVal = dynFn argVal                                
-                                {RuntimeChValues = Map [Ch.Default, {Value=chVal; Temporary=false}]}
+                                {RuntimeChValues = Map [Ch.Default, chVal]}
                             member __.Dev =
                                 op.Devs.[Ch.Default]
                         }
