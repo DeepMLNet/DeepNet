@@ -39,7 +39,10 @@ module Check =
             | SimpleRange.SymStartSymEnd _ -> ()
             | SimpleRange.DynStartSymSize (s, _) -> 
                 if (s :?> BaseExpr).[Ch.Default].DataType <> typeof<int64> then
-                    failwithf "Dynamic range start must be of type int64.")
+                    failwithf "Dynamic range start must be of type int64."
+                if (s :?> BaseExpr).[Ch.Default].Dev <> x.Dev then
+                    failwithf "Dynamic range is stored on device %A but value is stored on %A."
+                        (s :?> BaseExpr).[Ch.Default].Dev x.Dev)
 
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]

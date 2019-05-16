@@ -564,7 +564,7 @@ type Reshape = { X: BaseExprCh; Shape: Shape } with
                     ChStubs = data.ChStubs
                     Actions = CompileTools.noAction data
                 }
-            | Some argStubWish ->
+            | Some _argStubWish ->
                 // We propagated a tensor stub as a wish to our argument, but it was not accepeted.
                 // Thus we need to copy the arguments output to our assigned channel stub.
                 {
@@ -743,6 +743,7 @@ type Subtensor = {X: BaseExprCh; Range: SimpleRanges} with
 
     interface ICompilableOp with
         member this.Compile data =
+            let srcStub = data.ArgStubs.[Arg.Only]
             let dynamicChStub = Ch.only {
                 Shape = (this :> IOp).Shapes.[Ch.Default] |> Shape.eval
                 TypeName = (this :> IOp).TypeNames.[Ch.Default]
@@ -750,6 +751,7 @@ type Subtensor = {X: BaseExprCh; Range: SimpleRanges} with
                 OffsetStride = OffsetStride.Runtime (RuntimeStub ())
                 Storage = data.ArgStubs.[Arg.Only].Storage                       
             }
+
             if SimpleRanges.isDynamic this.Range then
                 // Dynamic range gives a dynamic tensor stub.
                 // If the range arguments are stored on another device, they
@@ -758,33 +760,38 @@ type Subtensor = {X: BaseExprCh; Range: SimpleRanges} with
                 // transfer of the indices to the host.
                 {
                     ChStubs = dynamicChStub
-                    Actions = { new IAction with
+                    Actions = {new IAction with
                         member __.Execute execData =
-                            let range = Subtensor.evalRange this.Range execData.ArgValues
-                            (ArgValue.unaryX execData.ArgValues).[range] |> Ch.only
-                        member __.Dev = this.X.Dev // TODO: correct?
+                            let srcVal = execData.StubValue srcStub
+                            let argValues = data.ArgStubs |> Map.map (fun _ stub -> execData.StubValue stub)
+                            let range = Subtensor.evalRange this.Range argValues
+                            let chVal = srcVal.[range] 
+                            {RuntimeChValues = Ch.only chVal}
+                        member __.Dev = this.X.Dev 
                     }
                 }
             else
                 // Static range allows to slice argument during compilation, when
                 // its layout is known.
                 let range = SimpleRanges.eval this.Range 
-                let srcStub = data.ArgStubs.[Arg.Only]
                 match srcStub |> TensorStub.tryView range with
                 | Some viewStub -> 
                     // Source layout is known and thus we can directly calculate the view.
                     {
                         ChStubs = Ch.only viewStub
-                        Actions = []
+                        Actions = CompileTools.noAction data
                     }
                 | None ->
                     // Source layout is unknown and thus we have to calculate view during execution.
                     {
                         ChStubs = dynamicChStub
-                        Actions = [{ new IAction with
+                        Actions = {new IAction with
                             member __.Execute execData =
-                                (ArgValue.unaryX execData.ArgValues).[range] |> Ch.only
-                        }]
+                                let srcVal = execData.StubValue srcStub
+                                let chVal = srcVal.[range] 
+                                {RuntimeChValues = Ch.only chVal}
+                            member __.Dev = this.X.Dev
+                        }
                     }            
 
     interface IOpFormat with
@@ -1135,7 +1142,7 @@ type AssumeZeroDeriv = { X: BaseExprCh } with
     interface ICompilableOp with
         member this.Compile data = {
             ChStubs = CompileTools.passthroughStub data
-            Actions = []
+            Actions = CompileTools.noAction data
         }
     
 
@@ -1167,7 +1174,7 @@ type AssumeDeriv = {Deriv: BaseExprCh; X: BaseExprCh} with
     interface ICompilableOp with
         member this.Compile data = {
             ChStubs = CompileTools.passthroughStub data
-            Actions = []
+            Actions = CompileTools.noAction data
         }
 
 
@@ -1188,7 +1195,7 @@ type Annotated = {Label: System.IComparable; X: BaseExprCh} with
     interface ICompilableOp with
         member this.Compile data = {
             ChStubs = CompileTools.passthroughStub data
-            Actions = []
+            Actions = CompileTools.noAction data
         }
 
     
@@ -1350,7 +1357,7 @@ type Channel = {X: BaseExprCh} with
     interface ICompilableOp with
         member this.Compile data = {
             ChStubs = CompileTools.passthroughStub data
-            Actions = []
+            Actions = CompileTools.noAction data
         }
 
 

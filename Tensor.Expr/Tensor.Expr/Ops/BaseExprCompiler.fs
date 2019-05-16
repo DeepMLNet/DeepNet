@@ -14,6 +14,9 @@ type CompileEnv = {
 type ExecuteEnv = {
     /// Values for each variable.
     VarValues:          Map<VarName, ITensor>
+    /// Tensors to store the resulting values of the root expressions.
+    /// Only for results that were specified to use external values during compilation.
+    ResultTargets:      Map<BaseExprCh, ITensor>
     /// Number of execution threads.
     /// If None, one thread is used per processor core.
     ThreadCount:        int option
@@ -296,10 +299,14 @@ module BaseExprCompiler =
             let overwritableArgs =
                 expr.Args
                 |> Map.toSeq
+                |> Seq.filter (fun (_arg, argExprCh) ->
+                    // Only overwrite arguments with non-runtime tensor stubs to
+                    // prevent the channels of the op from becoming runtime stubs.
+                    not (TensorStub.isRuntime tensorStubs.[argExprCh]))
                 |> Seq.filter (fun (arg, argExprCh) ->
                     // Arguments that share the same storage must not be overwritten.
                     expr.Args |> Map.toSeq |> Seq.exists (fun (otherArg, otherArgExprCh) ->
-                        otherArg <> arg && tensorStubs.[otherArgExprCh] = tensorStubs.[argExprCh])
+                        otherArg <> arg && tensorStubs.[otherArgExprCh].Storage = tensorStubs.[argExprCh].Storage)
                     |> not)
                 |> Seq.filter (fun (_arg, argExprCh) ->
                     // Only overwrite arguments that do not have aliased elements,

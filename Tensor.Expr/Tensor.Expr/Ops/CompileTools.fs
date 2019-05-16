@@ -48,20 +48,27 @@ type CompileTools () =
                 overwritableArgs <- overwritableArgs |> Set.remove arg
                 data.ArgStubs.[arg])
 
+
         op.Channels
         |> Set.toSeq
         |> Seq.map (fun ch ->
-            let typeName = op.TypeNames.[ch]
-            let shape = Shape.eval op.Shapes.[ch]
-            let dev = op.Devs.[ch]
-            let stub = 
-                match data.ChStubWishes |> Map.tryFind ch with
-                | Some chStubWish when honorWishes -> chStubWish
-                | _ ->
-                    match tryUseArg typeName dev shape with
-                    | Some inplaceStub -> inplaceStub
-                    | None -> TensorStub.alloc (data.Alloc, typeName, shape, dev)
-            ch, stub)
+            match data.ChStubs |> Map.tryFind ch with
+            | Some stub -> 
+                // Channel stub has been pre-assigned due to propagated wish.
+                ch, stub
+            | None ->
+                // We are free to choose the channels.
+                let typeName = op.TypeNames.[ch]
+                let shape = Shape.eval op.Shapes.[ch]
+                let dev = op.Devs.[ch]
+                let stub = 
+                    match data.ChStubWishes |> Map.tryFind ch with
+                    | Some chStubWish when honorWishes -> chStubWish
+                    | _ ->
+                        match tryUseArg typeName dev shape with
+                        | Some inplaceStub -> inplaceStub
+                        | None -> TensorStub.alloc (data.Alloc, typeName, shape, dev)
+                ch, stub)
         |> Map.ofSeq
 
     /// Passes through tensor stub of unary argument.
@@ -114,6 +121,9 @@ type CompileTools () =
         }
 
 
+    /// Tries to apply `staticFn`, which only changes the layout, to the tensor stub of the argument.
+    /// If this succeeds, no actions are performed at run-time.
+    /// If it fails, `dynFn`, which also only changes the layout, is applied at run-time.
     static member tryStatic (data: CompileData) (staticFn: TensorStub -> TensorStub option) (dynFn: ITensor -> ITensor) =
         let op = data.Expr.Op
         let argStub = ArgValue.unaryX data.ArgStubs 
@@ -126,7 +136,7 @@ type CompileTools () =
                 ChStubs = data.ChStubs
                 Actions = CompileTools.noAction data
             }
-        | Some argStubWish ->
+        | Some _argStubWish ->
             // We propagated a tensor stub as a wish to our argument, but it was not accepeted.
             // Thus we need to copy the arguments output to our assigned channel stub.
             {
@@ -139,6 +149,7 @@ type CompileTools () =
             match staticFn argStub with
             | Some chStub -> 
                 // Channel stub could be calculated at compile-time.
+                assert (chStub.Storage = argStub.Storage)
                 {
                     ChStubs = Ch.only chStub
                     Actions = CompileTools.noAction data
@@ -157,7 +168,8 @@ type CompileTools () =
                         {new IAction with
                             member __.Execute execData =
                                 let argVal = execData.StubValue argStub
-                                let chVal = dynFn argVal                                
+                                let chVal = dynFn argVal 
+                                assert (chVal.Storage = argVal.Storage)
                                 {RuntimeChValues = Map [Ch.Default, chVal]}
                             member __.Dev =
                                 op.Devs.[Ch.Default]

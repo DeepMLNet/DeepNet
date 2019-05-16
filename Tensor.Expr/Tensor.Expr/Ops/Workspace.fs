@@ -32,16 +32,24 @@ type internal RuntimeValues () =
         if not stub.IsRuntime then
             failwithf "Tensor stub %A is not run-time." stub
 
+
     /// Returns the value for a runtime tensor stub.
-    member __.Value (stub: TensorStub) =
+    member this.Value (stub: TensorStub) =
         checkRuntime stub
         stubVals.TryFind stub
         |> Option.defaultWith (fun () ->
-            failwithf "Value for runtime tensor stub %A is unknown." stub)        
+            failwithf "Value for runtime tensor stub %A is unknown." stub)    
+
+            
+    /// Returns true if the runtime tensor stub has a value.
+    member this.HasValue (stub: TensorStub) =
+        checkRuntime stub
+        stubVals.ContainsKey stub
+
             
     /// Adds a value for a runtime tensor stub and starts tracking its storage, 
     /// if the value is temporary.
-    member __.AddValue (stub: TensorStub) (chValue: ITensor) (owner: ActionGroup) =
+    member this.AddValue (stub: TensorStub) (chValue: ITensor) =
         checkRuntime stub
 
         // Check that returned value matches layout, if stub specifies one.
@@ -60,7 +68,10 @@ type internal RuntimeValues () =
             failwithf "Value for tensor stub %A has wrong device %A." stub chValue.Dev
 
         // Store value.
-        stubVals.[stub] <- chValue
+        let oldChValue = stubVals.GetOrAdd (stub, chValue)
+        if oldChValue <> chValue then
+            failwithf "Value for tensor stub %A cannot be changed from %A to %A." 
+                stub oldChValue chValue
 
         // Set up tracking, if op allocated storage for its result.
         match stub.Storage with
@@ -78,16 +89,20 @@ type internal RuntimeValues () =
             storageTrack.TryAdd (chValue.Storage, RuntimeStorageTrack.Untracked) |> ignore
         | _ -> failwith "Unknown storage stub for runtime tensor stub."
 
-        // Add action group as owner if its runtime value.
+
+    /// Adds the action group as user of the runtime value of the tensor stub.
+    member this.AddUser (stub: TensorStub) (owner: ActionGroup) =
+        let chValue = this.Value stub 
         match storageTrack.TryGetValue chValue.Storage with
         | true, (RuntimeStorageTrack.Tracked users) ->
             lock users (fun () -> 
                 users.Add owner |> ignore)  
-        | _ -> ()        
+        | _ -> ()           
+        
 
     /// Notifies the value storage that the value for the specified stub is no longer needed
     /// by the action group, i.e. when all its dependants have been executed.
-    member __.DoneWithValue (stub: TensorStub) (actGrp: ActionGroup) =
+    member this.DoneWithValue (stub: TensorStub) (actGrp: ActionGroup) =
         checkRuntime stub
 
         let rtStubValue = stubVals.[stub]
@@ -267,10 +282,10 @@ type BaseExprWorkspace (recipe: CompileResult) =
             let result = actGrp.Action.Execute execData
 
             // Store run-time channel values.
-            let notProcessed = 
+            let notReturned = 
                 actGrp.ChStubs
                 |> Map.toSeq
-                |> Seq.filter (fun (ch, chStub) -> chStub.IsRuntime)
+                |> Seq.filter (fun (_ch, chStub) -> chStub.IsRuntime)
                 |> Seq.map fst
                 |> HashSet
             for KeyValue(ch, chValue) in result.RuntimeChValues do
@@ -279,10 +294,14 @@ type BaseExprWorkspace (recipe: CompileResult) =
                     |> Map.tryFind ch
                     |> Option.defaultWith (fun () ->
                         failwithf "Action group %A returned a runtime value for a non-existant channel %A." actGrp ch)
-                rtValues.AddValue chStub chValue actGrp
-                notProcessed.Remove ch |> ignore
-            if notProcessed.Count > 0 then
-                failwithf "Action group %A did not return runtime values for channels %A." actGrp notProcessed
+                rtValues.AddValue chStub chValue 
+                rtValues.AddUser chStub actGrp
+                notReturned.Remove ch |> ignore
+            for ch in notReturned do
+                let chStub = actGrp.ChStubs.[ch]
+                if not (rtValues.HasValue chStub) then
+                    failwithf "Action group %A did not return a runtime value for channel %A which has no value so far." 
+                        actGrp ch
 
         /// Called when all dependencies of the specified action group have been executed.
         let allDepsExeced (actGrp: ActionGroup) = 

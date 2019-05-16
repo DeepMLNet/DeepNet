@@ -541,10 +541,11 @@ type SetSubtensor = {X: BaseExprCh; Y: BaseExprCh; Range: SimpleRanges} with
             // Try to use first argument in-place and overwrite the part of
             // the tensor we have to set.
             let chStubs = CompileTools.chStubs (data, tryInplace=TryInplace.Limited (Set [Arg.X]))
+            let chStub = chStubs.[Ch.Default]
 
             let copyActions = 
-                if data.ArgStubs.[Arg.X] = data.ChStubs.[Ch.Default] then
-                    // We are operation in-place the first argument.
+                if data.ArgStubs.[Arg.X] = chStub then
+                    // We are operating in-place the first argument.
                     // Thus it does not need to be copied.
                     CompileTools.noAction data
                 else 
@@ -560,11 +561,20 @@ type SetSubtensor = {X: BaseExprCh; Y: BaseExprCh; Range: SimpleRanges} with
                         (ChValue.onlyX chVals).[range] <- ArgValue.binaryY argVals)
                 else
                     let range = SimpleRanges.eval this.Range 
-                    // TODO: The range tensor stub could be pre-computed at compile-time,
-                    //       but at the moment there is no method to lookup a tensor
-                    //       corresponding to a stub at execution time.
-                    CompileTools.simpleAction data (fun chVals argVals ->
-                        (ChValue.onlyX chVals).[range] <- ArgValue.binaryY argVals)                   
+                    let yStub = ArgValue.binaryY data.ArgStubs
+                    match chStub |> TensorStub.tryView range with
+                    | Some rngStub ->
+                        {new IAction with
+                            member __.Execute execData =
+                                let yVal = execData.StubValue yStub
+                                let rngView = execData.StubValue rngStub
+                                rngView.CopyFrom yVal
+                                {RuntimeChValues=Map.empty}
+                            member __.Dev = this.X.Dev
+                        }
+                    | None ->     
+                        CompileTools.simpleAction data (fun chVals argVals ->
+                            (ChValue.onlyX chVals).[range] <- ArgValue.binaryY argVals)                   
         
             {
                 ChStubs = chStubs

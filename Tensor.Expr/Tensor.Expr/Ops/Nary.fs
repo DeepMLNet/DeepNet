@@ -200,14 +200,19 @@ type BuildTensor = {Shape: Shape; Ranges: BaseRanges list; Xs: BaseExprCh list} 
                         | Some chRngView ->
                             Some { new IAction with
                                 member __.Execute execData =
-                                    execData.StubValues.[chRngView].CopyFrom execData.ArgValues.[arg]
-                                    Map.empty }
+                                    let rngView = execData.StubValue chRngView
+                                    let argVal = execData.StubValue argStub
+                                    rngView.CopyFrom argVal
+                                    {RuntimeChValues=Map.empty}
+                                member __.Dev = chStub.Dev }
                         | None ->
                             Some { new IAction with
                                 member __.Execute execData =
-                                    let trgt = execData.ChValues.[Ch.Default]
-                                    trgt.[aryRng] <- execData.ArgValues.[arg]
-                                    Map.empty })
+                                    let trgt = execData.StubValue chStub
+                                    let argVal = execData.StubValue argStub
+                                    trgt.[aryRng] <- argVal
+                                    {RuntimeChValues=Map.empty} 
+                                member __.Dev = chStub.Dev })
             {
                 ChStubs = data.ChStubs
                 Actions = CompileTools.concatActions actions
