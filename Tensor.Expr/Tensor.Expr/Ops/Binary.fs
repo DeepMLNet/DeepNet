@@ -2,6 +2,8 @@
 
 open DeepNet.Utils
 open Tensor.Expr
+open Tensor.Expr.Base
+open Tensor.Expr.Compiler
 open Tensor
 
 

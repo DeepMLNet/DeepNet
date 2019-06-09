@@ -1,6 +1,7 @@
 ﻿namespace rec Tensor.Expr
 
 open DeepNet.Utils
+open Tensor.Expr.Base
 open Tensor.Expr.Ops
 open Tensor.Backend
 

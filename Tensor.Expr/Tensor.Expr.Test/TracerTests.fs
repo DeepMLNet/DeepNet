@@ -9,6 +9,7 @@ open Tensor.Utils
 open Tensor
 open Tensor.Backend
 open Tensor.Expr
+open Tensor.Expr.Base
 open Tensor.Host
 open Tensor.Cuda
 open TestUtils
@@ -52,7 +53,7 @@ type HDF5TracerTests (output: ITestOutputHelper) =
         (
             use hdf = HDF5.OpenWrite hdfName
             let tracer = HDF5Tracer hdf    
-            let evalEnv: Ops.EvalEnv = {VarEnv=varEnv; Tracer=tracer}
+            let evalEnv: Base.EvalEnv = {VarEnv=varEnv; Tracer=tracer}
             expr |> UExpr.evalWithEnv evalEnv |> ignore
         )
 

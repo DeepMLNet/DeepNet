@@ -1,6 +1,7 @@
 ﻿namespace Tensor.Expr
 
 open Tensor.Expr.Ops
+open Tensor.Expr.Base
 open DeepNet.Utils
 
 

@@ -87,3 +87,20 @@
 - but now the prediction function is using the uninstated graph, even if we instantiate everything...
 - that is a problem with immutability
 - and instantiating two times is also bad, since this will create two different tensors
+
+====
+
+TODO:
+  - Get the compiler running, so that we can test it.
+  - Get the remaining ops ready.
+  - Allow an expression tree dump for verification.
+  
+  - Include result wishes in compiler.
+  - Complete NonCompilableOpAction.
+  - Do some compiler refactoring and documentation.
+  - Perform simple tests.
+  
+
+
+  - Finish interface first, i.e. make Evaluator accept target wishes
+  - 

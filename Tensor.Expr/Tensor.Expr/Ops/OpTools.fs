@@ -2,6 +2,7 @@
 
 open DeepNet.Utils
 open Tensor.Expr
+open Tensor.Expr.Base
 
 
 /// Helper functions for checking validity of expressions.

@@ -1,8 +1,10 @@
-﻿module Tensor.Expr.Ops.Cuda
+﻿module Tensor.Expr.Compiler.Cuda
 
 open DeepNet.Utils
 open Tensor
 open Tensor.Expr
+open Tensor.Expr.Base
+open Tensor.Expr.Compiler
 open Tensor.Cuda
 
 
@@ -27,7 +29,7 @@ type ActionCudaData = {
 
 /// Assigns a CUDA stream to each action group.
 /// Streams are assigned for maximum possible parallelism and reused if possible.
-let assignStreams (dev: TensorCudaDevice) (group: BaseExprGroup) (actionGroups: Map<BaseExpr, ActionGroup>) = 
+let assignStreams (dev: TensorCudaDevice) (group: BaseExprGroup) (actionGroups: Map<BaseExpr, ActionNode>) = 
     let availStreams = Queue<Stream> ()
     let mutable streamCount = 0
 
@@ -44,7 +46,7 @@ let assignStreams (dev: TensorCudaDevice) (group: BaseExprGroup) (actionGroups: 
     let releaseStream stream =
         availStreams.Enqueue stream
 
-    let actionGroups = Dictionary<BaseExpr, ActionGroup> ()
+    let actionGroups = Dictionary<BaseExpr, ActionNode> ()
 
     /// True if the stream of the expression has been reused by one of its dependants.
     let streamReused = Dictionary<BaseExpr, bool> ()
@@ -104,7 +106,7 @@ type private EventHolder = {
 
 /// Assigns CUDA events to action groups to make dependants on other streams
 /// wait until the execution of the dependee is completed.
-let assignSyncEvents (dev: TensorCudaDevice) (group: BaseExprGroup) (actionGroups: Map<BaseExpr, ActionGroup>) =   
+let assignSyncEvents (dev: TensorCudaDevice) (group: BaseExprGroup) (actionGroups: Map<BaseExpr, ActionNode>) =   
     let actionGroups = Dictionary actionGroups
     let depending = BaseExprTransitiveDependencies ()
 

@@ -2,6 +2,8 @@
 
 open DeepNet.Utils
 open Tensor.Expr
+open Tensor.Expr.Base
+open Tensor.Expr.Compiler
 open Tensor
 
 
@@ -45,8 +47,8 @@ type Bundle = {ChExprs: Map<Ch, BaseExprCh>} with
 
     interface IMultiChannelOp
 
-    interface ITensorStubWishPropagatingOp with
-        member this.PropagateWishes data = {           
+    interface IStubWishingOp with
+        member this.WishStubs data = {           
             ChStubs = data.ChStubWishes
             ArgStubWishes =
                 data.ChStubWishes
@@ -150,8 +152,8 @@ type BuildTensor = {Shape: Shape; Ranges: BaseRanges list; Xs: BaseExprCh list} 
                 trgt.[aryRng] <- e 
             trgt |> Ch.only
 
-    interface ITensorStubWishPropagatingOp with
-        member this.PropagateWishes data =
+    interface IStubWishingOp with
+        member this.WishStubs data =
             let chStub =
                 match data.ChStubWishes |> Map.tryFind Ch.Default with
                 | Some chWish -> chWish

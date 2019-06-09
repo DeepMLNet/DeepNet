@@ -1,5 +1,6 @@
 ﻿namespace Tensor.Expr
 
+open Tensor.Expr.Base
 open Tensor.Expr.Ops
 open Tensor
 

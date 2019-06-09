@@ -1,148 +1,41 @@
-﻿namespace Tensor.Expr.Ops
+﻿[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module Tensor.Expr.Compiler
 
 open DeepNet.Utils
-open Tensor
 open Tensor.Expr
+open Tensor.Expr.Base
+open Tensor.Expr.Compiler
 
 
 
-type CompileEnv = {
-    //VarOffsetStrides: Map<VarName, int64 * int64 list> 
-    Unused: unit
-}
+/// Propagates tensor stub wishes from the roots of the expression tree towards its nodes.
+module StubWishing =
 
-type ExecuteEnv = {
-    /// Values for each variable.
-    VarValues:          Map<VarName, ITensor>
-    /// Tensors to store the resulting values of the root expressions.
-    /// Only for results that were specified to use external values during compilation.
-    ResultTargets:      Map<BaseExprCh, ITensor>
-    /// Number of execution threads.
-    /// If None, one thread is used per processor core.
-    ThreadCount:        int option
-    /// If true, results can use allocated or external storage, which might
-    /// be shared with other data (variable values) or be overwritten when
-    /// the workspace is executed again.
-    /// If false, results are guaranteed to have an exclusive storage and
-    /// may be overwritten by the caller.
-    RawResults:         bool
-}
+    /// Arguments for stub wish propagation.
+    type Args = {
+        /// Compile environment.
+        Env:                CompileEnv
+        /// Wishes for channel stubs.
+        ChStubWishes:       Map<BaseExprCh, TensorStub>
+        /// Expression forest to operate on.
+        Group:              BaseExprGroup
+    }
 
+    /// Result of stub wish propagation.
+    type Result = {
+        /// All allocations.
+        Allocs:             AllocStub list
+        /// Assigned tensor stubs for expression channels.
+        ChStubs:            Map<BaseExprCh, TensorStub>
+        /// Stub wishes made for expression channels.
+        ChStubWishes:       Map<BaseExprCh, TensorStub>
+        /// Stub wishes made for expression arguments.
+        ArgStubWishes:      Map<BaseExpr, Map<Arg, TensorStub>>
+    }
 
-type ExecuteData = {
-    StubValue:          TensorStub -> ITensor
-    Env:                ExecuteEnv
-}
-
-and ExecuteResult = {
-    RuntimeChValues:    Map<Ch, ITensor>  
-}
-
-
-type IAction =
-    /// Execute actions and return resulting tensor for dynamic stubs.
-    /// A tensor returned for a dynamic tensor stub must not use a storage
-    /// with a static allocation.
-    /// TODO: verify and enforce.
-    abstract Execute: ExecuteData -> ExecuteResult
-    /// Device that executes this action (primarily).
-    abstract Dev: ITensorDevice
-
-
-type IActionDeviceData =
-    interface end
-
-
-/// Action that marks the end of execution.
-/// This action is put into an ActionGroup that depends on all ActionGroup without dependants.
-type FinishAction () =
-    interface IAction with
-        member __.Execute _ = failwith "Not to be executed."
-        member __.Dev = HostTensor.Dev
-
-
-[<ReferenceEquality>]
-type ActionGroup = {
-    Expr:               BaseExpr option
-    DependsOn:          HashSet<ActionGroup>
-    Dependants:         HashSet<ActionGroup>
-    Action:             IAction 
-    ChStubs:            Map<Ch, TensorStub>
-    DevData:            IActionDeviceData option
-} with
-    member this.Dev = this.Action.Dev
-
-
-type CompileData = {
-    Alloc:              AllocReq -> AllocStub
-    Env:                CompileEnv
-    Expr:               BaseExpr
-    ArgStubs:           Map<Arg, TensorStub> 
-    OverwritableArgs:   Set<Arg>
-    ChStubWishes:       Map<Ch, TensorStub>
-    ChStubs:            Map<Ch, TensorStub>
-    ArgStubWishes:      Map<Arg, TensorStub>
-}
-
-
-type CompileOutput = {
-    ChStubs:            Map<Ch, TensorStub>
-    Actions:            IAction 
-}
-
-type CompileResult = {
-    Allocs:             AllocStub list
-    ChStubs:            Map<BaseExprCh, TensorStub>
-    ActionGroups:       ActionGroup list
-    ResultStubs:        Map<BaseExprCh, TensorStub>
-}
-
-
-type UpPropData = {
-    Alloc:              AllocReq -> AllocStub
-    Env:                CompileEnv    
-    Expr:               BaseExpr
-    ChStubWishes:       Map<Ch, TensorStub>
-}
-
-type UpPropOutput = {
-    ChStubs:            Map<Ch, TensorStub>
-    ArgStubWishes:      Map<Arg, TensorStub>
-}
-
-
-type UpPropResult = {
-    Allocs:             AllocStub list
-    ChStubs:            Map<BaseExprCh, TensorStub>
-    ChStubWishes:       Map<BaseExprCh, TensorStub>
-    ArgStubWishes:      Map<BaseExpr, Map<Arg, TensorStub>>
-}
-
-
-type ICompilableOp =
-    /// Should compute the channel stubs given the argument stubs.
-    abstract Compile: CompileData -> CompileOutput
-
-
-type ITensorStubWishPropagatingOp =
-    /// Should compute argument stub wishes given channel stub wishes.
-    abstract PropagateWishes: UpPropData -> UpPropOutput
-
-
-
-type NonCompilableOpAction (expr: BaseExpr, argStubs: Map<Arg, TensorStub>) =
-    interface IAction with
-        member this.Execute data =
-            failwith "TODO"
-        member this.Dev =
-            failwith "TODO"
-
-
-module BaseExprCompiler =
-
-    /// Propagates tensor stub wishes from the roots of the expression tree towards its nodes.
+    /// Perform propagation of tensor stubs from channels to arguments.
     /// Only wishes for non-aliased tensor stubs are honored.
-    let propagateStubWishes (env: CompileEnv) (chStubWishes: Map<BaseExprCh, TensorStub>) (group: BaseExprGroup) =
+    let perform (args: Args) : Result =
 
         /// All allocation stubs.
         let allocStubs = ResizeArray<AllocStub> ()
@@ -158,7 +51,10 @@ module BaseExprCompiler =
             |> Map.filter (fun _ ts -> TensorStub.isNotAliased ts)            
 
         /// Tensor stub wishes for an expression channel.
-        let chStubWishes = chStubWishes |> filterWishes |> Dictionary<BaseExprCh, TensorStub> 
+        let chStubWishes = 
+            args.ChStubWishes 
+            |> filterWishes 
+            |> Dictionary<BaseExprCh, TensorStub> 
 
         /// Tensor stubs for an expression channel.
         let chStubs = Dictionary<BaseExprCh, TensorStub> ()
@@ -169,7 +65,7 @@ module BaseExprCompiler =
         /// Propagates wishes from an expression to its arguments.
         let propagate (expr: BaseExpr) =
             match expr.Op with
-            | :? ITensorStubWishPropagatingOp as op ->
+            | :? IStubWishingOp as op ->
                 // Op supports wish propagation.
 
                 // Assemble all channel wishes of an expression.
@@ -181,9 +77,9 @@ module BaseExprCompiler =
                     |> Map.ofSeq
 
                 // Let op calculate wishes for its arguments.
-                let comp = op.PropagateWishes  {
+                let comp = op.WishStubs  {
                     Alloc = alloc expr
-                    Env = env
+                    Env = args.Env
                     Expr = expr
                     ChStubWishes = chWishes
                 }
@@ -222,7 +118,7 @@ module BaseExprCompiler =
                 ()
 
         // Walk over expression tree from roots to leafs and propagate wishes.
-        group.RevIter propagate
+        args.Group.RevIter propagate
 
         {
             Allocs = List.ofSeq allocStubs
@@ -232,11 +128,25 @@ module BaseExprCompiler =
         }
 
 
-    /// Assigns a tensor stub to each expression channel in the expression tree.
-    let assignStubs (env: CompileEnv) (upProp: UpPropResult) (group: BaseExprGroup) =
+
+/// Assignment of tensor stubs and action generation.
+module StubAndActionAssignment =
+  
+    /// Arguments for tensor stub and action assignment.  
+    type Args = {
+        /// Compile environment.
+        Env:                CompileEnv
+        /// Results for tensor stub wishing.
+        StubWishing:        StubWishing.Result
+        /// Expression forest to operate on.
+        Group:              BaseExprGroup
+    }
+    
+    /// Perform tensor stub and action assignment for every expression in the forect.
+    let perform (args: Args) : ExecutionRecipe =
 
         /// All allocation stubs.
-        let allocStubs = ResizeArray<AllocStub> upProp.Allocs
+        let allocStubs = ResizeArray<AllocStub> args.StubWishing.Allocs
         /// Users of an allocation, either as argument, internally or as channel.
         let allocUsers = Dictionary<AllocStub, Set<BaseExpr>> ()
         /// Expression channels that use an allocation.
@@ -258,16 +168,16 @@ module BaseExprCompiler =
         let tensorStubs = Dictionary<BaseExprCh, TensorStub> ()
 
         /// Action group for each expression.
-        let actionGroupForExpr = Dictionary<BaseExpr, ActionGroup> ()
+        let actionGroupForExpr = Dictionary<BaseExpr, ActionNode> ()
 
         /// All expressions that an expression depends on transitively.
         let depending = BaseExprTransitiveDependencies ()
 
         /// Action groups that have no dependants.
-        let leafActGrps = HashSet<ActionGroup> ()
+        let leafActGrps = HashSet<ActionNode> ()
 
         // Store channel stubs from stub propagation towards leafs. 
-        for KeyValue(exprCh, stub) in upProp.ChStubs do
+        for KeyValue(exprCh, stub) in args.StubWishing.ChStubs do
             tensorStubs.[exprCh] <- stub
             match stub.Storage with
             | StorageStub.Allocated allocStub -> addAllocUserCh allocStub exprCh
@@ -322,7 +232,7 @@ module BaseExprCompiler =
                         let deps =
                             exprChsUsingArgStorage
                             |> Set.toSeq
-                            |> Seq.collect group.Dependants
+                            |> Seq.collect args.Group.Dependants
                             |> Seq.filter ((<>) expr)
                         // Check if we depend on all their dependants *and* that they have been processed,
                         // i.e. if they exposed the allocation via an output channel it would already have been
@@ -338,7 +248,7 @@ module BaseExprCompiler =
             let preassignedChStubs =
                 expr.Channels
                 |> Seq.choose (fun ch ->
-                    upProp.ChStubs.TryFind expr.[ch]
+                    args.StubWishing.ChStubs.TryFind expr.[ch]
                     |> Option.map (fun wish -> ch, wish))
                 |> Map.ofSeq
 
@@ -346,7 +256,7 @@ module BaseExprCompiler =
             let chWishes =
                 expr.Channels
                 |> Seq.choose (fun ch ->
-                    upProp.ChStubWishes.TryFind expr.[ch]
+                    args.StubWishing.ChStubWishes.TryFind expr.[ch]
                     |> Option.map (fun wish -> ch, wish))
                 |> Map.ofSeq
 
@@ -355,7 +265,7 @@ module BaseExprCompiler =
                 expr.Args
                 |> Map.keys
                 |> Seq.choose (fun arg ->
-                    upProp.ArgStubWishes
+                    args.StubWishing.ArgStubWishes
                     |> Map.tryFind expr
                     |> Option.bind (Map.tryFind arg)
                     |> Option.map (fun wish -> arg, wish))
@@ -368,7 +278,7 @@ module BaseExprCompiler =
                     // Let op compute its output stubs given argument stubs.
                     cop.Compile {
                         Alloc = alloc expr
-                        Env = env
+                        Env = args.Env
                         ArgStubs = argStubs
                         OverwritableArgs = overwritableArgs
                         ChStubs = preassignedChStubs
@@ -415,7 +325,7 @@ module BaseExprCompiler =
 
             // Compute dependencies.
             let dependsOn =
-                group.Depending expr
+                args.Group.Depending expr
                 |> Seq.map (fun dep -> actionGroupForExpr.[dep])  
                 |> HashSet
 
@@ -457,7 +367,7 @@ module BaseExprCompiler =
             depending.Remove expr 
 
         // Process expression tree.
-        group.Iter (processExpr, allDepsOfExprEvaled=allDepsProcessed)
+        args.Group.Iter (processExpr, allDepsOfExprEvaled=allDepsProcessed)
 
         // Create action group that depends on all action groups that have not dependants.
         // It signals that all action groups have been evaluated.
@@ -476,7 +386,7 @@ module BaseExprCompiler =
         // Compose compilation result.
         let chStubs = Map.ofDictionary tensorStubs
         let resultStubs =
-            group.Exprs
+            args.Group.Exprs
             |> Seq.collect (fun resExpr -> 
                 resExpr.Channels
                 |> Seq.map (fun ch -> 
@@ -486,8 +396,36 @@ module BaseExprCompiler =
         {
             Allocs = List.ofSeq allocStubs
             ChStubs = Map.ofDictionary tensorStubs
-            ActionGroups = actionGroupForExpr.Values |> Seq.toList
+            ActionNodes = actionGroupForExpr.Values |> Seq.toList
             ResultStubs = resultStubs 
         }
 
 
+let compile (env: CompileEnv) (group: BaseExprGroup) : ExecutionRecipe =
+    let targetStubs =
+            env.ExternalTargets
+            |> Seq.map (fun exprCh ->
+                let inGroup = group.Exprs |> List.exists (fun e -> e.Channels |> Set.contains exprCh.Channel)
+                if not inGroup then
+                    failwithf "External target %A is not part of expression group." exprCh
+                exprCh, {
+                    Shape = Shape.eval exprCh.Shape
+                    TypeName = exprCh.TypeName
+                    Dev = exprCh.Dev
+                    OffsetStride = OffsetStride.Runtime (RuntimeStub())
+                    Storage = StorageStub.External (RuntimeStub())
+                })
+            |> Map.ofSeq    
+    let stubWishing = StubWishing.perform {
+        Env = env
+        ChStubWishes = targetStubs
+        Group = group
+    }
+    
+    StubAndActionAssignment.perform {
+        Env = env
+        StubWishing = stubWishing
+        Group = group
+    }
+
+    

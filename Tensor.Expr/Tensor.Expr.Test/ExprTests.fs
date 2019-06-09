@@ -9,6 +9,7 @@ open Tensor.Utils
 open Tensor
 open Tensor.Backend
 open Tensor.Expr
+open Tensor.Expr.Base
 open TestUtils
 
 
@@ -38,7 +39,7 @@ module ExprTestCase =
 
         printfn ""
         let tracer = TextTracer (output.WriteLine)
-        let evalEnv: Ops.EvalEnv = {VarEnv=varEnv; Tracer=tracer}
+        let evalEnv: Base.EvalEnv = {VarEnv=varEnv; Tracer=tracer}
         let value = tc.Expr |> UExpr.evalWithEnv evalEnv      
         printfn ""
         assert (value.AlmostEqual tc.Value)

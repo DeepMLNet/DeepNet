@@ -4,6 +4,8 @@ open DeepNet.Utils
 open Tensor
 open Tensor.Backend
 open Tensor.Expr
+open Tensor.Expr.Base
+open Tensor.Expr.Compiler
 
 
 /// Types for internal loop representation. 

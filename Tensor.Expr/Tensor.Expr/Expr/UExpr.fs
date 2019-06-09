@@ -3,12 +3,13 @@
 open System
 
 open DeepNet.Utils
+open Tensor.Expr.Base
 open Tensor.Expr.Ops
 open Tensor.Backend
 
 
-type Ch = Ops.Ch
-type Arg = Ops.Arg
+type Ch = Base.Ch
+type Arg = Base.Arg
 
 
 /// start plus the specified number of (symbolic elements)

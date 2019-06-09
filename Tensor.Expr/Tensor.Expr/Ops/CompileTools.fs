@@ -3,6 +3,8 @@
 open DeepNet.Utils
 open Tensor
 open Tensor.Expr
+open Tensor.Expr.Base
+open Tensor.Expr.Compiler
 
 
 
@@ -18,7 +20,7 @@ type CompileTools () =
     /// Allocates tensor stubs for all output channels of the op.
     /// Argument stubs will be reused, if tryInplace is true.
     /// Channel wishes will be honored, if honorWishes is true.
-    static member chStubs (data: CompileData, ?tryInplace: TryInplace, ?honorWishes: bool) =
+    static member chStubs (data: CompileOpArgs, ?tryInplace: TryInplace, ?honorWishes: bool) =
         let tryInplace = defaultArg tryInplace TryInplace.None
         let honorWishes = defaultArg honorWishes true
 
@@ -72,11 +74,11 @@ type CompileTools () =
         |> Map.ofSeq
 
     /// Passes through tensor stub of unary argument.
-    static member passthroughStub (data: CompileData) =
+    static member passthroughStub (data: CompileOpArgs) =
         Map [Ch.Default, data.ArgStubs.[Arg.Only]]
 
     /// Propagates a tensor stub wish for an unary operation.
-    static member propUnaryWish (data: UpPropData) (fn: TensorStub -> TensorStub option)  =
+    static member propUnaryWish (data: WishStubsArgs) (fn: TensorStub -> TensorStub option)  =
         let chWishOpt = data.ChStubWishes |> Map.tryFind Ch.Default
         let argWishOpt = chWishOpt |> Option.bind fn
         match chWishOpt, argWishOpt with
@@ -95,7 +97,7 @@ type CompileTools () =
             }
 
 
-    static member simpleAction (data: CompileData) (actFn: Map<Ch, ITensor> -> Map<Arg, ITensor> -> unit) =
+    static member simpleAction (data: CompileOpArgs) (actFn: Map<Ch, ITensor> -> Map<Arg, ITensor> -> unit) =
         let dev = data.ChStubs.[Ch.Default].Dev
         {new IAction with
             member __.Execute execData =
@@ -107,7 +109,7 @@ type CompileTools () =
         }
 
 
-    static member noAction (data: CompileData) =
+    static member noAction (data: CompileOpArgs) =
         CompileTools.simpleAction data (fun _ _ -> ())
 
 
@@ -124,7 +126,7 @@ type CompileTools () =
     /// Tries to apply `staticFn`, which only changes the layout, to the tensor stub of the argument.
     /// If this succeeds, no actions are performed at run-time.
     /// If it fails, `dynFn`, which also only changes the layout, is applied at run-time.
-    static member tryStatic (data: CompileData) (staticFn: TensorStub -> TensorStub option) (dynFn: ITensor -> ITensor) =
+    static member tryStatic (data: CompileOpArgs) (staticFn: TensorStub -> TensorStub option) (dynFn: ITensor -> ITensor) =
         let op = data.Expr.Op
         let argStub = ArgValue.unaryX data.ArgStubs 
 

@@ -10,6 +10,7 @@ open Tensor.Utils
 open Tensor
 open Tensor.Expr
 open Tensor.Backend
+open Tensor.Expr.Base
 open Tensor.Expr.Ops
 open Tensor.Cuda
 

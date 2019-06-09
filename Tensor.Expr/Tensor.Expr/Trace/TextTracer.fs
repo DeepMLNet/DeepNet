@@ -3,6 +3,7 @@
 open Tensor.Expr.Ops
 open DeepNet.Utils
 open Tensor
+open Tensor.Expr.Base
 
 
 /// Limits for TextTracer output.

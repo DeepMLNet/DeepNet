@@ -2,6 +2,7 @@
 
 open System.Diagnostics
 open DeepNet.Utils
+open Tensor.Expr.Base
 open Tensor.Expr.Ops
 
 

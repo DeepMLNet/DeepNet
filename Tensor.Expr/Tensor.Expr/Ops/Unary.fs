@@ -2,6 +2,8 @@
 
 open DeepNet.Utils
 open Tensor.Expr
+open Tensor.Expr.Base
+open Tensor.Expr.Compiler
 open Tensor
 open Tensor.Backend
 
@@ -538,8 +540,8 @@ type Reshape = { X: BaseExprCh; Shape: Shape } with
         member this.Eval env argVals =
             (ArgValue.unaryX argVals) |> ITensor.reshape (Shape.eval this.Shape) |> Ch.only
 
-    interface ITensorStubWishPropagatingOp with
-        member this.PropagateWishes data =
+    interface IStubWishingOp with
+        member this.WishStubs data =
             CompileTools.propUnaryWish data (fun wish ->
                 wish |> TensorStub.tryReshape (Shape.eval this.Shape))
 
@@ -681,8 +683,8 @@ type PermuteAxes = {X: BaseExprCh; Permutation: int list} with
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.unaryX argVals) |> ITensor.permuteAxes this.Permutation |> Ch.only
 
-    interface ITensorStubWishPropagatingOp with
-        member this.PropagateWishes data =
+    interface IStubWishingOp with
+        member this.WishStubs data =
             CompileTools.propUnaryWish data (fun wish ->
                 wish |> TensorStub.tryPermuteAxes (Permutation.invert this.Permutation))
 
@@ -813,8 +815,8 @@ type ReverseAxis = {X: BaseExprCh; Axis: int} with
         member this.CanEvalAllSymSizes = true
         member this.Eval env argVals = (ArgValue.unaryX argVals) |> ITensor.reverseAxis this.Axis |> Ch.only
 
-    interface ITensorStubWishPropagatingOp with
-        member this.PropagateWishes data =
+    interface IStubWishingOp with
+        member this.WishStubs data =
             CompileTools.propUnaryWish data (fun wish ->
                 wish |> TensorStub.tryReverseAxis this.Axis)
 

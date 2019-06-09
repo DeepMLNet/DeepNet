@@ -1,9 +1,10 @@
-﻿namespace Tensor.Expr.Ops
+﻿namespace Tensor.Expr.Compiler
 
 open DeepNet.Utils
 open Tensor
 open Tensor.Backend
 open Tensor.Expr
+open Tensor.Expr.Base
 
 
 type AllocReq = {

@@ -1,4 +1,4 @@
-﻿namespace rec Tensor.Expr.Ops
+﻿namespace rec Tensor.Expr.Base
 
 open System
 open MBrace.FsPickler

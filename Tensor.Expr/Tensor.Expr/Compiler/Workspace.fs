@@ -1,4 +1,4 @@
-﻿namespace Tensor.Expr.Ops
+﻿namespace Tensor.Expr.Compiler
 
 open System
 open System.Threading
@@ -6,6 +6,7 @@ open System.Threading
 open DeepNet.Utils
 open Tensor
 open Tensor.Expr
+open Tensor.Expr.Base
 open Tensor.Backend
 
 
@@ -17,7 +18,7 @@ type internal RuntimeStorageTrack =
     | Untracked
     /// Value is used by the set of action groups and will be disposed
     /// when all dependants of these action groups have been executed.
-    | Tracked of HashSet<ActionGroup>
+    | Tracked of HashSet<ActionNode>
    
 
 /// Storage for runtime stub values.
@@ -91,7 +92,7 @@ type internal RuntimeValues () =
 
 
     /// Adds the action group as user of the runtime value of the tensor stub.
-    member this.AddUser (stub: TensorStub) (owner: ActionGroup) =
+    member this.AddUser (stub: TensorStub) (owner: ActionNode) =
         let chValue = this.Value stub 
         match storageTrack.TryGetValue chValue.Storage with
         | true, (RuntimeStorageTrack.Tracked users) ->
@@ -102,7 +103,7 @@ type internal RuntimeValues () =
 
     /// Notifies the value storage that the value for the specified stub is no longer needed
     /// by the action group, i.e. when all its dependants have been executed.
-    member this.DoneWithValue (stub: TensorStub) (actGrp: ActionGroup) =
+    member this.DoneWithValue (stub: TensorStub) (actGrp: ActionNode) =
         checkRuntime stub
 
         let rtStubValue = stubVals.[stub]
@@ -129,11 +130,11 @@ type internal RuntimeValues () =
 
 
 
-type BaseExprWorkspace (recipe: CompileResult) =
+type BaseExprWorkspace (recipe: ExecutionRecipe) =
     let mutable _disposed = false
     let checkDisposed () =
         if _disposed then
-            raise (ObjectDisposedException ("BaseExprWorkSpace"))
+            raise (ObjectDisposedException ("BaseExprWorkspace"))
 
     /// Allocate and return storage for the specified storage stubs.
     let allocStorage (stubs: AllocStub list) =
@@ -153,19 +154,19 @@ type BaseExprWorkspace (recipe: CompileResult) =
     let storages = allocStorage recipe.Allocs
 
     /// Iterates over a set of action groups. 
-    let iter (fn: ActionGroup -> unit) (allDepsExecedFn: ActionGroup -> unit) 
-            (execThreadCount: int option) (actGrps: ActionGroup list) =
+    let iter (fn: ActionNode -> unit) (allDepsExecedFn: ActionNode -> unit) 
+            (execThreadCount: int option) (actGrps: ActionNode list) =
 
         let execThreadCount = defaultArg execThreadCount Environment.ProcessorCount
         if execThreadCount < 1 then 
             failwith "Execution thread count must be at least 1."
 
         /// Action groups missing for execution of an execution group.
-        let missing = Dictionary<ActionGroup, HashSet<ActionGroup>> ()
+        let missing = Dictionary<ActionNode, HashSet<ActionNode>> ()
         /// Dependants of an action group that have not yet beed executed.
-        let unexecedDeps = Dictionary<ActionGroup, HashSet<ActionGroup>> ()
+        let unexecedDeps = Dictionary<ActionNode, HashSet<ActionNode>> ()
         /// Action groups that can be executed.
-        let ready = ConcurrentQueue<ActionGroup> ()
+        let ready = ConcurrentQueue<ActionNode> ()
 
         /// Initialize list of missing action groups.
         for actGrp in actGrps do
@@ -248,7 +249,7 @@ type BaseExprWorkspace (recipe: CompileResult) =
 
 
     /// Executes a set of action groups.
-    let execute (execEnv: ExecuteEnv) (actGrps: ActionGroup list) =
+    let execute (execEnv: ExecuteEnv) (actGrps: ActionNode list) =
         let rtValues = RuntimeValues ()
 
         /// Gets the tensor for the specified tensor stub.
@@ -271,13 +272,13 @@ type BaseExprWorkspace (recipe: CompileResult) =
                 Tensor.NewOfType (stub.Layout.Value, storage)
                     
         /// Execution data.
-        let execData: ExecuteData = {
+        let execData: ActionData = {
             Env = execEnv
             StubValue = tensorForStub
         }
 
         /// Executes the action group.
-        let exec (actGrp: ActionGroup) =
+        let exec (actGrp: ActionNode) =
             // Execute op.
             let result = actGrp.Action.Execute execData
 
@@ -304,7 +305,7 @@ type BaseExprWorkspace (recipe: CompileResult) =
                         actGrp ch
 
         /// Called when all dependencies of the specified action group have been executed.
-        let allDepsExeced (actGrp: ActionGroup) = 
+        let allDepsExeced (actGrp: ActionNode) = 
             // Notify storage that runtime channel values of action group are no longer needed.
             for KeyValue(_ch, chStub) in actGrp.ChStubs do
                 if chStub.IsRuntime then
@@ -327,7 +328,7 @@ type BaseExprWorkspace (recipe: CompileResult) =
     /// Executes the workspace and returns the values of the root expressions.
     member this.Execute (env: ExecuteEnv) : Map<BaseExprCh, ITensor> =
         checkDisposed ()
-        execute env recipe.ActionGroups
+        execute env recipe.ActionNodes
 
 
     interface IDisposable with
