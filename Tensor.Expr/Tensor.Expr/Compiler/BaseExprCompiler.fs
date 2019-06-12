@@ -1,6 +1,7 @@
-﻿[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module Tensor.Expr.Compiler
+﻿namespace Tensor.Expr.Compiler
 
+open System.IO
+open System.IO
 open DeepNet.Utils
 open Tensor.Expr
 open Tensor.Expr.Base
@@ -31,7 +32,28 @@ module StubWishing =
         ChStubWishes:       Map<BaseExprCh, TensorStub>
         /// Stub wishes made for expression arguments.
         ArgStubWishes:      Map<BaseExpr, Map<Arg, TensorStub>>
-    }
+    } with
+        static member dump (writer: TextWriter) (exprIds: Map<BaseExpr, int>) (result: Result) =
+            fprintfn writer "Allocs:"
+            for allocStub in result.Allocs do
+                fprintfn writer "%A" allocStub
+            fprintfn writer ""
+            fprintfn writer "ChStubs:"
+            for KeyValue(BaseExprCh(ch, expr), stub) in result.ChStubs do
+                fprintfn writer "#%d[%A]: %A" exprIds.[expr] ch stub
+            fprintfn writer ""
+            fprintfn writer "ChStubWishes:"
+            for KeyValue(BaseExprCh(ch, expr), stub) in result.ChStubs do
+                fprintfn writer "#%d[%A]: %A" exprIds.[expr] ch stub
+            fprintfn writer ""
+            fprintfn writer "ArgStubWishes:"
+            for KeyValue(expr, wishes) in result.ArgStubWishes do
+                let wishStr =
+                    Map.toList wishes
+                    |> List.map (fun (arg, stub) -> sprintf "%A=%A" arg stub)
+                    |> String.concat ", "
+                fprintfn writer "#%d: %s" exprIds.[expr] wishStr
+                
 
     /// Perform propagation of tensor stubs from channels to arguments.
     /// Only wishes for non-aliased tensor stubs are honored.
@@ -141,6 +163,7 @@ module StubAndActionAssignment =
         /// Expression forest to operate on.
         Group:              BaseExprGroup
     }
+    
     
     /// Perform tensor stub and action assignment for every expression in the forect.
     let perform (args: Args) : ExecutionRecipe =
@@ -401,8 +424,27 @@ module StubAndActionAssignment =
         }
 
 
-let compile (env: CompileEnv) (group: BaseExprGroup) : ExecutionRecipe =
-    let targetStubs =
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module ExecutionRecipe = 
+
+    let make (env: CompileEnv) (group: BaseExprGroup) : ExecutionRecipe =
+        
+        // Dump expression.
+        let sep = "\n\n" + String.replicate 80 "=" + "\n"
+        let dump = 
+            match env.DumpPath with
+            | Some dumpPath ->
+                let dumpDir = Path.GetDirectoryName dumpPath
+                Directory.CreateDirectory dumpDir |> ignore
+                let writer = new StreamWriter (dumpPath)
+                fprintfn writer "Exprs:\n" 
+                let exprIds = group |> BaseExprGroup.dump writer
+                Some (writer, exprIds)
+            | None -> None
+                        
+        // Create tensor stubs for external target values.
+        let targetStubs =
             env.ExternalTargets
             |> Seq.map (fun exprCh ->
                 let inGroup = group.Exprs |> List.exists (fun e -> e.Channels |> Set.contains exprCh.Channel)
@@ -415,17 +457,43 @@ let compile (env: CompileEnv) (group: BaseExprGroup) : ExecutionRecipe =
                     OffsetStride = OffsetStride.Runtime (RuntimeStub())
                     Storage = StorageStub.External (RuntimeStub())
                 })
-            |> Map.ofSeq    
-    let stubWishing = StubWishing.perform {
-        Env = env
-        ChStubWishes = targetStubs
-        Group = group
-    }
-    
-    StubAndActionAssignment.perform {
-        Env = env
-        StubWishing = stubWishing
-        Group = group
-    }
+            |> Map.ofSeq
+            
+        match dump with
+        | Some (writer, exprIds) ->
+            fprintf writer "%s" sep
+            fprintfn writer "TargetStubs:\n"
+            for KeyValue(BaseExprCh(ch, expr), stub) in targetStubs do
+                fprintfn writer "%d[%s]: %A" exprIds.[expr] (ch.ToString()) stub         
+        | None -> ()
+            
+        let stubWishing = StubWishing.perform {
+            Env = env
+            ChStubWishes = targetStubs
+            Group = group
+        }
+        
+        match dump with
+        | Some (writer, exprIds) ->
+            fprintf writer "%s" sep            
+            fprintfn writer "StubWishing:\n"
+            StubWishing.Result.dump writer exprIds stubWishing
+        | None -> ()
+        
+        let recipe = 
+            StubAndActionAssignment.perform {
+                Env = env
+                StubWishing = stubWishing
+                Group = group
+            }
 
+        match dump with
+        | Some (writer, exprIds) ->
+            fprintf writer "%s" sep            
+            fprintfn writer "ExecutionRecipe:\n"
+            ExecutionRecipe.dump writer exprIds recipe
+            writer.Dispose()
+        | None -> ()        
+
+        recipe
     

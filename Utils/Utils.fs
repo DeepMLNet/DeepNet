@@ -539,6 +539,11 @@ module internal Util =
             // input is redirected from a file.
             None
 
+    /// Returns the value and increments it afterwards.
+    let returnAndIncr (n: int byref) =
+        let v = n
+        n <- n + 1
+        v
 
 
 /// Utility types and operators.        

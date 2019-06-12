@@ -7,28 +7,35 @@ open Tensor.Expr
 open Tensor.Expr.Base
 
 
+[<StructuredFormatDisplay("{Pretty}")>]
 type AllocReq = {
     TypeName:   TypeName
     Dev:        ITensorDevice
     Size:       int64
-}
+} with
+    member this.Pretty =
+        sprintf "%d<%A@%A>" this.Size this.TypeName this.Dev
 
 
-[<ReferenceEquality>]
+[<ReferenceEquality; StructuredFormatDisplay("{Pretty}")>]
 type AllocStub = {
     Req:        AllocReq
 } with
     member this.TypeName = this.Req.TypeName
     member this.Dev = this.Req.Dev
     member this.Size = this.Req.Size
+    
+    member this.Pretty =
+        sprintf "%A(%d)" this.Req (this.GetHashCode())
 
 type AllocFn = AllocReq -> AllocStub
 
     
 /// Placeholder for values unknown at compile-time.
 /// It has reference equality semantics, i.e. each instance is unique.
-type RuntimeStub () = 
-    class end
+type RuntimeStub () =
+    override this.ToString() =
+        sprintf "RuntimeStub(%d)" (this.GetHashCode())
 
 
 [<RequireQualifiedAccess>]
@@ -46,15 +53,21 @@ type StorageStub =
 
 
 /// Offset and stride for a tensor stub.
-[<RequireQualifiedAccess>]
+[<RequireQualifiedAccess; StructuredFormatDisplay("{Pretty}")>]
 type OffsetStride =
     /// Fixed offset and stride.
     | Fixed of offset:int64 * stride:int64 list
     /// Unknown offset and stride.
     | Runtime of RuntimeStub
-
+    
+    member this.Pretty =
+        match this with
+        | Fixed (offset, stride) -> sprintf "Offset=%d; Stride=%A" offset stride
+        | Runtime stub -> sprintf "Offset/Stride=%A" stub
+        
    
 /// A stub representing a tensor.
+[<StructuredFormatDisplay("{Pretty}")>]
 type TensorStub = {
     /// Shape (always known).
     Shape:          int64 list
@@ -116,7 +129,11 @@ type TensorStub = {
         Dev = alloc.Dev
         OffsetStride = OffsetStride.Fixed (layout.Offset, layout.Stride)
         Storage = StorageStub.Allocated alloc
-    }    
+    }
+    
+    member this.Pretty =
+        sprintf "TensorStub<%A@%A>{Storage=%A; Shape=%A; %A}"
+                this.TypeName this.Dev this.Storage this.Shape this.OffsetStride
 
     static member alloc (allocFn: AllocReq -> AllocStub, dataType: TypeName, shape: int64 list, 
                          dev: ITensorDevice, ?order: TensorOrder) =

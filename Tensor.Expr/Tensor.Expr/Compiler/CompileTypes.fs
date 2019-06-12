@@ -1,5 +1,6 @@
 namespace Tensor.Expr.Compiler
 
+open System.IO
 open DeepNet.Utils
 open Tensor
 open Tensor.Expr
@@ -13,6 +14,8 @@ type CompileEnv = {
     /// Root expression channels that should have their values stored in
     /// tensors passed in during execution.
     ExternalTargets:    Set<BaseExprCh>
+    /// Directory where to write compile information.
+    DumpPath:           string option
 }
 
 
@@ -94,6 +97,26 @@ type ActionNode = {
 } with
     /// Primary execution device.
     member this.Dev = this.Action.Dev
+    
+    static member dump (writer: TextWriter) (exprIds: Map<BaseExpr, int>) (getId: ActionNode -> int) (actNode: ActionNode) =
+        let idStr (actNodes: seq<ActionNode>) =
+            actNodes
+            |> Seq.map (fun dep -> sprintf "@%d" (getId dep))
+            |> String.concat ", "  
+        let id = getId actNode
+        fprintf writer "@%d: " id
+        match actNode.Expr with
+        | Some expr -> fprintf writer "#%d" exprIds.[expr]
+        | None -> ()
+        fprintfn writer ""
+        fprintfn writer "  DependsOn: %s" (idStr actNode.DependsOn)
+        fprintfn writer "  Dependants: %s" (idStr actNode.Dependants)
+        fprintfn writer "  ChStubs:"
+        for KeyValue(ch, stub) in actNode.ChStubs do
+            fprintfn writer "    [%s]: %A" (ch.ToString()) stub
+        fprintfn writer "  Action: %A" actNode.Action
+        fprintfn writer "  DevData: %A" actNode.DevData
+        fprintfn writer ""        
 
 
 /// Results of tensor stub and action assignment.
@@ -106,7 +129,26 @@ type ExecutionRecipe = {
     ActionNodes:        ActionNode list
     /// Stubs for all expression channels of root expressions.
     ResultStubs:        Map<BaseExprCh, TensorStub>
-}
+} with
+    static member dump (writer: TextWriter) (exprIds: Map<BaseExpr, int>) (recipe: ExecutionRecipe) =
+        fprintfn writer "Allocs:"
+        for alloc in recipe.Allocs do
+            fprintfn writer "%A" alloc
+        fprintfn writer ""
+        
+        let actNodeId =
+            recipe.ActionNodes
+            |> Seq.indexed
+            |> Seq.map (fun (idx, actNode) -> actNode, idx)
+            |> dict
+        let getId (actNode: ActionNode) = actNodeId.[actNode]         
+        fprintfn writer "ActionNodes:"
+        for actNode in recipe.ActionNodes do
+            ActionNode.dump writer exprIds getId actNode
+            
+        fprintfn writer "ResultStubs:"
+        for KeyValue(BaseExprCh(ch, expr), stub) in recipe.ResultStubs do
+            fprintfn writer "#%d[%s]: %A" exprIds.[expr] (ch.ToString()) stub
 
 
 /// Data for compilation of an op.

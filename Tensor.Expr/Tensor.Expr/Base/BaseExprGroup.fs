@@ -1,5 +1,6 @@
 ﻿namespace Tensor.Expr.Base
 
+open System.IO
 open DeepNet.Utils
 
 
@@ -225,6 +226,15 @@ type BaseExprGroup (exprs: BaseExpr list) =
                 if mv.Remove expr && mv.Count = 0 then
                     // Enqueue, if all dependants have evaluated values.
                     evalQueue.Enqueue argExpr
+                
+    
+    /// Writes the expression forest to a TextWriter and returns the ids assigned to each expression.
+    static member dump (writer: TextWriter) (group: BaseExprGroup) =
+        let mutable nextId = 0
+        let exprIds = Dictionary<BaseExpr, int> ()
+        let getId expr = exprIds.IGetOrAdd expr (fun _ -> Util.returnAndIncr &nextId) 
+        group.Iter (BaseExpr.dump writer getId)
+        Map.ofDictionary exprIds
 
 
 

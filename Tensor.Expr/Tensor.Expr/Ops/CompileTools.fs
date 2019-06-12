@@ -98,7 +98,7 @@ type CompileTools () =
 
 
     static member simpleAction (data: CompileOpArgs) (actFn: Map<Ch, ITensor> -> Map<Arg, ITensor> -> unit) =
-        let dev = data.ChStubs.[Ch.Default].Dev
+        let dev = data.Expr.[Ch.Default].Dev
         {new IAction with
             member __.Execute execData =
                 let chValues = data.ChStubs |> Map.map (fun _ stub -> execData.StubValue stub) 

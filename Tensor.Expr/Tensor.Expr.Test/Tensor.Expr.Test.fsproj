@@ -18,7 +18,8 @@
     <Compile Include="InterpolateTests.fs" />
     <Compile Include="DerivTests.fs" />
     <None Include="ElemExprTests.fs" />
-    <Compile Include="LoopTests.fs" />  
+    <Compile Include="LoopTests.fs" />
+    <Compile Include="CompilerTests.fs" />  
   </ItemGroup>
   <ItemGroup />
   <ItemGroup>

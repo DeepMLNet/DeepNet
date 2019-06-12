@@ -3,6 +3,7 @@
 open System
 open MBrace.FsPickler
 
+open System.IO
 open DeepNet.Utils
 open Tensor.Expr
 open Tensor
@@ -11,7 +12,7 @@ open Tensor.Backend
 
 
 /// A channel name (one output of an expression/op with multiple outputs).
-[<RequireQualifiedAccess>]
+[<RequireQualifiedAccess; StructuredFormatDisplay("{Pretty}")>]
 type Ch = 
     /// Only channel.
     | Default
@@ -25,6 +26,8 @@ type Ch =
         | Default -> "Default"
         | Custom name -> sprintf "Custom:%s" name
         | N idx -> sprintf "%d" idx     
+        
+    member this.Pretty = this.ToString()
         
     static member tryParse (str: string) =
         match str with
@@ -453,6 +456,28 @@ type BaseExpr private (op: IOp) =
 
     /// Pretty string.
     member this.Pretty = this.ToString 80
+    
+    /// Writes the expression to a TextWriter.
+    static member dump (writer: TextWriter) (getId: BaseExpr -> int) (expr: BaseExpr) =
+        fprintf writer "#%d := " (getId expr)
+        fprintf writer "%s" (expr.Op.GetType().Name)
+        
+        match expr.Op with
+        | :? IOpFormat as opFormat ->
+            fprintf writer " {%A}" opFormat.Text
+        | _ -> ()
+        
+        let args = expr.Args
+        let argStr =
+            args
+            |> Map.keys
+            |> List.ofSeq
+            |> List.sortBy (fun arg -> arg.ToString())
+            |> List.map (fun arg ->
+                let (BaseExprCh (argCh, argExpr)) = args.[arg]
+                sprintf "%A=#%d[%A]" arg (getId argExpr) argCh)
+            |> String.concat ", "
+        fprintf writer " (%s)\n" argStr      
 
 
 
