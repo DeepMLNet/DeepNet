@@ -27,6 +27,7 @@ type CompilerTests (output: ITestOutputHelper) =
         let env : CompileEnv = {
             ExternalTargets = Set.empty
             DumpPath = Some "CompilerTest/SimpleExecutionRecipe.txt"
+            AllocationRealizer = IndividualAllocationRealizer.perform
         }
         let group = BaseExprGroup [expr.BaseExpr]
         let er = ExecutionRecipe.make env group

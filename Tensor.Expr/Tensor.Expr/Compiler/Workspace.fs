@@ -151,7 +151,7 @@ type BaseExprWorkspace (recipe: ExecutionRecipe) =
             | _ -> ()
 
     /// Allocated storages for allocation stubs.
-    let storages = allocStorage recipe.Allocs
+    let storages : IDictionary<AllocStub, ITensorStorage> = failwith "TODO" // allocStorage recipe.Allocs
 
     /// Iterates over a set of action groups. 
     let iter (fn: ActionNode -> unit) (allDepsExecedFn: ActionNode -> unit) 

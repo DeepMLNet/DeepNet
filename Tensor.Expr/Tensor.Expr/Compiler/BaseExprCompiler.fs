@@ -1,8 +1,8 @@
 ﻿namespace Tensor.Expr.Compiler
 
 open System.IO
-open System.IO
 open DeepNet.Utils
+open Tensor.Backend
 open Tensor.Expr
 open Tensor.Expr.Base
 open Tensor.Expr.Compiler
@@ -20,53 +20,57 @@ module StubWishing =
         ChStubWishes:       Map<BaseExprCh, TensorStub>
         /// Expression forest to operate on.
         Group:              BaseExprGroup
+        /// Allocation function.
+        AllocFn:            AllocReq -> AllocStub        
     }
-
-    /// Result of stub wish propagation.
-    type Result = {
-        /// All allocations.
-        Allocs:             AllocStub list
-        /// Assigned tensor stubs for expression channels.
-        ChStubs:            Map<BaseExprCh, TensorStub>
-        /// Stub wishes made for expression channels.
-        ChStubWishes:       Map<BaseExprCh, TensorStub>
-        /// Stub wishes made for expression arguments.
-        ArgStubWishes:      Map<BaseExpr, Map<Arg, TensorStub>>
+    
+    type WishNode = {
+        /// Corresponding expression
+        Expr:                    BaseExpr
+        /// Wishes made for tensor stubs of arguments.
+        ArgStubWishes:           Map<Arg, TensorStub>
+        /// Wishes made for tensors stubs of channels by dependants.
+        ChStubWishes:            Map<Ch, TensorStub>
+        /// Channel stubs commited to during wish propagation.
+        ChStubs:                 Map<Ch, TensorStub>
+        /// Performed allocations during wish propagation.
+        Allocs:                  AllocStub list
     } with
-        static member dump (writer: TextWriter) (exprIds: Map<BaseExpr, int>) (result: Result) =
-            fprintfn writer "Allocs:"
-            for allocStub in result.Allocs do
-                fprintfn writer "%A" allocStub
-            fprintfn writer ""
-            fprintfn writer "ChStubs:"
-            for KeyValue(BaseExprCh(ch, expr), stub) in result.ChStubs do
-                fprintfn writer "#%d[%A]: %A" exprIds.[expr] ch stub
-            fprintfn writer ""
-            fprintfn writer "ChStubWishes:"
-            for KeyValue(BaseExprCh(ch, expr), stub) in result.ChStubs do
-                fprintfn writer "#%d[%A]: %A" exprIds.[expr] ch stub
-            fprintfn writer ""
-            fprintfn writer "ArgStubWishes:"
-            for KeyValue(expr, wishes) in result.ArgStubWishes do
-                let wishStr =
-                    Map.toList wishes
-                    |> List.map (fun (arg, stub) -> sprintf "%A=%A" arg stub)
-                    |> String.concat ", "
-                fprintfn writer "#%d: %s" exprIds.[expr] wishStr
-                
+        static member dump (writer: TextWriter) (wn: WishNode) =
+            fprintfn writer "  ArgStubWishes:"
+            for KeyValue(arg, stub) in wn.ArgStubWishes do
+                fprintfn writer "    %A: %A" arg stub            
+            fprintfn writer "  ChStubWishes:"
+            for KeyValue(ch, stub) in wn.ChStubWishes do
+                fprintfn writer "    [%A]: %A" ch stub
+            fprintfn writer "  ChStubs:"
+            for KeyValue(ch, stub) in wn.ChStubs do
+                fprintfn writer "    [%A]: %A" ch stub
+            let allocStr =
+                wn.Allocs |> Seq.map (sprintf "%A") |> String.concat ","
+            fprintfn writer "  Allocs: %s" allocStr
+            
+        static member dumpMap (writer: TextWriter) (exprIds: Map<BaseExpr, int>) (wns: Map<BaseExpr, WishNode>) =
+            let ids =
+                Map.keys wns
+                |> Seq.map (fun expr -> exprIds.[expr])
+                |> List.ofSeq
+                |> List.sort
+            let exprById =
+                exprIds
+                |> Map.toSeq
+                |> Seq.map (fun (expr, id) -> id, expr)
+                |> Map.ofSeq
+            for id in ids do
+                let expr = exprById.[id]
+                fprintfn writer "#%d:" id
+                WishNode.dump writer wns.[expr]
+                fprintfn writer ""
+            
 
     /// Perform propagation of tensor stubs from channels to arguments.
     /// Only wishes for non-aliased tensor stubs are honored.
-    let perform (args: Args) : Result =
-
-        /// All allocation stubs.
-        let allocStubs = ResizeArray<AllocStub> ()
-
-        /// Allocate memory for the specified expression.
-        let alloc expr req =
-            let alloc = {Req = req}
-            allocStubs.Add alloc
-            alloc
+    let perform (args: Args) : Map<BaseExpr, WishNode> =
 
         let filterWishes stubWishes =
             stubWishes
@@ -77,77 +81,92 @@ module StubWishing =
             args.ChStubWishes 
             |> filterWishes 
             |> Dictionary<BaseExprCh, TensorStub> 
-
-        /// Tensor stubs for an expression channel.
-        let chStubs = Dictionary<BaseExprCh, TensorStub> ()
-
-        /// Tensor stub wishes made by an expression for its arguments.
-        let allArgWishes = Dictionary<BaseExpr, Map<Arg, TensorStub>> ()
+        
+        // Wishes for each expression.
+        let wishNodes = Dictionary<BaseExpr, WishNode> ()
 
         /// Propagates wishes from an expression to its arguments.
         let propagate (expr: BaseExpr) =
-            match expr.Op with
-            | :? IStubWishingOp as op ->
-                // Op supports wish propagation.
+            // Assemble all channel wishes of an expression.
+            let chWishes =
+                expr.Channels
+                |> Seq.choose (fun ch ->
+                    chStubWishes.TryFind expr.[ch]
+                    |> Option.map (fun wish -> ch, wish))
+                |> Map.ofSeq
 
-                // Assemble all channel wishes of an expression.
-                let chWishes =
-                    expr.Channels
-                    |> Seq.choose (fun ch ->
-                        chStubWishes.TryFind expr.[ch]
-                        |> Option.map (fun wish -> ch, wish))
-                    |> Map.ofSeq
+            // Allocate memory for the specified expression.
+            let opAllocs = ResizeArray<AllocStub> ()
+            let allocForOp req =
+                let alloc = args.AllocFn req
+                opAllocs.Add alloc
+                alloc
+                    
+            let comp = 
+                match expr.Op with
+                | :? IStubWishingOp as op ->                    
+                    // Op supports wish propagation.
+                    // Let it calculate wishes for its arguments.
+                    op.WishStubs {
+                        Alloc = allocForOp 
+                        Env = args.Env
+                        Expr = expr
+                        ChStubWishes = chWishes
+                    }
+                | _ ->
+                    // Op does not support wish propagation. Do nothing.
+                    {
+                        ChStubs = Map.empty
+                        ArgStubWishes = Map.empty
+                    }
 
-                // Let op calculate wishes for its arguments.
-                let comp = op.WishStubs  {
-                    Alloc = alloc expr
-                    Env = args.Env
-                    Expr = expr
-                    ChStubWishes = chWishes
-                }
+            // Check commited channel stubs for plausibility.
+            for KeyValue(ch, chStub) in comp.ChStubs do
+                let exprCh = expr.[ch]
+                if not (chStub.Dev = exprCh.Dev && 
+                        chStub.TypeName = exprCh.TypeName &&
+                        chStub.Shape = Shape.eval exprCh.Shape) then
+                    failwithf "Tensor stub %A for channel %A is not compatiable with expression %A."
+                        chStub ch exprCh    
 
-                // Store argument stub wishes.
-                allArgWishes.[expr] <- comp.ArgStubWishes
+            // Propagate argument wishes to channels of argument expressions.
+            for KeyValue(arg, argWish) in filterWishes comp.ArgStubWishes do
+                let argExprCh = expr.Args.[arg]
 
-                // Store channel stubs.
-                for KeyValue(ch, chStub) in comp.ChStubs do
-                    let exprCh = expr.[ch]
-                    if not (chStub.Dev = exprCh.Dev && 
-                            chStub.TypeName = exprCh.TypeName &&
-                            chStub.Shape = Shape.eval exprCh.Shape) then
-                        failwithf "Tensor stub %A for channel %A is not compatiable with expression %A."
-                            chStub ch exprCh    
-                    chStubs.[exprCh] <- chStub
+                // Check wish for plausibility.
+                if not (argWish.Dev = argExprCh.Dev && 
+                        argWish.TypeName = argExprCh.TypeName &&
+                        argWish.Shape = Shape.eval argExprCh.Shape) then
+                    failwithf "Tensor stub wish %A for argument %A is not compatiable with %A."
+                        argWish arg argExprCh
 
-                // Propagate wishes to argument expressions.
-                for KeyValue(arg, argWish) in filterWishes comp.ArgStubWishes do
-                    let argExprCh = expr.Args.[arg]
-
-                    // Check wish for plausibility.
-                    if not (argWish.Dev = argExprCh.Dev && 
-                            argWish.TypeName = argExprCh.TypeName &&
-                            argWish.Shape = Shape.eval argExprCh.Shape) then
-                        failwithf "Tensor stub wish %A for argument %A is not compatiable with %A."
-                            argWish arg argExprCh
-
-                    // The first wish for an expression channel wins and subsequent 
-                    // wishes are ignored.
-                    if not (chStubWishes.ContainsKey argExprCh) then
-                        chStubWishes.[argExprCh] <- argWish
-
-            | _ -> 
-                // Op does not support wish propagation. Do nothing.
-                ()
+                // Check that, if a argument wish is made, the storage is either allocated
+                // or comes from a channel with a commited stub.
+                let isAlloced =
+                    opAllocs |> Seq.exists (fun alloc -> argWish.Storage = StorageStub.Allocated alloc)
+                let isFromCommitedCh =
+                    comp.ChStubs |> Map.exists (fun ch chStub -> argWish.Storage = chStub.Storage)
+                if not (isAlloced || isFromCommitedCh) then 
+                    failwithf "Tensor stub wish %A for argument %A uses storage neither from a commited channel
+                               nor self-allocated storage." argWish arg 
+            
+                // The first wish for an expression channel wins and subsequent 
+                // wishes are ignored.
+                if not (chStubWishes.ContainsKey argExprCh) then
+                    chStubWishes.[argExprCh] <- argWish
+                    
+            // Assemble.
+            wishNodes.[expr] <- {
+                Expr = expr
+                ArgStubWishes = comp.ArgStubWishes
+                ChStubWishes = chWishes
+                ChStubs = comp.ChStubs
+                Allocs = List.ofSeq opAllocs
+            }                        
 
         // Walk over expression tree from roots to leafs and propagate wishes.
         args.Group.RevIter propagate
-
-        {
-            Allocs = List.ofSeq allocStubs
-            ChStubs =  Map.ofDictionary chStubs 
-            ChStubWishes =  Map.ofDictionary chStubWishes 
-            ArgStubWishes =  Map.ofDictionary allArgWishes 
-        }
+        Map.ofDictionary wishNodes
 
 
 
@@ -159,30 +178,30 @@ module StubAndActionAssignment =
         /// Compile environment.
         Env:                CompileEnv
         /// Results for tensor stub wishing.
-        StubWishing:        StubWishing.Result
+        WishNodes:          Map<BaseExpr, StubWishing.WishNode>
         /// Expression forest to operate on.
         Group:              BaseExprGroup
+        /// Allocation function.
+        AllocFn:            AllocReq -> AllocStub             
     }
     
+    type Result = {
+        /// Stubs for all expression channels in the expression tree.
+        ChStubs:            Map<BaseExprCh, TensorStub>
+        /// All action nodes.
+        ActionNodes:        ActionNode list
+        /// Stubs for all expression channels of root expressions.
+        ResultStubs:        Map<BaseExprCh, TensorStub>        
+    }
     
     /// Perform tensor stub and action assignment for every expression in the forect.
-    let perform (args: Args) : ExecutionRecipe =
+    let perform (args: Args) : Result =
 
-        /// All allocation stubs.
-        let allocStubs = ResizeArray<AllocStub> args.StubWishing.Allocs
         /// Users of an allocation, either as argument, internally or as channel.
         let allocUsers = Dictionary<AllocStub, Set<BaseExpr>> ()
         /// Expression channels that use an allocation.
         let allocUserChs = Dictionary<AllocStub, Set<BaseExprCh>> ()
-
-        /// Allocate memory for the specified expression.
-        let alloc expr req =
-            let alloc = {Req = req}
-            allocUsers.Add (alloc, Set<BaseExpr> [expr])
-            allocUserChs.Add (alloc, Set.empty)
-            allocStubs.Add alloc
-            alloc
-
+        /// Add expression channel as user of an allocation.
         let addAllocUserCh allocStub exprCh =
             let users = allocUserChs.GetOrDefault allocStub Set.empty
             allocUserChs.[allocStub] <- users |> Set.add exprCh 
@@ -199,12 +218,13 @@ module StubAndActionAssignment =
         /// Action groups that have no dependants.
         let leafActGrps = HashSet<ActionNode> ()
 
-        // Store channel stubs from stub propagation towards leafs. 
-        for KeyValue(exprCh, stub) in args.StubWishing.ChStubs do
-            tensorStubs.[exprCh] <- stub
-            match stub.Storage with
-            | StorageStub.Allocated allocStub -> addAllocUserCh allocStub exprCh
-            | _ -> ()
+        // Store assigned channel stubs from wish propagation. 
+        for KeyValue(expr, wishNode) in args.WishNodes do
+            for KeyValue(ch, stub) in wishNode.ChStubs do
+                tensorStubs.[expr.[ch]] <- stub
+                match stub.Storage with
+                | StorageStub.Allocated allocStub -> addAllocUserCh allocStub expr.[ch]
+                | _ -> ()
 
         /// Processes an expression.
         let processExpr (expr: BaseExpr) =    
@@ -212,7 +232,19 @@ module StubAndActionAssignment =
             /// Due to the walk order over the expression tree all these expressions
             /// have already been processed.
             depending.Process expr
+            
+            /// Wishing node for this expression.
+            let wishNode = args.WishNodes.[expr]
 
+            /// Allocations for op.
+            let opAllocs = ResizeArray<AllocStub> ()
+            let allocForOp req =
+                let alloc = args.AllocFn req
+                opAllocs.Add alloc
+                allocUsers.Add (alloc, Set<BaseExpr> [expr])
+                allocUserChs.Add (alloc, Set.empty)            
+                alloc                 
+            
             /// Stubs for the arguments of the expression.
             let argStubs = expr.Args |> Map.map (fun _ argExprCh -> tensorStubs.[argExprCh])
 
@@ -265,48 +297,21 @@ module StubAndActionAssignment =
                         // Argument uses other storage. Do not overwrite it.
                         false)
                 |> Seq.map fst
-                |> Set.ofSeq
-                
-            // Assemble all pre-assigned channels for the expression.
-            let preassignedChStubs =
-                expr.Channels
-                |> Seq.choose (fun ch ->
-                    args.StubWishing.ChStubs.TryFind expr.[ch]
-                    |> Option.map (fun wish -> ch, wish))
-                |> Map.ofSeq
-
-            // Assemble all channel wishes for the expression.
-            let chWishes =
-                expr.Channels
-                |> Seq.choose (fun ch ->
-                    args.StubWishing.ChStubWishes.TryFind expr.[ch]
-                    |> Option.map (fun wish -> ch, wish))
-                |> Map.ofSeq
-
-            // Assemble all argument wishes that the expression has made.
-            let argWishes =
-                expr.Args
-                |> Map.keys
-                |> Seq.choose (fun arg ->
-                    args.StubWishing.ArgStubWishes
-                    |> Map.tryFind expr
-                    |> Option.bind (Map.tryFind arg)
-                    |> Option.map (fun wish -> arg, wish))
-                |> Map.ofSeq
-
+                |> Set.ofSeq                      
+            
             // Compute channel stubs given argument stubs.
             let comp =
                 match expr.Op with
                 | :? ICompilableOp as cop -> 
                     // Let op compute its output stubs given argument stubs.
                     cop.Compile {
-                        Alloc = alloc expr
+                        Alloc = allocForOp
                         Env = args.Env
                         ArgStubs = argStubs
                         OverwritableArgs = overwritableArgs
-                        ChStubs = preassignedChStubs
-                        ChStubWishes = chWishes
-                        ArgStubWishes = argWishes
+                        ChStubs = wishNode.ChStubs
+                        ChStubWishes = wishNode.ChStubWishes
+                        ArgStubWishes = wishNode.ArgStubWishes
                         Expr = expr
                     } 
                 | _ ->
@@ -330,7 +335,7 @@ module StubAndActionAssignment =
                     {ChStubs=chStubs; Actions=action}
 
             // Check that pre-assigned channel stubs were accepted.
-            for KeyValue(ch, preassignedChStub) in preassignedChStubs do
+            for KeyValue(ch, preassignedChStub) in wishNode.ChStubs do
                 match comp.ChStubs |> Map.tryFind ch with
                 | Some stub when stub = preassignedChStub -> ()
                 | _ ->
@@ -350,8 +355,8 @@ module StubAndActionAssignment =
             let dependsOn =
                 args.Group.Depending expr
                 |> Seq.map (fun dep -> actionGroupForExpr.[dep])  
-                |> HashSet
-
+                |> HashSet     
+                
             // Store action group.
             let actGrp = {
                 Expr = Some expr
@@ -360,6 +365,7 @@ module StubAndActionAssignment =
                 Dependants = HashSet<_> ()
                 ChStubs = comp.ChStubs
                 DevData = None
+                Allocs = List.ofSeq opAllocs
             }
             actionGroupForExpr.[expr] <- actGrp
 
@@ -401,6 +407,7 @@ module StubAndActionAssignment =
             Dependants = HashSet<_> ()
             ChStubs = Map.empty
             DevData = None
+            Allocs = []
         }
         // Add finish action group as dependant.
         for leafActGrp in leafActGrps do
@@ -417,7 +424,6 @@ module StubAndActionAssignment =
                     resExprCh, chStubs.[resExprCh]))
             |> Map.ofSeq
         {
-            Allocs = List.ofSeq allocStubs
             ChStubs = Map.ofDictionary tensorStubs
             ActionNodes = actionGroupForExpr.Values |> Seq.toList
             ResultStubs = resultStubs 
@@ -429,6 +435,13 @@ module StubAndActionAssignment =
 module ExecutionRecipe = 
 
     let make (env: CompileEnv) (group: BaseExprGroup) : ExecutionRecipe =
+        
+        let mutable nextAllocId = 0
+        let allocFn (req: AllocReq) : AllocStub =
+            {
+                Id = Util.returnAndIncr &nextAllocId
+                Req = req
+            }
         
         // Dump expression.
         let sep = "\n\n" + String.replicate 80 "=" + "\n"
@@ -459,6 +472,7 @@ module ExecutionRecipe =
                 })
             |> Map.ofSeq
             
+        // Dump target stubs.
         match dump with
         | Some (writer, exprIds) ->
             fprintf writer "%s" sep
@@ -467,26 +481,44 @@ module ExecutionRecipe =
                 fprintfn writer "%d[%s]: %A" exprIds.[expr] (ch.ToString()) stub         
         | None -> ()
             
-        let stubWishing = StubWishing.perform {
+        // Propagate stub wishes.
+        let wishNodes = StubWishing.perform {
             Env = env
             ChStubWishes = targetStubs
             Group = group
+            AllocFn = allocFn
         }
         
+        // Dump propagated stub wishes.
         match dump with
         | Some (writer, exprIds) ->
             fprintf writer "%s" sep            
-            fprintfn writer "StubWishing:\n"
-            StubWishing.Result.dump writer exprIds stubWishing
+            fprintfn writer "WishNodes:\n"
+            StubWishing.WishNode.dumpMap writer exprIds wishNodes
         | None -> ()
         
-        let recipe = 
+        // Perform stub and action assignment.
+        let stubAndActionAssignment = 
             StubAndActionAssignment.perform {
                 Env = env
-                StubWishing = stubWishing
+                WishNodes = wishNodes
                 Group = group
+                AllocFn = allocFn                
             }
 
+        // Perform allocations.
+        let allocs =
+            env.AllocationRealizer env stubAndActionAssignment.ActionNodes
+        
+        // Create execute recipe.
+        let recipe = {
+            ChStubs = stubAndActionAssignment.ChStubs
+            ActionNodes = stubAndActionAssignment.ActionNodes
+            ResultStubs = stubAndActionAssignment.ResultStubs
+            Allocs = allocs
+        }
+        
+        // Dump execution recipe.
         match dump with
         | Some (writer, exprIds) ->
             fprintf writer "%s" sep            

@@ -8,17 +8,6 @@ open Tensor.Expr.Base
 
 
 
-/// Data for compilation of an expression.
-type CompileEnv = {
-    //VarOffsetStrides: Map<VarName, int64 * int64 list> 
-    /// Root expression channels that should have their values stored in
-    /// tensors passed in during execution.
-    ExternalTargets:    Set<BaseExprCh>
-    /// Directory where to write compile information.
-    DumpPath:           string option
-}
-
-
 
 /// Data for execution of a compiled expression.
 type ExecuteEnv = {
@@ -94,6 +83,8 @@ type ActionNode = {
     ChStubs:            Map<Ch, TensorStub>
     /// Device-specific action data.
     DevData:            IActionDeviceData option
+    /// Allocations.
+    Allocs:             AllocStub list
 } with
     /// Primary execution device.
     member this.Dev = this.Action.Dev
@@ -116,26 +107,24 @@ type ActionNode = {
             fprintfn writer "    [%s]: %A" (ch.ToString()) stub
         fprintfn writer "  Action: %A" actNode.Action
         fprintfn writer "  DevData: %A" actNode.DevData
+        let allocStr =
+            actNode.Allocs |> Seq.map (sprintf "%A") |> String.concat ","
+        fprintfn writer "  Allocs: %s" allocStr
         fprintfn writer ""        
 
 
 /// Results of tensor stub and action assignment.
 type ExecutionRecipe = {
-    /// All storage allocations.
-    Allocs:             AllocStub list
     /// Stubs for all expression channels in the expression tree.
     ChStubs:            Map<BaseExprCh, TensorStub>
     /// All action nodes.
     ActionNodes:        ActionNode list
     /// Stubs for all expression channels of root expressions.
     ResultStubs:        Map<BaseExprCh, TensorStub>
+    /// Allocation plan.
+    Allocs:             AllocPlan
 } with
     static member dump (writer: TextWriter) (exprIds: Map<BaseExpr, int>) (recipe: ExecutionRecipe) =
-        fprintfn writer "Allocs:"
-        for alloc in recipe.Allocs do
-            fprintfn writer "%A" alloc
-        fprintfn writer ""
-        
         let actNodeId =
             recipe.ActionNodes
             |> Seq.indexed
@@ -144,11 +133,24 @@ type ExecutionRecipe = {
         let getId (actNode: ActionNode) = actNodeId.[actNode]         
         fprintfn writer "ActionNodes:"
         for actNode in recipe.ActionNodes do
-            ActionNode.dump writer exprIds getId actNode
-            
+            ActionNode.dump writer exprIds getId actNode           
         fprintfn writer "ResultStubs:"
         for KeyValue(BaseExprCh(ch, expr), stub) in recipe.ResultStubs do
             fprintfn writer "#%d[%s]: %A" exprIds.[expr] (ch.ToString()) stub
+        fprintfn writer "Allocs: %A" recipe.Allocs
+
+
+/// Data for compilation of an expression.
+type CompileEnv = {
+    //VarOffsetStrides: Map<VarName, int64 * int64 list> 
+    /// Root expression channels that should have their values stored in
+    /// tensors passed in during execution.
+    ExternalTargets:    Set<BaseExprCh>
+    /// Allocation realizer
+    AllocationRealizer: CompileEnv -> ActionNode list -> AllocPlan
+    /// Directory where to write compile information.
+    DumpPath:           string option    
+}
 
 
 /// Data for compilation of an op.
@@ -215,6 +217,10 @@ type WishStubsResult = {
     ArgStubWishes:      Map<Arg, TensorStub>
 }
 
+/// An op that can wish for tensor stubs of its arguments.
 type IStubWishingOp =
     /// Should compute argument stub wishes given channel stub wishes.
     abstract WishStubs: WishStubsArgs -> WishStubsResult
+    
+    
+

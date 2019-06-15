@@ -38,6 +38,7 @@
     <Compile Include="Compiler\CompileTypes.fs" />
     <Compile Include="Compiler\BaseExprCompiler.fs" />
     <Compile Include="Compiler\CudaDevCompiler.fs" />
+    <Compile Include="Compiler\AllocationRealizers.fs" />
     <Compile Include="Compiler\Workspace.fs" />
     <Compile Include="Compiler\BaseExprEvaluator.fs" />
     <Compile Include="Ops\OpTools.fs" />

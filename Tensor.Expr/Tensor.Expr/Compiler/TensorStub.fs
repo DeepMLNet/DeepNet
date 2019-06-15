@@ -14,21 +14,51 @@ type AllocReq = {
     Size:       int64
 } with
     member this.Pretty =
-        sprintf "%d<%A@%A>" this.Size this.TypeName this.Dev
+        sprintf "%A@%A[%d]" this.TypeName this.Dev this.Size
 
 
-[<ReferenceEquality; StructuredFormatDisplay("{Pretty}")>]
+[<StructuredFormatDisplay("{Pretty}")>]
 type AllocStub = {
-    Req:        AllocReq
+    Id:          int
+    Req:         AllocReq
 } with
     member this.TypeName = this.Req.TypeName
     member this.Dev = this.Req.Dev
     member this.Size = this.Req.Size
     
     member this.Pretty =
-        sprintf "%A(%d)" this.Req (this.GetHashCode())
+        sprintf "%A(%d)" this.Req this.Id
+    override this.ToString() = this.Pretty
+    
 
-type AllocFn = AllocReq -> AllocStub
+//type AllocFn = AllocReq -> AllocStub
+
+
+/// A block of allocations.    
+type AllocBlock = {
+    /// Data type.
+    TypeName: TypeName    
+    /// Storage device.
+    Dev:      ITensorDevice
+    /// Size in elements.
+    Size:     int64
+}
+
+/// A realization of an allocation (range within an allocation block).
+type AllocRealization = {
+    /// Index of the allocation block.
+    BlockIndex:  int
+    /// Offset in elements within the allocation block.
+    Offset:      int64
+}
+
+/// An allocation plan, mapping allocation stubs to ranges within allocation blocks.
+type AllocPlan = {
+    /// Allocation blocks.
+    Blocks:  AllocBlock list
+    /// Realizations of allocation stubs.
+    Allocs:  Map<AllocStub, AllocRealization> 
+}
 
     
 /// Placeholder for values unknown at compile-time.
