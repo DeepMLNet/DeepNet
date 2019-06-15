@@ -137,7 +137,9 @@ type ExecutionRecipe = {
         fprintfn writer "ResultStubs:"
         for KeyValue(BaseExprCh(ch, expr), stub) in recipe.ResultStubs do
             fprintfn writer "#%d[%s]: %A" exprIds.[expr] (ch.ToString()) stub
-        fprintfn writer "Allocs: %A" recipe.Allocs
+        fprintfn writer ""
+        fprintfn writer "Allocs:"
+        AllocPlan.dump writer recipe.Allocs
 
 
 /// Data for compilation of an expression.

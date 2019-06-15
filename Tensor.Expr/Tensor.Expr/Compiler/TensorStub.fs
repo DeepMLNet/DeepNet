@@ -1,5 +1,6 @@
 ﻿namespace Tensor.Expr.Compiler
 
+open System.IO
 open DeepNet.Utils
 open Tensor
 open Tensor.Backend
@@ -34,7 +35,8 @@ type AllocStub = {
 //type AllocFn = AllocReq -> AllocStub
 
 
-/// A block of allocations.    
+/// A block of allocations.
+[<StructuredFormatDisplay("{Pretty}")>] 
 type AllocBlock = {
     /// Data type.
     TypeName: TypeName    
@@ -42,15 +44,21 @@ type AllocBlock = {
     Dev:      ITensorDevice
     /// Size in elements.
     Size:     int64
-}
+} with
+    member this.Pretty =
+        sprintf "<%A@%A>[%d]" this.TypeName this.Dev this.Size
+
 
 /// A realization of an allocation (range within an allocation block).
+[<StructuredFormatDisplay("{Pretty}")>] 
 type AllocRealization = {
     /// Index of the allocation block.
     BlockIndex:  int
     /// Offset in elements within the allocation block.
     Offset:      int64
-}
+} with
+    member this.Pretty =
+        sprintf "%d@B%d" this.Offset this.BlockIndex
 
 /// An allocation plan, mapping allocation stubs to ranges within allocation blocks.
 type AllocPlan = {
@@ -58,7 +66,17 @@ type AllocPlan = {
     Blocks:  AllocBlock list
     /// Realizations of allocation stubs.
     Allocs:  Map<AllocStub, AllocRealization> 
-}
+} with
+    static member dump (writer: TextWriter) (plan: AllocPlan) =
+        fprintfn writer "  Blocks:"
+        for blockIdx, block in Seq.indexed plan.Blocks do
+            fprintfn writer "    B%d: %A" blockIdx block
+        fprintfn writer ""
+        fprintfn writer "  Allocs:"
+        for KeyValue(stub, real) in plan.Allocs do
+            fprintfn writer "    %A: %A" stub real
+        fprintfn writer ""        
+    
 
     
 /// Placeholder for values unknown at compile-time.

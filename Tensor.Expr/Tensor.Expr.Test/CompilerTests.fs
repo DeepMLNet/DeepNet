@@ -18,12 +18,7 @@ type CompilerTests (output: ITestOutputHelper) =
     
     [<Fact>]
     let ``Simple ExecutionRecipe`` () =
-        let ctx = Context.root HostTensor.Dev
-        let a = Var<float> (ctx / "a", [Size.fix 2L; Size.fix 3L])
-        let b = Var<float> (ctx / "b", [Size.fix 2L; Size.fix 3L])        
-
-        let expr = Expr Vars.a + Expr Vars.b
-        
+        let expr = Expr Vars.a + Expr Vars.b        
         let env : CompileEnv = {
             ExternalTargets = Set.empty
             DumpPath = Some "CompilerTest/SimpleExecutionRecipe.txt"
