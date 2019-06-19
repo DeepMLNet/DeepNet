@@ -1,16 +1,9 @@
+#nowarn "9"
+
 namespace Tensor.Host
 
 open System
-open System.Reflection
-open System.Numerics
-open System.Threading.Tasks
-open System.Linq.Expressions
-open System.Collections.Generic
-open System.Runtime.CompilerServices
-open System.Runtime.InteropServices
 
-open Tensor
-open Tensor.Utils
 open Tensor.Backend
 open DeepNet.Utils
 
@@ -126,9 +119,20 @@ type internal PosIter32 =
 
 
 
-/// Data and fast layout of a host tensor.
-type internal DataAndLayout<'T> = {
-    Data:       'T[]
-    FastLayout: FastLayout32
-}
+/// Memory that can be accessed via a Span<'T>.
+[<RequireQualifiedAccess>]
+type internal SpanSrc<'T> =
+    | Native of ptr:nativeint * length:int
+    | Managed of memory:Memory<'T>
+        
+    member inline this.Span =
+        match this with
+        | Native (ptr, length) -> Span<'T> (Util.toVoidPtr ptr, length)
+        | Managed memory -> memory.Span
 
+
+/// Data and fast layout of a host tensor.
+type internal DataAndLayout<'T> (spanSrc: SpanSrc<'T>, fastLayout: FastLayout32) =
+    member inline this.Span = spanSrc.Span
+    member inline this.FastLayout = fastLayout
+    

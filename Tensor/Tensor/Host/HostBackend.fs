@@ -1,106 +1,208 @@
-﻿namespace Tensor.Host
+﻿#nowarn "9"
+
+namespace Tensor.Host
 
 open System
-open System.Reflection
-open System.Numerics
-open System.Threading.Tasks
-open System.Linq.Expressions
 open System.Collections.Generic
-open System.Runtime.CompilerServices
 open System.Runtime.InteropServices
 
+open System.Buffers
 open Tensor
 open Tensor.Backend
-open Tensor.Utils
 open DeepNet.Utils
 
+                                                                                                                                
+
+[<StructuredFormatDisplay("{Pretty}")>]
+type OwnedNativeMemory (size: nativeint) =
+    let ptr = Marshal.AllocHGlobal size
+    do GC.AddMemoryPressure (int64 size)
+    
+    let mutable disposed = false
+    let checkDisposed () =
+        if disposed then
+            raise (ObjectDisposedException("OwnedNativeMemory"))
+            
+    interface IDisposable with
+        member this.Dispose() =
+            if not disposed then
+                GC.RemoveMemoryPressure (int64 size)
+                Marshal.FreeHGlobal ptr
+                disposed <- true            
+    
+    override this.Finalize() =
+        (this :> IDisposable).Dispose()
+    
+    member this.Ptr : nativeint =
+        checkDisposed()
+        ptr
+        
+    member this.Size : nativeint =
+        checkDisposed()
+        size
+        
+    member this.Disposed = disposed
+    
+    member this.Pretty =
+        let disposedStr = if disposed then ", disposed" else ""
+        sprintf "%d (%d bytes%s)" this.Ptr this.Size disposedStr
+    override this.ToString() = this.Pretty
+    
+
+/// Holds a reference to `OwnedNativeMemory` to prevent it from being garbage collected.
+type internal OwnedNativeMemoryHolder (mem: OwnedNativeMemory option) =
+    interface IDisposable with
+        member this.Dispose() = ()
 
 
 /// pinned .NET managed memory (wraps a GCHandle)
-type PinnedMemory (gcHnd: GCHandle, size: int64) =       
-    let mutable disposed = false
+[<RequireQualifiedAccess>]
+type PinnedMemory =
+    | Managed of handle:MemoryHandle
+    | Native of ptr:nativeint * owner:OwnedNativeMemory option
 
     /// pointer to storage array 
-    member this.Ptr = gcHnd.AddrOfPinnedObject()
+    member this.Ptr =
+        match this with
+        | Managed handle -> Util.fromVoidPtr handle.Pointer  
+        | Native (ptr, _owner) -> ptr
 
     /// size of storage array in bytes
-    member this.Size = size
+    //member this.Size = size
 
     interface IDisposable with
         member this.Dispose() = 
-            if not disposed then
-                gcHnd.Free()
-                disposed <- true
+            match this with
+            | Managed handle -> (handle :> IDisposable).Dispose()
+            | Native _ -> ()
 
     override this.Finalize() = (this :> IDisposable).Dispose()
 
-                                                                                                                                  
+
 
 /// type-neutral interface to TensorHostStorage<'T>
 type ITensorHostStorage =
-    /// the underlying data array
-    abstract Data: Array
-    /// size of underlying data array in elements
-    abstract DataSize: int64
+//    /// the underlying data array
+//    abstract Data: Array
+//    /// size of underlying data array in elements
+//    abstract DataSize: int64
+    /// number of elements
+    abstract NElems: int64
     /// size of underlying data array in bytes
-    abstract DataSizeInBytes: int64
+    abstract DataSizeInBytes: int64    
     /// pins the underlying data array and returns the corresponding pinned memory
     abstract Pin: unit -> PinnedMemory
 
 
+/// Host tensor storage using managed memory.
+type TensorManagedStorage<'T> (memory: Memory<'T>) =
+    
+    new (nElems: int64) =
+        let ary = Array.zeroCreate (int nElems)
+        let mem = Memory<'T> ary
+        TensorManagedStorage<'T> mem
+        
+    new (ary: 'T[]) =
+        let mem = Memory<'T> ary
+        TensorManagedStorage<'T> mem
+    
+    member this.Memory = memory
+    member this.NElems = int64 memory.Length
+    
+    
 
-/// Storage (using a .NET array) for host tensors.
-type TensorHostStorage<'T> (data: 'T []) =
+/// Host tensor storage using non-managed memory. 
+[<StructuredFormatDisplay("{Pretty}")>]
+type TensorNativeStorage<'T> (ptr: nativeint, nElems: int64,
+                              owner: OwnedNativeMemory option) =
 
     /// allocates a new data array with the given number of elements
     new (nElems: int64) =
-        if nElems > int64 FSharp.Core.int32.MaxValue then
-            failwithf "Cannot create host tensor storage for %d elements, the current
-                       limit is %d elements." nElems FSharp.Core.int32.MaxValue
-        TensorHostStorage<'T> (Array.zeroCreate (int32 nElems))        
+//        if nElems > int64 FSharp.Core.int32.MaxValue then
+//            failwithf "Cannot create host tensor storage for %d elements, the current
+//                       limit is %d elements." nElems FSharp.Core.int32.MaxValue
+        let ownedMem = new OwnedNativeMemory (nativeint nElems * nativeint sizeof<'T>)
+        new TensorNativeStorage<'T> (ownedMem.Ptr, nElems, Some ownedMem)        
 
     /// the underlying data array
-    member this.Data = data
+    member this.Ptr = ptr
+    member this.NElems = nElems
+    member this.Owner = owner
 
     /// pins the underlying data array and returns the corresponding pinned memory
-    member this.Pin () =
-        let gcHnd = GCHandle.Alloc (data, GCHandleType.Pinned)
-        new PinnedMemory (gcHnd, data.LongLength * sizeof64<'T>) 
+//    member this.Pin () =
+//        let gcHnd = GCHandle.Alloc (data, GCHandleType.Pinned)
+//        new PinnedMemory (gcHnd, int64 data.Length * sizeof64<'T>) 
 
     /// size of underlying data array in elements
-    member this.DataSize = data.LongLength
+    //member this.DataSize = int64 data.Length
 
     /// size of underlying data array in bytes
-    member this.DataSizeInBytes = data.LongLength * sizeof64<'T>
+    //member this.DataSizeInBytes = int64 data.Length * sizeof64<'T>
 
-    interface ITensorStorage<'T> with
-        member this.Backend layout =
-            TensorHostBackend<'T> (layout, this) :> ITensorBackend<_>
-        member this.Dev = 
-            TensorHostDevice.Instance :> ITensorDevice
-        member this.DataType =
-            typeof<'T>
-
-    interface ITensorHostStorage with
-        member this.Data = this.Data :> Array
-        member this.DataSize = this.DataSize
-        member this.DataSizeInBytes = this.DataSizeInBytes
-        member this.Pin () = this.Pin ()
-
-    interface BLAS.IBLASStorage with
-        member this.Pin () =
-            let pinHnd = this.Pin ()
-            pinHnd :> IDisposable, pinHnd.Ptr
+    interface IDisposable with
+        member this.Dispose () =
+            match this.Owner with
+            | Some owner -> (owner :> IDisposable).Dispose()
+            | None -> ()
 
     override this.Equals other =
         match other with
-        | :? TensorHostStorage<'T> as os ->
-            LanguagePrimitives.PhysicalEquality this.Data os.Data
+        | :? TensorNativeStorage<'T> as os ->
+            this.Ptr = os.Ptr && this.Owner = os.Owner
         | _ -> false            
 
     override this.GetHashCode () =
-        RuntimeHelpers.GetHashCode data
+        hash this.Ptr
         
+    member this.Pretty =
+        match this.Owner with
+        | Some owner -> sprintf "%A owned by %A" this.Ptr owner
+        | None -> sprintf "%A unowned" this.Ptr
+    override this.ToString() = this.Pretty        
+        
+
+and [<RequireQualifiedAccess>] TensorHostStorage<'T> =
+    | Managed of TensorManagedStorage<'T>
+    | Native of TensorNativeStorage<'T>
+
+    member this.NElems =
+        match this with
+        | Managed managed -> managed.NElems
+        | Native native -> native.NElems
+        
+    member internal this.SpanSrc =
+        match this with
+        | Managed managed -> SpanSrc<'T>.Managed managed.Memory
+        | Native native -> SpanSrc<'T>.Native (native.Ptr, int native.NElems)
+    
+    member this.Pin () =
+        match this with
+        | Managed managed -> PinnedMemory.Managed (managed.Memory.Pin())
+        | Native native -> PinnedMemory.Native (native.Ptr, native.Owner)        
+    
+    member this.DataSizeInBytes = this.NElems * sizeof64<'T>    
+    
+    interface ITensorHostStorage with
+        member this.Pin () = this.Pin ()
+        member this.NElems = this.NElems
+        member this.DataSizeInBytes = this.DataSizeInBytes
+    
+    interface ITensorStorage<'T> with
+        member this.Backend layout =
+            TensorHostBackend<'T> (layout, this) :> ITensorBackend<_>
+        member this.Dev =
+            match this with
+            | Managed _ -> TensorHostManagedDevice.Instance :> ITensorDevice
+            | Native _ -> TensorHostNativeDevice.Instance :> ITensorDevice
+        member this.DataType =
+            typeof<'T>
+            
+    interface BLAS.IBLASStorage with
+        member this.Pin () =
+            let pinHnd = this.Pin()
+            pinHnd :> IDisposable, pinHnd.Ptr     
+                            
 
 
 /// Backend for host tensors.
@@ -115,14 +217,14 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
     member val internal FastLayout = FastLayout32 layout
 
     /// underlying TensorHostStorate<'T>
-    member this.Storage = storage
+    member inline this.Storage = storage
 
     /// underlying data array
-    member val Data = storage.Data
+    //member val Ptr : nativeptr<'T> = storage.Ptr
 
-    /// data array and fast layout
-    member inline internal this.DataAndLayout = 
-        {Data=this.Data; FastLayout=this.FastLayout}
+    /// data and fast layout
+    member inline internal this.DataAndLayout =
+        DataAndLayout<'T> (this.Storage.SpanSrc, this.FastLayout)
               
     /// gets DataAndLayout for specified tensors
     static member internal GetDataAndLayout (t: ITensorFrontend<'T>) =
@@ -158,7 +260,7 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
 
     /// gets DataAndLayout for specified tensors, optimized for an element-wise operation
     static member internal ElemwiseDataAndLayout (t: ITensorFrontend<'T>) =        
-        let tl, ls = TensorHostBackend<_>.ElemwiseLayouts (t.Layout, [])
+        let tl, _ls = TensorHostBackend<_>.ElemwiseLayouts (t.Layout, [])
         (t.Relayout(tl).Backend :?> TensorHostBackend<'T>).DataAndLayout        
 
     /// gets DataAndLayout for specified tensors, optimized for an element-wise operation
@@ -180,18 +282,24 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
         (t.Relayout(tl).Backend :?> TensorHostBackend<'T>).DataAndLayout, 
         (a.Relayout(ls.[0]).Backend :?> TensorHostBackend<'TA>).DataAndLayout,
         (b.Relayout(ls.[1]).Backend :?> TensorHostBackend<'TB>).DataAndLayout,
-        (c.Relayout(ls.[2]).Backend :?> TensorHostBackend<'TC>).DataAndLayout 
-
-
+        (c.Relayout(ls.[2]).Backend :?> TensorHostBackend<'TC>).DataAndLayout    
+    
     interface ITensorBackend<'T> with
         member this.Item 
-            with get idx = this.Data.[this.FastLayout.Addr idx]
-            and set idx value = this.Data.[this.FastLayout.Addr idx] <- value
+            with get idx =
+                let span = this.Storage.SpanSrc.Span
+                let addr = this.FastLayout.Addr idx
+                span.[addr]
+            and set idx value =
+                let span = this.Storage.SpanSrc.Span
+                let addr = this.FastLayout.Addr idx
+                span.[addr] <- value
 
-        member this.FillConst (value, trgt) =
+        member this.FillConst (value, trgt) = 
             let trgt = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt)
-            if VectorOps.CanUse (trgt) then VectorOps.Fill (value, trgt)
-            else ScalarOps.Fill (value, trgt)
+            //if VectorOps.CanUse (trgt) then VectorOps.Fill (value, trgt)
+            //else ScalarOps.Fill (value, trgt)
+            ScalarOps.Fill (value, trgt)
 
         member this.FillIncrementing (start, incr, trgt) =
             let trgt = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt)
@@ -201,21 +309,24 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
             if TensorLayout.hasContiguousMemory trgt.Layout &&
                TensorLayout.hasContiguousMemory src.Layout &&
                trgt.Layout.Stride = src.Layout.Stride then
-                // use array block copy for contiguous memory block
+                // use span block copy for contiguous memory block
                 let trgt, src = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, src)
-                if trgt.FastLayout.NElems > 0 then
-                    Array.Copy (src.Data, src.FastLayout.Offset, 
-                                trgt.Data, trgt.FastLayout.Offset, trgt.FastLayout.NElems)
+                let nElems = trgt.FastLayout.NElems
+                if nElems > 0 then
+                    let srcSpan = src.Span.Slice (src.FastLayout.Offset, nElems)
+                    let trgtSpan = trgt.Span.Slice (trgt.FastLayout.Offset, nElems)
+                    srcSpan.CopyTo trgtSpan
             else 
                 let trgt, src = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, src)
-                if VectorOps.CanUse (trgt, src) then VectorOps.Copy (trgt, src)
-                else ScalarOps.Copy (trgt, src)
+                //if VectorOps.CanUse (trgt, src) then VectorOps.Copy (trgt, src)
+                //else ScalarOps.Copy (trgt, src)
+                ScalarOps.Copy (trgt, src)
 
-        member this.Transfer (trgt, src) =
+        member this.Transfer (_trgt, _src) =
             false
 
         member this.Convert (trgt, a) =
-            let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
+            let trgt, a = TensorHostBackend<'T>.ElemwiseDataAndLayout (trgt, a)
             ScalarOps.Convert (trgt, a)
       
         member this.UnaryPlus (trgt, a) =
@@ -224,13 +335,15 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
 
         member this.UnaryMinus (trgt, a) =
             let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
-            if VectorOps.CanUse (trgt, a) then VectorOps.UnaryMinus (trgt, a)
-            else ScalarOps.UnaryMinus (trgt, a)
+            //if VectorOps.CanUse (trgt, a) then VectorOps.UnaryMinus (trgt, a)
+            //else ScalarOps.UnaryMinus (trgt, a)
+            ScalarOps.UnaryMinus (trgt, a)
 
         member this.Abs (trgt, a) =
             let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
-            if VectorOps.CanUse (trgt, a) then VectorOps.Abs (trgt, a)
-            else ScalarOps.Abs (trgt, a)
+            //if VectorOps.CanUse (trgt, a) then VectorOps.Abs (trgt, a)
+            //else ScalarOps.Abs (trgt, a)
+            ScalarOps.Abs (trgt, a)
 
         member this.Sgn (trgt, a) =
             let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
@@ -286,8 +399,9 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
 
         member this.Sqrt (trgt, a) =
             let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
-            if VectorOps.CanUse (trgt, a) then VectorOps.Sqrt (trgt, a)
-            else ScalarOps.Sqrt (trgt, a)
+            //if VectorOps.CanUse (trgt, a) then VectorOps.Sqrt (trgt, a)
+            //else ScalarOps.Sqrt (trgt, a)
+            ScalarOps.Sqrt (trgt, a)
 
         member this.Ceiling (trgt, a) =
             let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
@@ -315,23 +429,27 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
 
         member this.Add (trgt, a, b) =
             let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
-            if VectorOps.CanUse (trgt, a, b) then VectorOps.Add (trgt, a, b)
-            else ScalarOps.Add (trgt, a, b)
+            //if VectorOps.CanUse (trgt, a, b) then VectorOps.Add (trgt, a, b)
+            //else ScalarOps.Add (trgt, a, b)
+            ScalarOps.Add (trgt, a, b)
 
         member this.Subtract (trgt, a, b) =
             let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
-            if VectorOps.CanUse (trgt, a, b) then VectorOps.Subtract (trgt, a, b)
-            else ScalarOps.Subtract (trgt, a, b)
+            //if VectorOps.CanUse (trgt, a, b) then VectorOps.Subtract (trgt, a, b)
+            //else ScalarOps.Subtract (trgt, a, b)
+            ScalarOps.Subtract (trgt, a, b)
 
         member this.Multiply (trgt, a, b) =
             let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
-            if VectorOps.CanUse (trgt, a, b) then VectorOps.Multiply (trgt, a, b)
-            else ScalarOps.Multiply (trgt, a, b)
+            //if VectorOps.CanUse (trgt, a, b) then VectorOps.Multiply (trgt, a, b)
+            //else ScalarOps.Multiply (trgt, a, b)
+            ScalarOps.Multiply (trgt, a, b)
 
         member this.Divide (trgt, a, b) =
             let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
-            if VectorOps.CanUse (trgt, a, b) then VectorOps.Divide (trgt, a, b)
-            else ScalarOps.Divide (trgt, a, b)
+            //if VectorOps.CanUse (trgt, a, b) then VectorOps.Divide (trgt, a, b)
+            //else ScalarOps.Divide (trgt, a, b)
+            ScalarOps.Divide (trgt, a, b)
 
         member this.Modulo (trgt, a, b) =
             let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
@@ -343,13 +461,15 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
 
         member this.MaxElemwise (trgt, a, b) =
             let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
-            if VectorOps.CanUse (trgt, a, b) then VectorOps.MaxElemwise (trgt, a, b)
-            else ScalarOps.MaxElemwise (trgt, a, b)
+            //if VectorOps.CanUse (trgt, a, b) then VectorOps.MaxElemwise (trgt, a, b)
+            //else ScalarOps.MaxElemwise (trgt, a, b)
+            ScalarOps.MaxElemwise (trgt, a, b)
 
         member this.MinElemwise (trgt, a, b) =
             let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
-            if VectorOps.CanUse (trgt, a, b) then VectorOps.MinElemwise (trgt, a, b)
-            else ScalarOps.MinElemwise (trgt, a, b)
+            //if VectorOps.CanUse (trgt, a, b) then VectorOps.MinElemwise (trgt, a, b)
+            //else ScalarOps.MinElemwise (trgt, a, b)
+            ScalarOps.MinElemwise (trgt, a, b)
 
         member this.Equal (trgt, a, b) =
             let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
@@ -585,7 +705,7 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
                 raise (NotImplementedException("this operation is only supported for floating point numbers"))
 
             let src = src.Copy(order=ColumnMajor) // LAPACK destorys src
-            let batchShp, M, N, K = Tensor.SVDSizes src
+            let _batchShp, M, N, _K = Tensor.SVDSizes src
 
             use a = BLAS.GetMatrix (src, isSource=true, isTarget=false, canTranspose=false)
             use s = BLAS.GetVector (trgtS, isSource=false, isTarget=true, reqLinear=true)
@@ -613,7 +733,7 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
             if not isBlasSupported then
                 raise (NotImplementedException("this operation is only supported for floating point numbers"))
 
-            let size = src.Shape.[0]
+            //let size = src.Shape.[0]
             let part = 
                 match part with
                 | MatrixPart.Upper -> 'U'
@@ -634,7 +754,7 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
 
     member this.Fill (fn, trgt, useThreads) = 
         let trgt = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt)
-        let inline scalarOp idx = fn ()
+        let inline scalarOp _idx = fn ()
         ScalarOps.ApplyNoaryOp (scalarOp, trgt, isIndexed=false, useThreads=useThreads)
 
     member this.FillIndexed (fn, trgt, useThreads) = 
@@ -643,7 +763,7 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
 
     member this.Map (fn, trgt, a, useThreads) = 
         let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
-        let inline scalarOp idx av = fn av
+        let inline scalarOp _idx av = fn av
         ScalarOps.ApplyUnaryOp (scalarOp, trgt, a, isIndexed=false, useThreads=useThreads)
 
     member this.MapIndexed (fn, trgt, a, useThreads) = 
@@ -652,7 +772,7 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
 
     member this.Map2 (fn, trgt, a, b, useThreads) = 
         let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
-        let inline scalarOp idx av bv = fn av bv
+        let inline scalarOp _idx av bv = fn av bv
         ScalarOps.ApplyBinaryOp (scalarOp, trgt, a, b, isIndexed=false, useThreads=useThreads)
 
     member this.MapIndexed2 (fn, trgt, a, b, useThreads) =
@@ -661,19 +781,20 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
 
     member this.FoldLastAxis (fn, initial, trgt, a, useThreads) = 
         let initial, trgt, a = TensorHostBackend<_>.GetDataAndLayout (initial, trgt, a)
-        let inline foldOp idx state xv = fn state xv
-        ScalarOps.ApplyAxisFold (foldOp, id, trgt, a, Choice2Of2 initial, isIndexed=false, useThreads=useThreads)
+        let inline foldOp _idx state xv = fn state xv
+        ScalarOps.ApplyAxisFoldInitialTensor (foldOp, id, trgt, a, initial, isIndexed=false, useThreads=useThreads)
 
     member this.FoldLastAxisIndexed (fn, initial, trgt, a, useThreads) = 
         let initial, trgt, a = TensorHostBackend<_>.GetDataAndLayout (initial, trgt, a)
-        ScalarOps.ApplyAxisFold (fn, id, trgt, a, Choice2Of2 initial, isIndexed=true, useThreads=useThreads)
+        ScalarOps.ApplyAxisFoldInitialTensor (fn, id, trgt, a, initial, isIndexed=true, useThreads=useThreads)
 
     interface System.Collections.Generic.IEnumerable<'T> with
         member this.GetEnumerator() : IEnumerator<'T> = 
             let s = seq {
                 let mutable pos = PosIter32 this.FastLayout
+                let spanSrc = this.Storage.SpanSrc
                 while pos.Active do
-                    yield this.Data.[pos.Addr]
+                    yield spanSrc.Span.[pos.Addr]
                     pos.MoveNext()
             }
             s.GetEnumerator()
@@ -683,13 +804,30 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
             (this :> IEnumerable<'T>).GetEnumerator() :> System.Collections.IEnumerator
 
 
-/// Factory for host tensors.
-and TensorHostDevice private () =
+/// A host tensor device (using managed or native memory).
+and ITensorHostDevice =
+    interface end
+    
+
+/// Factory for host tensors using native memory.
+and TensorHostNativeDevice private () =
     inherit BaseTensorDevice()
-    static member Instance = TensorHostDevice () 
+    interface ITensorHostDevice
+    static member Instance = TensorHostNativeDevice () 
 
-    override this.Id = "Host"
+    override this.Id = "HostNative"
     override this.Create nElems =
-        TensorHostStorage<_> nElems :> ITensorStorage<_>
-    override this.Zeroed = true
+        TensorHostStorage.Native (new TensorNativeStorage<_> (nElems)) :> ITensorStorage<_>
+    override this.Zeroed = false
 
+
+/// Factory for host tensors using managed memory. 
+and TensorHostManagedDevice private () =
+    inherit BaseTensorDevice()
+    interface ITensorHostDevice    
+    static member Instance = TensorHostManagedDevice () 
+
+    override this.Id = "HostManaged"
+    override this.Create nElems =
+        TensorHostStorage.Managed (new TensorManagedStorage<_> (nElems)) :> ITensorStorage<_>
+    override this.Zeroed = true

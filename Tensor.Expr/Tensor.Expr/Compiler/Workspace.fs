@@ -137,21 +137,21 @@ type BaseExprWorkspace (recipe: ExecutionRecipe) =
             raise (ObjectDisposedException ("BaseExprWorkspace"))
 
     /// Allocate and return storage for the specified storage stubs.
-    let allocStorage (stubs: AllocStub list) =
-        stubs
-        |> List.map (fun stub ->
-            stub, stub.Dev.CreateUntyped stub.TypeName.Type stub.Size)
-        |> dict
+    let allocBlocks (blocks: AllocBlock list) =
+        blocks
+        |> List.map (fun block ->
+            block.Dev.CreateUntyped block.TypeName.Type block.Size)
+        |> Array.ofList
 
     /// Disposes the storage.
-    let disposeStorage (storages: IDictionary<AllocStub, ITensorStorage>) =
-        for KeyValue (_stub, stor) in storages do
-            match stor with
+    let disposeStorages (storages: seq<#ITensorStorage>) =
+        for stor in storages do
+            match box stor with
             | :? IDisposable as d -> d.Dispose()
             | _ -> ()
 
-    /// Allocated storages for allocation stubs.
-    let storages : IDictionary<AllocStub, ITensorStorage> = failwith "TODO" // allocStorage recipe.Allocs
+    /// Allocated storages for allocation blocks.
+    let storageBlocks = allocBlocks recipe.Allocs.Blocks
 
     /// Iterates over a set of action groups. 
     let iter (fn: ActionNode -> unit) (allDepsExecedFn: ActionNode -> unit) 
@@ -262,9 +262,17 @@ type BaseExprWorkspace (recipe: ExecutionRecipe) =
                 let storage =
                     match stub.Storage with
                     | StorageStub.Allocated allocStub ->
-                        storages.TryFind allocStub 
-                        |> Option.defaultWith (fun () ->
-                            failwithf "Storage for tensor stub %A with allocated storage is unknown." stub)                   
+                        match recipe.Allocs.Allocs |> Map.tryFind allocStub with
+                        | Some real ->
+                            let block = storageBlocks.[real.BlockIndex]
+                            // But how to return a storage within the allocation block.
+                            // Well, can we just add it to the layout offset.
+                            // Probably not, since offsets may be precomputed for many operations.
+                            // So we need to make a new shadow storage?
+                            // This is not even possible in current model.
+                            
+                        | None ->
+                            failwithf "Storage for tensor stub %A with allocated storage is unknown." stub                   
                     | StorageStub.Fixed storage -> storage
                     | StorageStub.Temporary _ 
                     | StorageStub.External _ -> 
@@ -334,6 +342,7 @@ type BaseExprWorkspace (recipe: ExecutionRecipe) =
     interface IDisposable with
         member this.Dispose () =
             if not _disposed then 
-                disposeStorage storages
+                disposeStorages storageBlocks
+                storageBlocks.Clear ()
                 _disposed <- true
 

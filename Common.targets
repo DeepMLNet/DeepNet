@@ -3,7 +3,7 @@
   <Import Project="Revision.targets" />
 
   <PropertyGroup>
-      <TargetFramework>netstandard2.0</TargetFramework>
+      <TargetFramework>netcoreapp3.0</TargetFramework>
       <Platform>x64</Platform>      
 
       <GenerateAssemblyInfo>true</GenerateAssemblyInfo>    

@@ -1,15 +1,8 @@
 namespace Tensor
 
 open System
-open System.Reflection
-open System.Numerics
-open System.Threading.Tasks
-open System.Linq.Expressions
 open System.Collections.Generic
-open System.Runtime.CompilerServices
-open System.Runtime.InteropServices
 
-open Tensor.Utils
 open DeepNet.Utils
 open Tensor.Backend
 open Tensor.Host
@@ -18,8 +11,9 @@ open Tensor.Host
 module internal HostTensorHelpers = 
 
     let ensureRowMajorAndOffsetFree (x: Tensor<'T>) =
-        if x.Dev <> (TensorHostDevice.Instance :> ITensorDevice) then
-            invalidOp "Require a tensor stored on host device, but got a %s tensor." x.Dev.Id
+        match x.Dev with
+        | :? ITensorHostDevice -> ()
+        | _ -> invalidOp "Require a tensor stored on host device, but got a %s tensor." x.Dev.Id
         if TensorLayout.isRowMajor x.Layout && x.Layout.Offset = 0L then x
         else Tensor.copy (x, order=RowMajor)
 
@@ -29,11 +23,13 @@ type private HDFFuncs =
     static member Write<'T> (hdf5: HDF5, path: string, x: Tensor<'T>) =
         let x = HostTensorHelpers.ensureRowMajorAndOffsetFree x
         let storage = x.Storage :?> TensorHostStorage<'T>
-        hdf5.Write (path, storage.Data, Tensor.shape x)
+        let ary = storage.SpanSrc.Span.ToArray ()
+        hdf5.Write (path, ary, Tensor.shape x)
 
     static member Read<'T> (hdf5: HDF5, name: string) =
         let (data: 'T []), shape = hdf5.Read (name)
-        Tensor<'T> (TensorLayout.newRowMajor shape, TensorHostStorage<'T> data)         
+        let storage = TensorHostStorage.Managed (TensorManagedStorage data)
+        Tensor<'T> (TensorLayout.newRowMajor shape, storage)         
 
 
 
@@ -49,13 +45,22 @@ type private HDFFuncs =
 module HostTensor =
 
     /// <summary>Tensor device using a .NET array in host memory as data storage.</summary>
+    /// <seealso cref="DevNative"/><seealso cref="Tensor`1.Dev"/>    
+    let DevManaged = TensorHostManagedDevice.Instance :> ITensorDevice
+    
+    /// <summary>Tensor device using native host memory as data storage.</summary>
+    /// <seealso cref="DevManaged"/><seealso cref="Tensor`1.Dev"/>    
+    let DevNative = TensorHostNativeDevice.Instance :> ITensorDevice
+    
+    /// <summary>Tensor device using native host memory as data storage.</summary>
     /// <seealso cref="Tensor`1.Dev"/>
-    let Dev = TensorHostDevice.Instance :> ITensorDevice
+    let Dev = DevNative
 
     /// Gets the backend of a host tensor.
     let internal backend (trgt: Tensor<'T>) =
-        if trgt.Dev <> Dev then
-            invalidOp "This operation requires a tensor stored on the host, but got device %A." trgt.Dev
+        match trgt.Dev with
+        | :? ITensorHostDevice -> ()
+        | _ -> invalidOp "This operation requires a tensor stored on the host, but got device %A." trgt.Dev
         trgt.Backend :?> TensorHostBackend<'T>
 
     /// <summary>Fills the tensor with values returned by the specifed function.</summary>
@@ -170,8 +175,8 @@ module HostTensor =
     let usingArray (data: 'T []) =
         let shp = [data.LongLength]
         let layout = TensorLayout.newRowMajor shp
-        let storage = TensorHostStorage<'T> (data)
-        Tensor<'T> (layout, storage) 
+        let storage = TensorManagedStorage<'T> (data)
+        Tensor<'T> (layout, TensorHostStorage.Managed storage) 
 
     /// <summary>Creates a one-dimensional tensor copying the specified data.</summary>
     /// <typeparam name="'T">The type of the data.</typeparam>

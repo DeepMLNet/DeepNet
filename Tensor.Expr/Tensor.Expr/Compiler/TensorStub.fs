@@ -60,6 +60,7 @@ type AllocRealization = {
     member this.Pretty =
         sprintf "%d@B%d" this.Offset this.BlockIndex
 
+
 /// An allocation plan, mapping allocation stubs to ranges within allocation blocks.
 type AllocPlan = {
     /// Allocation blocks.

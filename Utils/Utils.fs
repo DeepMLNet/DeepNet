@@ -1,11 +1,13 @@
-﻿namespace DeepNet.Utils
+﻿#nowarn "9"
+
+namespace DeepNet.Utils
 
 open System
 open System.Reflection
 open System.IO
 open System.Runtime.InteropServices
-open System.Collections.Concurrent
 open FSharp.Reflection
+open FSharp.NativeInterop
 
 
 
@@ -15,7 +17,7 @@ module internal List =
     /// sets element with index elem to given value
     let rec set elem value lst =
         match lst, elem with
-            | l::ls, 0 -> value::ls
+            | _l::ls, 0 -> value::ls
             | l::ls, _ -> l::(set (elem-1) value ls)
             | [], _ -> invalidArg "elem" "element index out of bounds"
 
@@ -133,8 +135,8 @@ module internal Permutation =
     let invert (perm: int list) =
         check perm
         List.indexed perm
-        |> List.sortBy (fun (i, p) -> p)
-        |> List.map (fun (i, p) -> i)
+        |> List.sortBy (fun (_i, p) -> p)
+        |> List.map (fun (i, _p) -> i)
     
     /// returns the permutation that would result in applying perm1 after perm2    
     let chain (perm1: int list) (perm2: int list) =
@@ -164,7 +166,7 @@ module internal Permutation =
 module internal CollectionExtensions =
 
     type System.Collections.Generic.IDictionary<'TKey, 'TValue> with
-        member this.TryFind key =
+        member this.TryFind (key: 'TKey when 'TKey :> obj) =
             match this.TryGetValue key with
             | true, value -> Some value
             | false, _ -> None
@@ -544,6 +546,23 @@ module internal Util =
         let v = n
         n <- n + 1
         v
+        
+    /// Converts a nativeint pointer to a voidptr.
+    let inline toVoidPtr (ptr: nativeint) : voidptr =
+         ptr
+         |> NativePtr.ofNativeInt<byte>
+         |> NativePtr.toVoidPtr
+         
+    /// Converts a voidptr to a nativeint pointer.
+    let inline fromVoidPtr (ptr: voidptr) : nativeint =
+        ptr
+        |> NativePtr.ofVoidPtr<byte>
+        |> NativePtr.toNativeInt       
+    
+    /// Create Span<'T> from nativeint pointer and number of elements.
+    let inline span<'T> (ptr: nativeint) (nElems: int64) : Span<'T> =
+        let voidPtr = ptr |> NativePtr.ofNativeInt<byte> |> NativePtr.toVoidPtr
+        Span<'T> (voidPtr, int nElems)
 
 
 /// Utility types and operators.        
@@ -596,13 +615,13 @@ module internal String =
             )
 
     // active pattern parsing
-    let private tryParseWith tryParseFunc = 
+    let private tryParseWith (tryParseFunc: string -> bool * 'V) = 
         tryParseFunc >> function
             | true, v    -> Some v
             | false, _   -> None
 
     /// Matches a DateTime.
-    let (|DateTime|_|) = tryParseWith System.DateTime.TryParse
+    let (|DateTime|_|) = tryParseWith System.DateTime.TryParse 
     /// Matches an int32.
     let (|Int|_|)      = tryParseWith System.Int32.TryParse
     /// Matches an int64.

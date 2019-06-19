@@ -3,15 +3,7 @@ namespace Tensor.Host
 open System
 open System.Reflection
 open System.Numerics
-open System.Threading.Tasks
-open System.Linq.Expressions
-open System.Collections.Generic
-open System.Runtime.CompilerServices
-open System.Runtime.InteropServices
 
-open Tensor
-open Tensor.Utils
-open Tensor.Backend
 open DeepNet.Utils
 
 
@@ -37,12 +29,14 @@ type internal VectorOps() =
         let nd = trgt.FastLayout.NDims
         let shape = trgt.FastLayout.Shape
 
-        let inline vectorInnerLoop (trgtAddr: int) =                   
+        let inline vectorInnerLoop (trgtAddr: int) =
+            let trgtSpan = trgt.Span
             let mutable trgtAddr = trgtAddr               
             let trgtVec = Vector<'T> value
             let vecIters = shape.[nd-1] / Vector<'T>.Count
             for vecIter in 0 .. vecIters-1 do
-                trgtVec.CopyTo (trgt.Data, trgtAddr)
+                let s = trgtSpan.Slice (trgtAddr, Vector<'T>.Count)
+                trgtVec.CopyTo (s)
                 trgtAddr <- trgtAddr + Vector<'T>.Count 
             let restElems = shape.[nd-1] % Vector<'T>.Count
             for restPos in 0 .. restElems - 1 do
