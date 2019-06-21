@@ -521,7 +521,7 @@ type Loop = {
         // Replace LoopArgs with variables in all channels.
         let processed = Dictionary<BaseExprCh, BaseExprCh> ()
         let rec processLoopArgs (exprCh: BaseExprCh) : BaseExprCh =
-            processed.IGetOrAdd exprCh (fun _ ->
+            processed.IGetOrAdd (exprCh, fun _ ->
                 match exprCh.Expr.Op with
                 | :? LoopArg as loopArg -> (makeVar loopArg).[Ch.Default]
                 | _ -> exprCh |> BaseExprCh.map (BaseExpr.mapArgs processLoopArgs)           
@@ -534,7 +534,7 @@ type Loop = {
         let loopVarSet = Set loopInput.Keys
         let processed = Dictionary<BaseExprCh, BaseExprCh> ()
         let rec liftConstants (exprCh: BaseExprCh) : BaseExprCh =
-            processed.IGetOrAdd exprCh (fun _ ->
+            processed.IGetOrAdd (exprCh, fun _ ->
                 let exprVars = exprCh.Expr.Vars 
                 let indepOfLoopVars = Set.isEmpty (Set.intersect exprVars loopVarSet)
                 if indepOfLoopVars then

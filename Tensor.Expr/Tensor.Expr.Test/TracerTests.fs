@@ -43,7 +43,8 @@ type HDF5TracerTests (output: ITestOutputHelper) =
     let performTraceTest (dev: ITensorDevice) name expr varEnv =
         let devStr =
             match dev with
-            | :? TensorHostDevice -> "host"
+            | :? TensorHostNativeDevice -> "host"
+            | :? TensorHostManagedDevice -> "host"
             | :? TensorCudaDevice -> "cuda"
             | _ -> dev.Id
         let hdfName = sprintf "%s_%s.h5" name devStr

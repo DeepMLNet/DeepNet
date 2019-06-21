@@ -111,7 +111,7 @@ module BaseExprOpt =
 
         let optimized = Dictionary<BaseExpr, BaseExpr> ()
         let rec optRec expr =      
-            optimized.IGetOrAdd expr (fun _ ->
+            optimized.IGetOrAdd (expr, fun _ ->
                 expr
                 |> BaseExpr.mapArgs (BaseExprCh.map optRec)
                 |> applyIterated data opts)

@@ -2,7 +2,7 @@
   <Import Project="../../Common.targets" />
 
   <PropertyGroup>
-    <TargetFramework>netcoreapp2.0</TargetFramework>
+    <TargetFramework>netcoreapp3.0</TargetFramework>
     <IsPackable>false</IsPackable>
     <NoWarn>988</NoWarn>
     <Platform>x64</Platform>

@@ -167,7 +167,7 @@ module internal Permutation =
 module internal CollectionExtensions =
     open System.Collections.Generic
     open System.Collections.Concurrent
-    
+       
     [<Extension>]
     type IDictionaryExtensions() =
         

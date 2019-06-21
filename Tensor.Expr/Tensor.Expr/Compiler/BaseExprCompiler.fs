@@ -203,7 +203,7 @@ module StubAndActionAssignment =
         let allocUserChs = Dictionary<AllocStub, Set<BaseExprCh>> ()
         /// Add expression channel as user of an allocation.
         let addAllocUserCh allocStub exprCh =
-            let users = allocUserChs.GetOrDefault allocStub Set.empty
+            let users = allocUserChs.GetOrDefault (allocStub, Set.empty)
             allocUserChs.[allocStub] <- users |> Set.add exprCh 
 
         /// Assigned tensor stub for each expression channel.

@@ -1,9 +1,9 @@
 ﻿namespace rec Tensor.Expr.Base
 
 open System
+open System.IO
 open MBrace.FsPickler
 
-open System.IO
 open DeepNet.Utils
 open Tensor.Expr
 open Tensor
@@ -359,7 +359,7 @@ type BaseExpr private (op: IOp) =
     static member mapOpRec (fn: IOp -> IOp) (expr: BaseExpr) =
         let replacement = Dictionary<BaseExpr, BaseExpr> ()
         let rec mapStep (subExpr: BaseExpr) =
-            replacement.IGetOrAdd subExpr (fun _ ->
+            replacement.IGetOrAdd (subExpr, fun _ ->
                 subExpr.Op.Args
                 |> Map.map (fun _ arg -> arg |> BaseExprCh.map mapStep)
                 |> subExpr.Op.ReplaceArgs 

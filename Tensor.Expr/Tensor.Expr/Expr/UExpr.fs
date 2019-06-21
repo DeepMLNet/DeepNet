@@ -337,7 +337,7 @@ type UExpr (baseExpr: BaseExpr) =
             | Range.NewAxis :: rngs, _ ->
                 splitFRS rngs shps simpleRs (Size.broadcastable::newShape)
             | Range.AllFill :: rrngs, _ ->
-                if List.length rngs <= List.length shps then splitFRS (Range.All::rngs) shps simpleRs newShape
+                if List.length rngs <= List.length shps then splitFRS (Tensor.Expr.Range.All::rngs) shps simpleRs newShape
                 else splitFRS rrngs shps simpleRs newShape
             | [], [] -> List.rev simpleRs, List.rev newShape
             | _ -> failwith "Item/slice processing error."
@@ -606,8 +606,8 @@ type UExpr (baseExpr: BaseExpr) =
             ||> List.fold (fun (concatSoFar, pos) e ->
                 let len = e.Shape.[dim]
                 let slice: Ranges = 
-                    List.replicate e.NDims Range.All
-                    |> List.set dim (Range.SymStartSymEnd (Some pos, Some (pos + len - 1L)))
+                    List.replicate e.NDims Tensor.Expr.Range.All
+                    |> List.set dim (Tensor.Expr.Range.SymStartSymEnd (Some pos, Some (pos + len - 1L)))
                 UExpr.setSubtensor concatSoFar.[slice] e, pos + len)
         concatenated
 

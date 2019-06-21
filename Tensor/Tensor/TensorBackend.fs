@@ -1,12 +1,8 @@
 namespace Tensor.Backend
 
 open System
-open System.Collections
-open System.Collections.Generic
-open System.Diagnostics
 
 open Tensor
-open Tensor.Utils
 open DeepNet.Utils
 
 
@@ -16,6 +12,8 @@ type ITensorStorage =
     abstract Dev:               ITensorDevice
     /// The type of the stored data.
     abstract DataType:          Type
+    /// Returns a storage using the same data, starting at the specified element.
+    abstract Slice:             offset:int64 -> ITensorStorage
 
 
 /// Tensor storage.

@@ -78,7 +78,7 @@ module Mnist =
 
             let image = imageReader.ReadBytes (nRows * nCols)           
             let imageSingle = Array.map (fun p -> single p / 255.0f) image
-            let imageMat = HostTensor.usingArray imageSingle |> Tensor.reshape [int64 nRows; int64 nCols]
+            let imageMat = HostTensor.ofArray imageSingle |> Tensor.reshape [int64 nRows; int64 nCols]
 
             yield labelHot, imageMat
     }

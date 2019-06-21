@@ -226,7 +226,7 @@ module Csv =
             let stream = new GZipStream (gzStream, CompressionMode.Decompress)
             new StreamReader (stream) :> TextReader)
 
-    let loadFile (pars: Parameters) path =
+    let loadFile (pars: Parameters) (path: string) =
         if Path.GetExtension(path).EndsWith(".gz") then
             loadGzipFile pars path
         else

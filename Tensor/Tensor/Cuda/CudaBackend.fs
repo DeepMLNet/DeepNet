@@ -29,7 +29,7 @@ type ITensorCudaStorage =
 /// Tensor storage on a CUDA device.
 [<CustomPickler>]
 type TensorCudaStorage<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
-                    (data: CudaDeviceVariable<'T>, dev: TensorCudaDevice) =
+                    (data: CudaDeviceVariable<'T>, dev: TensorCudaDevice, owner: CudaDeviceVariable<'T> option) =
 
     let mutable disposed = false
     let checkDisposed () =
@@ -40,14 +40,17 @@ type TensorCudaStorage<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sy
         // CUDA cannot allocate memory of size zero
         let nElems = if nElems > 0L then nElems else 1L
         let devVar = Cuda.newDevVar dev.Context nElems
-        new TensorCudaStorage<'T> (devVar, dev)
+        new TensorCudaStorage<'T> (devVar, dev, Some devVar)
      
     /// data device variable
     member this.Data = checkDisposed(); data
-
+    
     /// data device
     member this.Dev = dev
 
+    /// The device variable owning the device memory.
+    member this.Owner = owner
+    
     /// data size in elements
     member this.DataSize = checkDisposed(); int64 data.Size
 
@@ -98,6 +101,11 @@ type TensorCudaStorage<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> Sy
             this.Dev :> ITensorDevice
         member this.DataType =
             typeof<'T>
+        member this.Slice offset =
+            let offsetPtr = data.DevicePointer + SizeT (sizeof64<'T> * offset)
+            let offsetNElems = data.Size - SizeT offset
+            let offsetVar = new CudaDeviceVariable<'T> (offsetPtr, offsetNElems)
+            new TensorCudaStorage<'T> (offsetVar, this.Dev, this.Owner) :> ITensorStorage   
 
     interface ITensorCudaStorage with
         member this.ByteData = this.ByteData

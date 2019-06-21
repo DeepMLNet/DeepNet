@@ -265,12 +265,7 @@ type BaseExprWorkspace (recipe: ExecutionRecipe) =
                         match recipe.Allocs.Allocs |> Map.tryFind allocStub with
                         | Some real ->
                             let block = storageBlocks.[real.BlockIndex]
-                            // But how to return a storage within the allocation block.
-                            // Well, can we just add it to the layout offset.
-                            // Probably not, since offsets may be precomputed for many operations.
-                            // So we need to make a new shadow storage?
-                            // This is not even possible in current model.
-                            
+                            block.Slice (real.Offset)
                         | None ->
                             failwithf "Storage for tensor stub %A with allocated storage is unknown." stub                   
                     | StorageStub.Fixed storage -> storage
@@ -343,6 +338,5 @@ type BaseExprWorkspace (recipe: ExecutionRecipe) =
         member this.Dispose () =
             if not _disposed then 
                 disposeStorages storageBlocks
-                storageBlocks.Clear ()
                 _disposed <- true
 

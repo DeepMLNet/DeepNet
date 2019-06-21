@@ -232,7 +232,7 @@ type BaseExprGroup (exprs: BaseExpr list) =
     static member dump (writer: TextWriter) (group: BaseExprGroup) =
         let mutable nextId = 0
         let exprIds = Dictionary<BaseExpr, int> ()
-        let getId expr = exprIds.IGetOrAdd expr (fun _ -> Util.returnAndIncr &nextId) 
+        let getId expr = exprIds.IGetOrAdd (expr, fun _ -> Util.returnAndIncr &nextId) 
         group.Iter (BaseExpr.dump writer getId)
         Map.ofDictionary exprIds
 

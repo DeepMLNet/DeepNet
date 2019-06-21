@@ -17,6 +17,10 @@ open DeepNet.Utils
 /// When this object is disposed or finalized, the native memory is freed.
 [<StructuredFormatDisplay("{Pretty}")>]
 type OwnedNativeMemory (size: nativeint) =
+    let size =
+        if size > 0n then size
+        else 1n
+        
     let ptr = Marshal.AllocHGlobal size
     do GC.AddMemoryPressure (int64 size)
     
@@ -226,6 +230,16 @@ and [<RequireQualifiedAccess>] TensorHostStorage<'T> =
             | Native _ -> TensorHostNativeDevice.Instance :> ITensorDevice
         member this.DataType =
             typeof<'T>
+        member this.Slice offset =
+            match this with
+            | Managed managed ->
+                let slicedMem = managed.Memory.Slice (int offset)
+                Managed (TensorManagedStorage<'T> slicedMem)
+            | Native native ->
+                let offsetPtr = native.Ptr + nativeint (sizeof64<'T> * offset)
+                let offsetNElems = native.NElems - offset
+                Native (new TensorNativeStorage<'T> (offsetPtr, offsetNElems, native.Owner))
+            :> ITensorStorage
             
     interface BLAS.IBLASStorage with
         member this.Pin () =
