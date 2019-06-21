@@ -13,6 +13,8 @@ open DeepNet.Utils
 
                                                                                                                                 
 
+/// Holds an allocation of native memory. 
+/// When this object is disposed or finalized, the native memory is freed.
 [<StructuredFormatDisplay("{Pretty}")>]
 type OwnedNativeMemory (size: nativeint) =
     let ptr = Marshal.AllocHGlobal size
@@ -33,16 +35,20 @@ type OwnedNativeMemory (size: nativeint) =
     override this.Finalize() =
         (this :> IDisposable).Dispose()
     
+    /// The pointer to the native memory.
     member this.Ptr : nativeint =
         checkDisposed()
         ptr
         
+    /// The size in bytes of the native memory.
     member this.Size : nativeint =
         checkDisposed()
         size
         
+    /// True if memory is disposed.
     member this.Disposed = disposed
     
+    /// Pretty string.
     member this.Pretty =
         let disposedStr = if disposed then ", disposed" else ""
         sprintf "%d (%d bytes%s)" this.Ptr this.Size disposedStr
@@ -55,90 +61,94 @@ type internal OwnedNativeMemoryHolder (mem: OwnedNativeMemory option) =
         member this.Dispose() = ()
 
 
-/// pinned .NET managed memory (wraps a GCHandle)
+/// Pinned memory that can be accessed by a pointer.
 [<RequireQualifiedAccess>]
 type PinnedMemory =
+    /// Managed memory that has been pinned.
     | Managed of handle:MemoryHandle
+    /// Native memory.
     | Native of ptr:nativeint * owner:OwnedNativeMemory option
 
-    /// pointer to storage array 
+    /// Pointer to the start of the memory. 
     member this.Ptr =
         match this with
         | Managed handle -> Util.fromVoidPtr handle.Pointer  
         | Native (ptr, _owner) -> ptr
-
-    /// size of storage array in bytes
-    //member this.Size = size
 
     interface IDisposable with
         member this.Dispose() = 
             match this with
             | Managed handle -> (handle :> IDisposable).Dispose()
             | Native _ -> ()
-
     override this.Finalize() = (this :> IDisposable).Dispose()
 
 
 
-/// type-neutral interface to TensorHostStorage<'T>
+/// Type-neutral interface to TensorHostStorage<'T>.
 type ITensorHostStorage =
-//    /// the underlying data array
-//    abstract Data: Array
-//    /// size of underlying data array in elements
-//    abstract DataSize: int64
-    /// number of elements
+    /// Number of elements.
     abstract NElems: int64
-    /// size of underlying data array in bytes
+    /// Size of underlying storage in bytes.
     abstract DataSizeInBytes: int64    
-    /// pins the underlying data array and returns the corresponding pinned memory
+    /// Pins the underlying storage and returns the corresponding pinned memory.
     abstract Pin: unit -> PinnedMemory
 
 
 /// Host tensor storage using managed memory.
 type TensorManagedStorage<'T> (memory: Memory<'T>) =
     
+    /// Creates a new, zeroed managed storages using a .NET array.
     new (nElems: int64) =
         let ary = Array.zeroCreate (int nElems)
         let mem = Memory<'T> ary
         TensorManagedStorage<'T> mem
         
+    /// Uses the specified .NET array as storage.
     new (ary: 'T[]) =
         let mem = Memory<'T> ary
         TensorManagedStorage<'T> mem
     
+    /// The used storage memory.
     member this.Memory = memory
+    
+    /// Number of elements.
     member this.NElems = int64 memory.Length
+    
+    override this.Equals other =
+        match other with
+        | :? TensorManagedStorage<'T> as os ->
+            this.Memory = os.Memory
+        | _ -> false            
+
+    override this.GetHashCode () =
+        hash this.Memory
+        
+    member this.Pretty = sprintf "%A" this.Memory
+    override this.ToString() = this.Pretty     
     
     
 
-/// Host tensor storage using non-managed memory. 
+/// Host tensor storage using native (non-managed) memory. 
 [<StructuredFormatDisplay("{Pretty}")>]
 type TensorNativeStorage<'T> (ptr: nativeint, nElems: int64,
                               owner: OwnedNativeMemory option) =
 
-    /// allocates a new data array with the given number of elements
+    /// Allocates new unmanaged menory with the given number of elements.
     new (nElems: int64) =
-//        if nElems > int64 FSharp.Core.int32.MaxValue then
-//            failwithf "Cannot create host tensor storage for %d elements, the current
-//                       limit is %d elements." nElems FSharp.Core.int32.MaxValue
+        if nElems > int64 FSharp.Core.int32.MaxValue then
+            failwithf "Cannot create host tensor storage for %d elements, the current
+                       limit is %d elements." nElems FSharp.Core.int32.MaxValue
         let ownedMem = new OwnedNativeMemory (nativeint nElems * nativeint sizeof<'T>)
         new TensorNativeStorage<'T> (ownedMem.Ptr, nElems, Some ownedMem)        
 
-    /// the underlying data array
+    /// Pointer to the first element of the storage.
     member this.Ptr = ptr
+    
+    /// Number of elements.
     member this.NElems = nElems
+    
+    /// An optional owner of the memory allocation,
     member this.Owner = owner
-
-    /// pins the underlying data array and returns the corresponding pinned memory
-//    member this.Pin () =
-//        let gcHnd = GCHandle.Alloc (data, GCHandleType.Pinned)
-//        new PinnedMemory (gcHnd, int64 data.Length * sizeof64<'T>) 
-
-    /// size of underlying data array in elements
-    //member this.DataSize = int64 data.Length
-
-    /// size of underlying data array in bytes
-    //member this.DataSizeInBytes = int64 data.Length * sizeof64<'T>
 
     interface IDisposable with
         member this.Dispose () =
@@ -162,26 +172,45 @@ type TensorNativeStorage<'T> (ptr: nativeint, nElems: int64,
     override this.ToString() = this.Pretty        
         
 
+/// Tensor storage in host memory.
 and [<RequireQualifiedAccess>] TensorHostStorage<'T> =
+    /// Tensor stored in managed memory.
     | Managed of TensorManagedStorage<'T>
+    /// Tensor stored in native (non-managed) memory.
     | Native of TensorNativeStorage<'T>
 
+    /// Number of elements.
     member this.NElems =
         match this with
         | Managed managed -> managed.NElems
         | Native native -> native.NElems
         
-    member internal this.SpanSrc =
+    /// Returns a `Span<'T>` factory.
+    member this.SpanSrc =
         match this with
         | Managed managed -> SpanSrc<'T>.Managed managed.Memory
         | Native native -> SpanSrc<'T>.Native (native.Ptr, int native.NElems)
     
+    /// Pins the memory and returns a handle for accessing and releasing it.
     member this.Pin () =
         match this with
         | Managed managed -> PinnedMemory.Managed (managed.Memory.Pin())
         | Native native -> PinnedMemory.Native (native.Ptr, native.Owner)        
     
-    member this.DataSizeInBytes = this.NElems * sizeof64<'T>    
+    /// Data size in bytes.
+    member this.DataSizeInBytes = this.NElems * sizeof64<'T>
+    
+    /// Creates a tensor storage from managed memory.
+    static member make (memory: Memory<'T>) =
+        Managed (TensorManagedStorage<'T> memory)
+        
+    /// Uses the specified array as tensor storage.
+    static member make (ary: 'T[]) =
+        TensorHostStorage<'T>.make (Memory<'T> ary)
+        
+    /// Creates a tensor storage using the specified block of pre-allocated memory.
+    static member make (ptr: nativeint, nElems: int64, owner: OwnedNativeMemory option) =
+        Native (new TensorNativeStorage<'T> (ptr, nElems, owner))
     
     interface ITensorHostStorage with
         member this.Pin () = this.Pin ()
@@ -217,10 +246,7 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
     member val internal FastLayout = FastLayout32 layout
 
     /// underlying TensorHostStorate<'T>
-    member inline this.Storage = storage
-
-    /// underlying data array
-    //member val Ptr : nativeptr<'T> = storage.Ptr
+    member this.Storage = storage
 
     /// data and fast layout
     member inline internal this.DataAndLayout =
@@ -297,9 +323,8 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
 
         member this.FillConst (value, trgt) = 
             let trgt = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt)
-            //if VectorOps.CanUse (trgt) then VectorOps.Fill (value, trgt)
-            //else ScalarOps.Fill (value, trgt)
-            ScalarOps.Fill (value, trgt)
+            if VectorOps.CanUse (trgt) then VectorOps.Fill (value, trgt)
+            else ScalarOps.Fill (value, trgt)
 
         member this.FillIncrementing (start, incr, trgt) =
             let trgt = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt)
@@ -318,12 +343,17 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
                     srcSpan.CopyTo trgtSpan
             else 
                 let trgt, src = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, src)
-                //if VectorOps.CanUse (trgt, src) then VectorOps.Copy (trgt, src)
-                //else ScalarOps.Copy (trgt, src)
-                ScalarOps.Copy (trgt, src)
+                if VectorOps.CanUse (trgt, src) then VectorOps.Copy (trgt, src)
+                else ScalarOps.Copy (trgt, src)
 
-        member this.Transfer (_trgt, _src) =
-            false
+        member this.Transfer (trgt, src) =
+            let nativeDev = TensorHostNativeDevice.Instance :> ITensorDevice
+            let managedDev = TensorHostManagedDevice.Instance :> ITensorDevice
+            if (trgt.Dev = nativeDev && src.Dev = managedDev) || (src.Dev = managedDev && trgt.Dev = nativeDev) then
+                (this :> ITensorBackend<'T>).Copy (trgt, src)
+                true
+            else
+                false
 
         member this.Convert (trgt, a) =
             let trgt, a = TensorHostBackend<'T>.ElemwiseDataAndLayout (trgt, a)
@@ -335,15 +365,13 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
 
         member this.UnaryMinus (trgt, a) =
             let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
-            //if VectorOps.CanUse (trgt, a) then VectorOps.UnaryMinus (trgt, a)
-            //else ScalarOps.UnaryMinus (trgt, a)
-            ScalarOps.UnaryMinus (trgt, a)
+            if VectorOps.CanUse (trgt, a) then VectorOps.UnaryMinus (trgt, a)
+            else ScalarOps.UnaryMinus (trgt, a)
 
         member this.Abs (trgt, a) =
             let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
-            //if VectorOps.CanUse (trgt, a) then VectorOps.Abs (trgt, a)
-            //else ScalarOps.Abs (trgt, a)
-            ScalarOps.Abs (trgt, a)
+            if VectorOps.CanUse (trgt, a) then VectorOps.Abs (trgt, a)
+            else ScalarOps.Abs (trgt, a)
 
         member this.Sgn (trgt, a) =
             let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
@@ -399,9 +427,8 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
 
         member this.Sqrt (trgt, a) =
             let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
-            //if VectorOps.CanUse (trgt, a) then VectorOps.Sqrt (trgt, a)
-            //else ScalarOps.Sqrt (trgt, a)
-            ScalarOps.Sqrt (trgt, a)
+            if VectorOps.CanUse (trgt, a) then VectorOps.Sqrt (trgt, a)
+            else ScalarOps.Sqrt (trgt, a)
 
         member this.Ceiling (trgt, a) =
             let trgt, a = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a)
@@ -429,27 +456,23 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
 
         member this.Add (trgt, a, b) =
             let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
-            //if VectorOps.CanUse (trgt, a, b) then VectorOps.Add (trgt, a, b)
-            //else ScalarOps.Add (trgt, a, b)
-            ScalarOps.Add (trgt, a, b)
+            if VectorOps.CanUse (trgt, a, b) then VectorOps.Add (trgt, a, b)
+            else ScalarOps.Add (trgt, a, b)
 
         member this.Subtract (trgt, a, b) =
             let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
-            //if VectorOps.CanUse (trgt, a, b) then VectorOps.Subtract (trgt, a, b)
-            //else ScalarOps.Subtract (trgt, a, b)
-            ScalarOps.Subtract (trgt, a, b)
+            if VectorOps.CanUse (trgt, a, b) then VectorOps.Subtract (trgt, a, b)
+            else ScalarOps.Subtract (trgt, a, b)
 
         member this.Multiply (trgt, a, b) =
             let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
-            //if VectorOps.CanUse (trgt, a, b) then VectorOps.Multiply (trgt, a, b)
-            //else ScalarOps.Multiply (trgt, a, b)
-            ScalarOps.Multiply (trgt, a, b)
+            if VectorOps.CanUse (trgt, a, b) then VectorOps.Multiply (trgt, a, b)
+            else ScalarOps.Multiply (trgt, a, b)
 
         member this.Divide (trgt, a, b) =
             let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
-            //if VectorOps.CanUse (trgt, a, b) then VectorOps.Divide (trgt, a, b)
-            //else ScalarOps.Divide (trgt, a, b)
-            ScalarOps.Divide (trgt, a, b)
+            if VectorOps.CanUse (trgt, a, b) then VectorOps.Divide (trgt, a, b)
+            else ScalarOps.Divide (trgt, a, b)
 
         member this.Modulo (trgt, a, b) =
             let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
@@ -461,16 +484,14 @@ and TensorHostBackend<'T> (layout: TensorLayout, storage: TensorHostStorage<'T>)
 
         member this.MaxElemwise (trgt, a, b) =
             let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
-            //if VectorOps.CanUse (trgt, a, b) then VectorOps.MaxElemwise (trgt, a, b)
-            //else ScalarOps.MaxElemwise (trgt, a, b)
-            ScalarOps.MaxElemwise (trgt, a, b)
+            if VectorOps.CanUse (trgt, a, b) then VectorOps.MaxElemwise (trgt, a, b)
+            else ScalarOps.MaxElemwise (trgt, a, b)
 
         member this.MinElemwise (trgt, a, b) =
             let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
-            //if VectorOps.CanUse (trgt, a, b) then VectorOps.MinElemwise (trgt, a, b)
-            //else ScalarOps.MinElemwise (trgt, a, b)
-            ScalarOps.MinElemwise (trgt, a, b)
-
+            if VectorOps.CanUse (trgt, a, b) then VectorOps.MinElemwise (trgt, a, b)
+            else ScalarOps.MinElemwise (trgt, a, b)
+            
         member this.Equal (trgt, a, b) =
             let trgt, a, b = TensorHostBackend<_>.ElemwiseDataAndLayout (trgt, a, b)
             ScalarOps.Equal (trgt, a, b)
@@ -813,7 +834,7 @@ and ITensorHostDevice =
 and TensorHostNativeDevice private () =
     inherit BaseTensorDevice()
     interface ITensorHostDevice
-    static member Instance = TensorHostNativeDevice () 
+    static member Instance : TensorHostNativeDevice = TensorHostNativeDevice () 
 
     override this.Id = "HostNative"
     override this.Create nElems =
@@ -825,7 +846,7 @@ and TensorHostNativeDevice private () =
 and TensorHostManagedDevice private () =
     inherit BaseTensorDevice()
     interface ITensorHostDevice    
-    static member Instance = TensorHostManagedDevice () 
+    static member Instance : TensorHostManagedDevice = TensorHostManagedDevice () 
 
     override this.Id = "HostManaged"
     override this.Create nElems =

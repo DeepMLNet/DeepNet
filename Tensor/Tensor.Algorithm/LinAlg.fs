@@ -105,7 +105,7 @@ module LinAlg =
     let generalInverse (L: Tensor<'T>) =
         // compute row echelon form
         let rows, cols = getRowsCols L
-        let A = HostTensor.identity (max rows cols) |> fun A -> A.[0L .. rows-1L, *]       
+        let A = Tensor.identity L.Dev (max rows cols) |> fun A -> A.[0L .. rows-1L, *]       
         let E, nzRows, unCols, I = rowEchelonAugmented L A
 
         // extract unnormalized columns from row echelon form E

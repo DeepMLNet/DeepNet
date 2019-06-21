@@ -28,6 +28,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="../../Utils/Utils.fs" Link="Utils/Utils.fs" />    
     <Compile Include="BigIntegerExtensions.fs" />
     <Compile Include="Rat.fs" />
     <Compile Include="Decomposition.fs" />
@@ -37,6 +38,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Tensor\Tensor.fsproj" />
-  </ItemGroup>  
-  
+  </ItemGroup>
+
 </Project>

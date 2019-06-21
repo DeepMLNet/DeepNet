@@ -296,22 +296,31 @@ type HDF5 private (path: string, mode: HDF5Mode) =
     /// <remarks>All HDF5 groups are automatically created as necessary.</remarks>
     /// <seealso cref="Read``1"/><seealso cref="HostTensor.write"/>
     member this.Write (name: string, data: 'T array, shape: int64 list) =
+        checkShape data shape           
+        let gcHnd = GCHandle.Alloc(data, GCHandleType.Pinned)
+        this.Write (name, gcHnd.AddrOfPinnedObject(), typeof<'T>, shape)
+        gcHnd.Free ()
+    
+    /// <summary>Write data from memory to HDF5 file.</summary>
+    /// <typeparam name="'T">Type of the data.</typeparam>
+    /// <param name="name">HDF5 path to write to.</param>
+    /// <param name="ptr">Pointer to first element of data.</param>
+    /// <param name="typ">Data type of elements.</param>
+    /// <param name="shape">Array shape to use.</param>
+    /// <remarks>All HDF5 groups are automatically created as necessary.</remarks>
+    /// <seealso cref="Read``1"/><seealso cref="HostTensor.write"/>    
+    member this.Write (name: string, ptr: nativeint, typ: Type, shape: int64 list) =
         checkDisposed ()
         if mode <> HDF5Overwrite then
             invalidOp "HDF5 file %s is opened for reading." path
-        checkShape data shape
         this.CreateParentGroups name
         if this.Exists name then
             invalidOp "HDF5 dataset %s already exists in file %s." name path
             
-        let typeHnd = H5T.copy hdfType<'T> |> check
+        let typeHnd = H5T.copy (hdfTypeInst typ) |> check
         let shapeHnd = H5S.create_simple (List.length shape, hdfShape shape, hdfShape shape) |> check
         let dataHnd = H5D.create (fileHnd, name, typeHnd, shapeHnd) |> check
-
-        let gcHnd = GCHandle.Alloc(data, GCHandleType.Pinned)
-        H5D.write (dataHnd, typeHnd, int64 H5S.ALL, int64 H5S.ALL, H5P.DEFAULT, gcHnd.AddrOfPinnedObject()) |> check |> ignore
-        gcHnd.Free ()
-
+        H5D.write (dataHnd, typeHnd, int64 H5S.ALL, int64 H5S.ALL, H5P.DEFAULT, ptr) |> check |> ignore
         H5D.close dataHnd |> check |> ignore
         H5S.close shapeHnd |> check |> ignore
         H5T.close typeHnd |> check |> ignore
@@ -326,14 +335,43 @@ type HDF5 private (path: string, mode: HDF5Mode) =
     /// <seealso cref="Write``1"/><seealso cref="GetDataType"/><seealso cref="HostTensor.read``1"/>
     member this.Read<'T> (name: string) = 
         checkDisposed ()
+        
+        if not (this.Exists name) then
+            invalidOp "HDF5 dataset %s does not exist in file %s." name path
+            
+        let typ = this.GetDataType name
+        if typ <> typeof<'T> then
+            invalidOp "HDF5 dataset %s has type %A but method for %A was used." name typ typeof<'T>
+
+        let shape = this.GetShape name
+        let nElems = List.fold (*) 1L shape 
+
+        let data : 'T array = Array.zeroCreate (int nElems)
+        let gcHnd = GCHandle.Alloc(data, GCHandleType.Pinned)
+        this.Read (name, gcHnd.AddrOfPinnedObject(), typ, nElems)
+        gcHnd.Free ()
+
+        data, shape 
+        
+        
+    /// <summary>Read data array from HDF5 file.</summary>
+    /// <typeparam name="'T">Type of the data.</typeparam>
+    /// <param name="name">HDF5 path to read from.</param>
+    /// <returns>A tuple of <c>(data, shape)</c> where <c>data</c> is the read data array and <c>shape</c> is the 
+    /// corresponding shape.</returns>
+    /// <remarks>The type <c>'T</c> must match the data type stored in the HDF5 file, otherwise an exception is raised.
+    /// </remarks>
+    /// <seealso cref="Write``1"/><seealso cref="GetDataType"/><seealso cref="HostTensor.read``1"/>
+    member this.Read (name: string, ptr: nativeint, typ: Type, nElems: int64) = 
+        checkDisposed ()
         if not (this.Exists name) then
             invalidOp "HDF5 dataset %s does not exist in file %s." name path
         let dataHnd = H5D.``open`` (fileHnd, name) |> check
         let typeHnd = H5D.get_type dataHnd |> check
         let shapeHnd = H5D.get_space (dataHnd) |> check
 
-        if H5T.equal (hdfType<'T>, typeHnd) = 0 then
-            invalidOp "HDF5 dataset %s has other type than %A." name typeof<'T>
+        if H5T.equal (hdfTypeInst typ, typeHnd) = 0 then
+            invalidOp "HDF5 dataset %s has other type than %A." name typ
 
         if H5S.is_simple (shapeHnd) = 0 then
             invalidOp "HDF5 dataset %s is not simple." name
@@ -341,18 +379,16 @@ type HDF5 private (path: string, mode: HDF5Mode) =
         let shape : uint64 array = Array.zeroCreate nDims
         let maxShape : uint64 array = Array.zeroCreate nDims
         H5S.get_simple_extent_dims(shapeHnd, shape, maxShape) |> check |> ignore
-        let nElems = Array.fold (*) 1UL shape |> int
+        let nElemsHdf = Array.fold (*) 1UL shape 
+        if nElems <> int64 nElemsHdf then
+            invalidArg "nElems" "Number of elements specified does not match number of elements in HDF5 file."
 
-        let data : 'T array = Array.zeroCreate nElems
-        let gcHnd = GCHandle.Alloc(data, GCHandleType.Pinned)
-        H5D.read (dataHnd, typeHnd, int64 H5S.ALL, int64 H5S.ALL, H5P.DEFAULT, gcHnd.AddrOfPinnedObject()) |> check |> ignore
-        gcHnd.Free ()
+        H5D.read (dataHnd, typeHnd, int64 H5S.ALL, int64 H5S.ALL, H5P.DEFAULT, ptr) |> check |> ignore
 
         H5D.close dataHnd |> check |> ignore
         H5S.close shapeHnd |> check |> ignore
         H5T.close typeHnd |> check |> ignore
-
-        data, shape |> intShape
+ 
 
     /// <summary>Get data type of array in HDF5 file.</summary>
     /// <param name="name">HDF5 path to read from.</param>
@@ -367,6 +403,30 @@ type HDF5 private (path: string, mode: HDF5Mode) =
         H5D.close dataHnd |> check |> ignore
         H5T.close typeHnd |> check |> ignore
         netType
+        
+        
+    /// <summary>Get shape of array in HDF5 file.</summary>
+    /// <param name="name">HDF5 path to read from.</param>
+    /// <returns>Shape.</returns>            
+    member this.GetShape (name: string) : int64 list =
+        checkDisposed ()
+        if not (this.Exists name) then
+            invalidOp "HDF5 dataset %s does not exist in file %s." name path
+        let dataHnd = H5D.``open`` (fileHnd, name) |> check
+        let shapeHnd = H5D.get_space (dataHnd) |> check
+
+        if H5S.is_simple (shapeHnd) = 0 then
+            invalidOp "HDF5 dataset %s is not simple." name
+        let nDims = H5S.get_simple_extent_ndims (shapeHnd) |> check
+        let shape : uint64 array = Array.zeroCreate nDims
+        let maxShape : uint64 array = Array.zeroCreate nDims
+        H5S.get_simple_extent_dims(shapeHnd, shape, maxShape) |> check |> ignore
+        
+        H5D.close dataHnd |> check |> ignore
+        H5S.close shapeHnd |> check |> ignore   
+        
+        intShape shape 
+        
 
     /// <summary>Set attribute value on an HDF5 object.</summary>
     /// <typeparam name="'T">Type of the attribute value.</typeparam>

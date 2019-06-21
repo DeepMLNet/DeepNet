@@ -82,10 +82,10 @@ type RatTests (output: ITestOutputHelper) =
 
     [<Fact>]
     let ``Rat Tensors`` () =
-        let A = HostTensor.zeros<Rat> [3L; 3L]
-        let B = HostTensor.ones<Rat> [3L; 3L]
+        let A = ManagedHostTensor.zeros<Rat> [3L; 3L]
+        let B = ManagedHostTensor.ones<Rat> [3L; 3L]
         let C = Rat 3 * B
-        let D = HostTensor.filled [3L; 3L] (Rat (2,3))
+        let D = ManagedHostTensor.filled [3L; 3L] (Rat (2,3))
 
         printfn "A=\n%A" A
         printfn "B=\n%A" B
@@ -100,9 +100,9 @@ type RatTests (output: ITestOutputHelper) =
 
     [<Fact>]
     let ``Rat Dot`` () =
-        let A = HostTensor.identity<Rat> 5L
+        let A = ManagedHostTensor.identity<Rat> 5L
         A.[2L, *] <- (Rat 2) * A.[2L, *]
-        let B = HostTensor.linspace (Rat 0) (Rat 5) 5L
+        let B = ManagedHostTensor.linspace (Rat 0) (Rat 5) 5L
         let B = Tensor.replicate 0 5L B.[NewAxis, *]
 
         printfn "A=\n%A" A
@@ -153,7 +153,7 @@ type RatTests (output: ITestOutputHelper) =
 
     [<Fact>]
     let ``Rat Tensor Conversions`` () =
-        let A = HostTensor.arange 1 2 10
+        let A = ManagedHostTensor.arange 1 2 10
         let B = A |> Tensor<Rat>.convert
         let C = B |> Tensor<int32>.convert
         printfn "A=\n%A" A
@@ -164,13 +164,13 @@ type RatTests (output: ITestOutputHelper) =
 
     [<Fact>]
     let ``Rat Tensor Arange`` () =
-        let A = HostTensor.arange (Rat(1)) (Rat(1,3)) (Rat(3))
+        let A = ManagedHostTensor.arange (Rat(1)) (Rat(1,3)) (Rat(3))
         printfn "arange:\n%A" A
 
 
     [<Fact>]
     let ``Rat Tensor Linspace`` () =
-        let A = HostTensor.linspace (Rat 1) (Rat 3) 10L
+        let A = ManagedHostTensor.linspace (Rat 1) (Rat 3) 10L
         printfn "linspace:\n%A" A
          
 

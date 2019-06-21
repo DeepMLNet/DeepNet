@@ -35,12 +35,11 @@ type internal VectorOps() =
             let trgtVec = Vector<'T> value
             let vecIters = shape.[nd-1] / Vector<'T>.Count
             for vecIter in 0 .. vecIters-1 do
-                let s = trgtSpan.Slice (trgtAddr, Vector<'T>.Count)
-                trgtVec.CopyTo (s)
+                trgtVec.CopyTo (trgtSpan.Slice (trgtAddr, Vector<'T>.Count))
                 trgtAddr <- trgtAddr + Vector<'T>.Count 
             let restElems = shape.[nd-1] % Vector<'T>.Count
             for restPos in 0 .. restElems - 1 do
-                trgt.Data.[trgtAddr] <- trgtVec.[restPos]
+                trgtSpan.[trgtAddr] <- trgtVec.[restPos]
                 trgtAddr <- trgtAddr + 1
                        
         let mutable trgtPosIter = PosIter32 (trgt.FastLayout, toDim=nd-2)
@@ -57,34 +56,38 @@ type internal VectorOps() =
         let shape = trgt.FastLayout.Shape
         let src1Buf : 'T1[] = Array.zeroCreate Vector<'T>.Count
 
-        let inline stride11InnerLoop (trgtAddr: int) (src1Addr: int) =                   
+        let inline stride11InnerLoop (trgtAddr: int) (src1Addr: int) =
+            let trgtSpan = trgt.Span
+            let src1Span = src1.Span 
             let mutable trgtAddr, src1Addr = trgtAddr, src1Addr                
             let vecIters = shape.[nd-1] / Vector<'T>.Count
             for vecIter in 0 .. vecIters-1 do
-                let trgtVec = vectorOp (Vector (src1.Data, src1Addr)) 
-                trgtVec.CopyTo (trgt.Data, trgtAddr)
+                let trgtVec = vectorOp (Vector<'T1> (src1Span.Slice(src1Addr, Vector<'T1>.Count))) 
+                trgtVec.CopyTo (trgtSpan.Slice(trgtAddr, Vector<'T>.Count))
                 trgtAddr <- trgtAddr + Vector<'T>.Count
                 src1Addr <- src1Addr + Vector<'T>.Count 
             let restElems = shape.[nd-1] % Vector<'T>.Count
             for restPos in 0 .. restElems - 1 do
-                src1Buf.[restPos] <- src1.Data.[src1Addr]
+                src1Buf.[restPos] <- src1Span.[src1Addr]
                 src1Addr <- src1Addr + 1
             let trgtVec = vectorOp (Vector src1Buf)
             for restPos in 0 .. restElems - 1 do
-                trgt.Data.[trgtAddr] <- trgtVec.[restPos]
+                trgtSpan.[trgtAddr] <- trgtVec.[restPos]
                 trgtAddr <- trgtAddr + 1
 
-        let inline stride10InnerLoop (trgtAddr: int) (src1Addr: int) =                   
+        let inline stride10InnerLoop (trgtAddr: int) (src1Addr: int) =
+            let trgtSpan = trgt.Span
+            let src1Span = src1.Span        
             let mutable trgtAddr = trgtAddr                
             let vecIters = shape.[nd-1] / Vector<'T>.Count
-            let src1Vec = Vector (src1.Data.[src1Addr])
+            let src1Vec = Vector<'T1> (src1Span.[src1Addr])
             let trgtVec = vectorOp src1Vec
             for vecIter in 0 .. vecIters-1 do
-                trgtVec.CopyTo (trgt.Data, trgtAddr)
+                trgtVec.CopyTo (trgtSpan.Slice(trgtAddr, Vector<'T>.Count))
                 trgtAddr <- trgtAddr + Vector<'T>.Count 
             let restElems = shape.[nd-1] % Vector<'T>.Count
             for restPos in 0 .. restElems - 1 do
-                trgt.Data.[trgtAddr] <- trgtVec.[restPos]
+                trgtSpan.[trgtAddr] <- trgtVec.[restPos]
                 trgtAddr <- trgtAddr + 1
                      
         let mutable trgtPosIter = PosIter32 (trgt.FastLayout, toDim=nd-2)
@@ -106,76 +109,89 @@ type internal VectorOps() =
         let src1Buf : 'T1[] = Array.zeroCreate Vector<'T>.Count
         let src2Buf : 'T2[] = Array.zeroCreate Vector<'T>.Count
         
-        let inline stride111InnerLoop (trgtAddr: int) (src1Addr: int) (src2Addr: int) =                   
+        let inline stride111InnerLoop (trgtAddr: int) (src1Addr: int) (src2Addr: int) =
+            let trgtSpan = trgt.Span
+            let src1Span = src1.Span
+            let src2Span = src2.Span
             let mutable trgtAddr, src1Addr, src2Addr = trgtAddr, src1Addr, src2Addr                
             let vecIters = shape.[nd-1] / Vector<'T>.Count
             for vecIter in 0 .. vecIters-1 do
-                let trgtVec = vectorOp (Vector (src1.Data, src1Addr), Vector (src2.Data, src2Addr))
-                trgtVec.CopyTo (trgt.Data, trgtAddr)
+                let trgtVec = vectorOp (Vector<'T1> (src1Span.Slice(src1Addr, Vector<'T1>.Count)),
+                                        Vector<'T2> (src2Span.Slice(src2Addr, Vector<'T2>.Count)))
+                trgtVec.CopyTo (trgtSpan.Slice(trgtAddr, Vector<'T>.Count))
                 trgtAddr <- trgtAddr + Vector<'T>.Count
                 src1Addr <- src1Addr + Vector<'T>.Count
                 src2Addr <- src2Addr + Vector<'T>.Count
 
             let restElems = shape.[nd-1] % Vector<'T>.Count
             for restPos in 0 .. restElems - 1 do
-                src1Buf.[restPos] <- src1.Data.[src1Addr]
-                src2Buf.[restPos] <- src2.Data.[src2Addr]
+                src1Buf.[restPos] <- src1Span.[src1Addr]
+                src2Buf.[restPos] <- src2Span.[src2Addr]
                 src1Addr <- src1Addr + 1
                 src2Addr <- src2Addr + 1
             let trgtVec = vectorOp (Vector src1Buf, Vector src2Buf)
             for restPos in 0 .. restElems - 1 do
-                trgt.Data.[trgtAddr] <- trgtVec.[restPos]
+                trgtSpan.[trgtAddr] <- trgtVec.[restPos]
                 trgtAddr <- trgtAddr + 1
 
-        let inline stride110InnerLoop (trgtAddr: int) (src1Addr: int) (src2Addr: int) =                   
+        let inline stride110InnerLoop (trgtAddr: int) (src1Addr: int) (src2Addr: int) =
+            let trgtSpan = trgt.Span
+            let src1Span = src1.Span
+            let src2Span = src2.Span         
             let mutable trgtAddr, src1Addr = trgtAddr, src1Addr               
             let vecIters = shape.[nd-1] / Vector<'T>.Count
-            let src2Vec = Vector (src2.Data.[src2Addr])
+            let src2Vec = Vector<'T2> (src2Span.[src2Addr])
             for vecIter in 0 .. vecIters-1 do
-                let trgtVec = vectorOp (Vector (src1.Data, src1Addr), src2Vec)
-                trgtVec.CopyTo (trgt.Data, trgtAddr)
+                let trgtVec = vectorOp (Vector<'T1> (src1Span.Slice(src1Addr, Vector<'T1>.Count)), src2Vec)
+                trgtVec.CopyTo (trgtSpan.Slice(trgtAddr, Vector<'T>.Count))
                 trgtAddr <- trgtAddr + Vector<'T>.Count
                 src1Addr <- src1Addr + Vector<'T>.Count 
 
             let restElems = shape.[nd-1] % Vector<'T>.Count
             for restPos in 0 .. restElems - 1 do
-                src1Buf.[restPos] <- src1.Data.[src1Addr]
+                src1Buf.[restPos] <- src1Span.[src1Addr]
                 src1Addr <- src1Addr + 1
             let trgtVec = vectorOp (Vector src1Buf, src2Vec)
             for restPos in 0 .. restElems - 1 do
-                trgt.Data.[trgtAddr] <- trgtVec.[restPos]
+                trgtSpan.[trgtAddr] <- trgtVec.[restPos]
                 trgtAddr <- trgtAddr + 1
                        
-        let inline stride101InnerLoop (trgtAddr: int) (src1Addr: int) (src2Addr: int) =                   
+        let inline stride101InnerLoop (trgtAddr: int) (src1Addr: int) (src2Addr: int) =
+            let trgtSpan = trgt.Span
+            let src1Span = src1.Span
+            let src2Span = src2.Span         
             let mutable trgtAddr, src2Addr = trgtAddr, src2Addr               
             let vecIters = shape.[nd-1] / Vector<'T>.Count
-            let src1Vec = Vector (src1.Data.[src1Addr])
+            let src1Vec = Vector<'T1> (src1Span.[src1Addr])
             for vecIter in 0 .. vecIters-1 do
-                let trgtVec = vectorOp (src1Vec, Vector (src2.Data, src2Addr))
-                trgtVec.CopyTo (trgt.Data, trgtAddr)
+                let trgtVec = vectorOp (src1Vec, Vector<'T2> (src2Span.Slice(src2Addr, Vector<'T2>.Count)))
+                trgtVec.CopyTo (trgtSpan.Slice(trgtAddr, Vector<'T>.Count))
                 trgtAddr <- trgtAddr + Vector<'T>.Count
                 src2Addr <- src2Addr + Vector<'T>.Count 
 
             let restElems = shape.[nd-1] % Vector<'T>.Count
             for restPos in 0 .. restElems - 1 do
-                src2Buf.[restPos] <- src2.Data.[src2Addr]
+                src2Buf.[restPos] <- src2Span.[src2Addr]
                 src2Addr <- src2Addr + 1
             let trgtVec = vectorOp (src1Vec, Vector src2Buf)
             for restPos in 0 .. restElems - 1 do
-                trgt.Data.[trgtAddr] <- trgtVec.[restPos]
+                trgtSpan.[trgtAddr] <- trgtVec.[restPos]
                 trgtAddr <- trgtAddr + 1
 
-        let inline stride100InnerLoop (trgtAddr: int) (src1Addr: int) (src2Addr: int) =                   
+        let inline stride100InnerLoop (trgtAddr: int) (src1Addr: int) (src2Addr: int) =
+            let trgtSpan = trgt.Span
+            let src1Span = src1.Span
+            let src2Span = src2.Span                  
             let mutable trgtAddr = trgtAddr
             let vecIters = shape.[nd-1] / Vector<'T>.Count
-            let trgtVec = vectorOp (Vector src1.Data.[src1Addr], Vector src2.Data.[src2Addr])
+            let trgtVec = vectorOp (Vector<'T1> (src1Span.[src1Addr]), Vector<'T2> (src2Span.[src2Addr]))
             for vecIter in 0 .. vecIters-1 do
-                trgtVec.CopyTo (trgt.Data, trgtAddr)
+                trgtVec.CopyTo (trgtSpan.Slice(trgtAddr, Vector<'T>.Count))
                 trgtAddr <- trgtAddr + Vector<'T>.Count
 
             let restElems = shape.[nd-1] % Vector<'T>.Count
             for restPos in 0 .. restElems - 1 do
-                trgt.Data.[trgtAddr] <- trgtVec.[restPos]
+                trgtSpan.[trgtAddr] <- trgtVec.[restPos]
                 trgtAddr <- trgtAddr + 1
                       
         let mutable trgtPosIter = PosIter32 (trgt.FastLayout, toDim=nd-2)
@@ -284,7 +300,7 @@ type internal VectorOps() =
                 vecTypes |> Array.contains typeof<'T>
             let canUseTrgt = 
                 trgt.FastLayout.Stride.[nd-1] = 1
-            let canUseSrc src = 
+            let canUseSrc (src: DataAndLayout<'a> option) = 
                 match src with
                 | Some src -> 
                     let str = src.FastLayout.Stride 

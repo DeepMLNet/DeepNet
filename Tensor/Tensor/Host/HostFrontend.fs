@@ -23,38 +23,39 @@ type private HDFFuncs =
     static member Write<'T> (hdf5: HDF5, path: string, x: Tensor<'T>) =
         let x = HostTensorHelpers.ensureRowMajorAndOffsetFree x
         let storage = x.Storage :?> TensorHostStorage<'T>
-        let ary = storage.SpanSrc.Span.ToArray ()
-        hdf5.Write (path, ary, Tensor.shape x)
+        use pin = storage.Pin()
+        hdf5.Write (path, pin.Ptr, typeof<'T>, Tensor.shape x)
 
-    static member Read<'T> (hdf5: HDF5, name: string) =
-        let (data: 'T []), shape = hdf5.Read (name)
-        let storage = TensorHostStorage.Managed (TensorManagedStorage data)
-        Tensor<'T> (TensorLayout.newRowMajor shape, storage)         
+    static member Read<'T> (hdf5: HDF5, name: string, dev: ITensorDevice) : Tensor<'T> =
+        let shape = hdf5.GetShape (name)
+        let nElems = List.fold (*) (1L) shape 
+        let x = Tensor<'T> (shape, dev)
+        let storage = x.Storage :?> TensorHostStorage<'T>
+        use pin = storage.Pin()
+        hdf5.Read (name, pin.Ptr, typeof<'T>, nElems)
+        x
 
 
 
-/// <summary>Functions for creating and operating on tensors stored in host memory.</summary>
-/// <remarks>This module contains functions for creating tensors stored in host memory.
-/// It further contains functions that only work with tensors stored in host memory.
+/// <summary>Functions for creating and operating on tensors stored in native host memory.</summary>
+/// <remarks>
+/// <p>This module contains functions for creating tensors stored in native host memory.
+/// The data type must of the tensor must be a value (struct) type and must not contain
+/// any references.
+/// Use <see cref="ManagedHostTensor"> instead for reference data types.</p>
+/// <p>This module also contains functions that only work with tensors stored in host memory.
 /// Calling these functions with tensors stored on other devices will result in an
-/// <see cref="System.InvalidOperationException"/>.</remarks>
+/// <see cref="System.InvalidOperationException"/>.</p>
+/// </remarks>
 /// <example><code language="fsharp">
 /// let x = HostTensor.zeros [3L; 3L]  // x.Dev = HostTensor.Dev
 /// </code></example>
-/// <seealso cref="Tensor`1"/><seealso cref="HostTensor.Parallel"/>
+/// <seealso cref="Tensor`1"/><seealso cref="HostTensor.Parallel"/><seealso cref="ManagedHostTensor"/>
 module HostTensor =
 
-    /// <summary>Tensor device using a .NET array in host memory as data storage.</summary>
-    /// <seealso cref="DevNative"/><seealso cref="Tensor`1.Dev"/>    
-    let DevManaged = TensorHostManagedDevice.Instance :> ITensorDevice
-    
     /// <summary>Tensor device using native host memory as data storage.</summary>
-    /// <seealso cref="DevManaged"/><seealso cref="Tensor`1.Dev"/>    
-    let DevNative = TensorHostNativeDevice.Instance :> ITensorDevice
-    
-    /// <summary>Tensor device using native host memory as data storage.</summary>
-    /// <seealso cref="Tensor`1.Dev"/>
-    let Dev = DevNative
+    /// <seealso cref="HostManagedTensor.Dev"/><seealso cref="Tensor`1.Dev"/>
+    let Dev = TensorHostNativeDevice.Instance :> ITensorDevice
 
     /// Gets the backend of a host tensor.
     let internal backend (trgt: Tensor<'T>) =
@@ -71,15 +72,17 @@ module HostTensor =
     let FillIndexed (trgt: Tensor<'T>) (fn: int64[] -> 'T) =
         (backend trgt).FillIndexed (fn=fn, trgt=trgt, useThreads=false)
 
+    let internal initDev (dev: ITensorDevice) (shape: int64 list) (fn: int64[] -> 'T) : Tensor<'T> =
+        let x = Tensor<'T> (shape, dev)
+        FillIndexed x fn
+        x           
+    
     /// <summary>Creates a new tensor with values returned by the specified function.</summary>
     /// <param name="shape">The shape of the new tensor.</param>
     /// <param name="fn">A function that takes the index of the element to fill and returns
     /// the corresponding value.</param>
     /// <seealso cref="FillIndexed``1"/><seealso cref="HostTensor.Parallel.init``1"/>  
-    let init (shape: int64 list) (fn: int64[] -> 'T) : Tensor<'T> =
-        let x = Tensor<'T> (shape, Dev)
-        FillIndexed x fn
-        x           
+    let init shape fn = initDev Dev shape fn
 
     /// <summary>Transfers a tensor to the host device.</summary>
     /// <typeparam name="'T">The data type of the tensor.</typeparam>    
@@ -164,20 +167,12 @@ module HostTensor =
     /// <returns>The new tensor.</returns>
     /// <seealso cref="Tensor`1.linspace``2"/>
     let linspace (start: 'T) (stop: 'T) nElems = Tensor.linspace Dev start stop nElems
-  
-    /// <summary>Creates a one-dimensional tensor referencing the specified data.</summary>
-    /// <typeparam name="'T">The type of the data.</typeparam>
-    /// <param name="data">The data array to use.</param>
-    /// <returns>A tensor using the array <c>data</c> as its storage.</returns>
-    /// <remarks>The data array is referenced, not copied.
-    /// Thus changing the tensor modifies the specified data array and vice versa.</remarks>
-    /// <seealso cref="ofArray``1"/>
-    let usingArray (data: 'T []) =
-        let shp = [data.LongLength]
-        let layout = TensorLayout.newRowMajor shp
-        let storage = TensorManagedStorage<'T> (data)
-        Tensor<'T> (layout, TensorHostStorage.Managed storage) 
 
+    let internal ofArrayDev (dev: ITensorDevice) (data: 'T []) =
+        let shp = [Array.length data]
+        let shp = shp |> List.map int64
+        initDev dev shp (fun idx -> data.[int32 idx.[0]])        
+    
     /// <summary>Creates a one-dimensional tensor copying the specified data.</summary>
     /// <typeparam name="'T">The type of the data.</typeparam>
     /// <param name="data">The data array to use.</param>
@@ -185,44 +180,47 @@ module HostTensor =
     /// <remarks>The data is copied.</remarks>
     /// <seealso cref="usingArray``1"/>
     /// <seealso cref="ofArray2D``1"/><seealso cref="ofArray3D``1"/><seealso cref="ofArray4D``1"/>
-    let ofArray (data: 'T []) =
-        let shp = [Array.length data]
-        let shp = shp |> List.map int64
-        init shp (fun idx -> data.[int32 idx.[0]])
+    let ofArray data = ofArrayDev Dev data
 
+    let internal ofArray2DDev (dev: ITensorDevice) (data: 'T [,]) =
+        let shp = [Array2D.length1 data; Array2D.length2 data]
+        let shp = shp |> List.map int64
+        initDev dev shp (fun idx -> data.[int32 idx.[0], int32 idx.[1]])    
+    
     /// <summary>Creates a two-dimensional tensor copying the specified data.</summary>
     /// <typeparam name="'T">The type of the data.</typeparam>
     /// <param name="data">The data array to use.</param>
     /// <returns>A tensor using filled with the values from <c>data</c>.</returns>
     /// <remarks>The data is copied.</remarks>
     /// <seealso cref="ofArray``1"/><seealso cref="ofArray3D``1"/><seealso cref="ofArray4D``1"/>
-    let ofArray2D (data: 'T [,]) =
-        let shp = [Array2D.length1 data; Array2D.length2 data]
-        let shp = shp |> List.map int64
-        init shp (fun idx -> data.[int32 idx.[0], int32 idx.[1]])
+    let ofArray2D data = ofArray2DDev Dev data
 
+    let internal ofArray3DDev (dev: ITensorDevice) (data: 'T [,,]) =
+        let shp = [Array3D.length1 data; Array3D.length2 data; Array3D.length3 data]
+        let shp = shp |> List.map int64
+        initDev dev shp (fun idx -> data.[int32 idx.[0], int32 idx.[1], int32 idx.[2]])    
+    
     /// <summary>Creates a three-dimensional tensor copying the specified data.</summary>
     /// <typeparam name="'T">The type of the data.</typeparam>
     /// <param name="data">The data array to use.</param>
     /// <returns>A tensor using filled with the values from <c>data</c>.</returns>
     /// <remarks>The data is copied.</remarks>
     /// <seealso cref="ofArray``1"/><seealso cref="ofArray2D``1"/><seealso cref="ofArray4D``1"/>
-    let ofArray3D (data: 'T [,,]) =
-        let shp = [Array3D.length1 data; Array3D.length2 data; Array3D.length3 data]
-        let shp = shp |> List.map int64
-        init shp (fun idx -> data.[int32 idx.[0], int32 idx.[1], int32 idx.[2]])
+    let ofArray3D data = ofArray3DDev Dev data
 
+    let internal ofArray4DDev (dev: ITensorDevice) (data: 'T [,,,]) =
+        let shp = [Array4D.length1 data; Array4D.length2 data; 
+                   Array4D.length3 data; Array4D.length4 data]
+        let shp = shp |> List.map int64
+        init shp (fun idx -> data.[int32 idx.[0], int32 idx.[1], int32 idx.[2], int32 idx.[3]])    
+    
     /// <summary>Creates a four-dimensional tensor copying the specified data.</summary>
     /// <typeparam name="'T">The type of the data.</typeparam>
     /// <param name="data">The data array to use.</param>
     /// <returns>A tensor using filled with the values from <c>data</c>.</returns>
     /// <remarks>The data is copied.</remarks>
     /// <seealso cref="ofArray``1"/><seealso cref="ofArray2D``1"/><seealso cref="ofArray3D``1"/>
-    let ofArray4D (data: 'T [,,,]) =
-        let shp = [Array4D.length1 data; Array4D.length2 data; 
-                   Array4D.length3 data; Array4D.length4 data]
-        let shp = shp |> List.map int64
-        init shp (fun idx -> data.[int32 idx.[0], int32 idx.[1], int32 idx.[2], int32 idx.[3]])
+    let ofArray4D data = ofArray4DDev Dev data
 
     /// <summary>Creates a one-dimensional tensor from the specified sequence.</summary>
     /// <typeparam name="'T">The type of the data.</typeparam>
@@ -231,7 +229,7 @@ module HostTensor =
     /// <remarks>The sequence must be finite.</remarks>
     /// <seealso cref="ofSeqWithShape``1"/><seealso cref="ofList``1"/> 
     let ofSeq (data: 'T seq) =
-        data |> Array.ofSeq |> usingArray
+        data |> Array.ofSeq |> ofArray
 
     /// <summary>Creates a one-dimensional Tensor using the specified sequence and shape.</summary>
     /// <typeparam name="'T">The type of the data.</typeparam>
@@ -242,8 +240,11 @@ module HostTensor =
     /// shape are consumed from the sequence. Thus it may be infinite.</remarks>
     /// <seealso cref="ofSeq``1"/>
     let ofSeqWithShape shape (data: 'T seq) =
-        let nElems = shape |> List.fold (*) 1L
-        data |> Seq.take (int32 nElems) |> ofSeq |> Tensor.reshape shape
+        let enumerator = data.GetEnumerator()
+        init shape (fun _ ->
+            if not (enumerator.MoveNext()) then
+                invalidArg "data" "Sequence ended before tensor was filled."
+            enumerator.Current)
 
     /// <summary>A sequence of all elements contained in the tensor.</summary>
     /// <typeparam name="'T">The type of the data.</typeparam>
@@ -261,7 +262,7 @@ module HostTensor =
     /// <seealso cref="ofSeq``1"/><seealso cref="ofList2D``1"/>    
     /// <seealso cref="toList``1"/>
     let ofList (data: 'T list) =
-        data |> Array.ofList |> usingArray
+        data |> Array.ofList |> ofArray
 
     /// <summary>Creates a two-dimensional tensor from the specified list of lists.</summary>
     /// <typeparam name="'T">The type of the data.</typeparam>
@@ -355,6 +356,9 @@ module HostTensor =
     let write (hdf5: HDF5) (path: string) (x: ITensor) =
         callGeneric<HDFFuncs, unit> "Write" [x.DataType] (hdf5, path, x)
 
+    let internal readDev<'T> (dev: ITensorDevice) (hdf5: HDF5) (path: string) : Tensor<'T> =
+        HDFFuncs.Read (hdf5, path, dev)    
+    
     /// <summary>Reads a tensor from the specified HDF5 object path in an HDF5 file.</summary>
     /// <typeparam name="'T">The type of the data. This must match the type of the data stored in the
     /// HDF5 file.</typeparam>
@@ -368,17 +372,18 @@ module HostTensor =
     /// let k = HostTensor.read&lt;float&gt; hdfFile "k"
     /// </code></example>    
     /// <seealso cref="write"/><seealso cref="readUntyped"/>
-    let read<'T> (hdf5: HDF5) (path: string) : Tensor<'T> =
-        HDFFuncs.Read (hdf5, path)
+    let read<'T> hdf5 path = readDev<'T> Dev hdf5 path
 
+    let internal readUntypedDev (dev: ITensorDevice) (hdf5: HDF5) (path: string) =
+        let dataType = hdf5.GetDataType path
+        callGeneric<HDFFuncs, ITensor> "Read" [dataType] (hdf5, path, dev)        
+    
     /// <summary>Reads a tensor with unspecified data type from the specified HDF5 object path in an HDF5 file.</summary>
     /// <param name="hdf5">The HDF5 file.</param>
     /// <param name="path">The HDF5 object path.</param>
     /// <returns>A tensor filled with data read from the HDF5 file.</returns>
     /// <seealso cref="read``1"/>
-    let readUntyped (hdf5: HDF5) (path: string) = 
-        let dataType = hdf5.GetDataType path
-        callGeneric<HDFFuncs, ITensor> "Read" [dataType] (hdf5, path)
+    let readUntyped hdf5 path = readUntypedDev Dev hdf5 path
 
     /// <summary>Creates a tensor filled with random integer numbers from a uniform distribution.</summary>
     /// <param name="rnd">The random generator to use.</param>

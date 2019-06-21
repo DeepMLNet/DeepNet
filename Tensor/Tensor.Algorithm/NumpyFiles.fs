@@ -103,26 +103,22 @@ module NPYFile =
             failwithf "numpy data type \"%s\" does not match type %A or is unsupported in %s" 
                 descrStr typeof<'T> name
 
-        // create layout
-        let layout =
-            if fortranOrder then TensorLayout.newColumnMajor shp
-            else TensorLayout.newRowMajor shp
-        let nElems = TensorLayout.nElems layout
-
+        // create tensor
+        let order =
+            if fortranOrder then TensorOrder.ColumnMajor
+            else TensorOrder.RowMajor            
+        let tensor = Tensor<'T> (shp, HostTensor.Dev, order)
+        let storage = tensor.Storage :?> TensorHostStorage<'T>
+        let sizeInBytes = tensor.NElems * sizeof64<'T>
+        
         // read data
-        let sizeInBytes = nElems * sizeof64<'T>
-        let dataBytes : byte[] = Array.zeroCreate (int32 sizeInBytes)
-        let nRead = stream.Read (dataBytes, 0, int32 sizeInBytes)
+        use pin = storage.Pin()     
+        let span = Util.span<byte> pin.Ptr sizeInBytes
+        let nRead = stream.Read (span)
         if nRead <> int32 sizeInBytes then
-            failwithf "premature end of .npy file after reading %d bytes but expecting %d bytes in %s"
+            failwithf "Premature end of .npy file after reading %d bytes but expecting %d bytes in %s"
                 nRead sizeInBytes name
-
-        // convert to correct data type
-        let data : 'T[] = Array.zeroCreate (int32 nElems)
-        Buffer.BlockCopy (dataBytes, 0, data, 0, int32 sizeInBytes)
-
-        // create HostTensor
-        Tensor<'T> (layout, TensorHostStorage<'T> data)
+        tensor
 
 
     /// loads a .npy file from the specified path 

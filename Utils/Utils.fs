@@ -6,6 +6,7 @@ open System
 open System.Reflection
 open System.IO
 open System.Runtime.InteropServices
+open System.Runtime.CompilerServices
 open FSharp.Reflection
 open FSharp.NativeInterop
 
@@ -164,19 +165,26 @@ module internal Permutation =
 /// Extension methods for common collection types.
 [<AutoOpen>]
 module internal CollectionExtensions =
-
-    type System.Collections.Generic.IDictionary<'TKey, 'TValue> with
-        member this.TryFind (key: 'TKey when 'TKey :> obj) =
+    open System.Collections.Generic
+    open System.Collections.Concurrent
+    
+    [<Extension>]
+    type IDictionaryExtensions() =
+        
+        [<Extension>]
+        static member inline TryFind (this: IDictionary<'TKey, 'TValue>, key: 'TKey) =
             match this.TryGetValue key with
             | true, value -> Some value
             | false, _ -> None
 
-        member this.GetOrDefault key dflt =
+        [<Extension>]
+        static member GetOrDefault (this: IDictionary<'TKey, 'TValue>, key: 'TKey, dflt: 'TValue) =
             match this.TryFind key with
             | Some v -> v
             | None -> dflt
 
-        member this.IGetOrAdd key createFn =
+        [<Extension>]
+        static member IGetOrAdd (this: IDictionary<'TKey, 'TValue>, key: 'TKey, createFn: 'TKey -> 'TValue) =
             match this.TryFind key with
             | Some v -> v
             | None ->
@@ -184,32 +192,42 @@ module internal CollectionExtensions =
                 this.[key] <- v
                 v
 
-        member this.LockedTryFind key =
+        [<Extension>]
+        static member LockedTryFind (this: IDictionary<'TKey, 'TValue>, key: 'TKey) =
             lock this (fun () -> this.TryFind key)
 
-        member this.LockedAdd (key, value) =
+        [<Extension>]
+        static member LockedAdd (this: IDictionary<'TKey, 'TValue>, key: 'TKey, value: 'TValue) =
             lock this (fun () -> this.Add (key, value))
 
-        member this.LockedSet (key, value) =
+        [<Extension>]
+        static member LockedSet (this: IDictionary<'TKey, 'TValue>, key: 'TKey, value: 'TValue) =
             lock this (fun () -> this.[key] <- value)
 
-    type System.Collections.Concurrent.ConcurrentDictionary<'TKey, 'TValue> with
-        member this.TryFind key =
+    
+    [<Extension>]
+    type ConcurrentDictionaryExtensions() =
+        
+        [<Extension>]
+        static member TryFind (this: ConcurrentDictionary<'TKey, 'TValue>, key: 'TKey) =
             let value = ref (Unchecked.defaultof<'TValue>)
             if this.TryGetValue (key, value) then Some !value
             else None
 
-        member this.GetOrDefault key dflt =
+        [<Extension>]
+        static member GetOrDefault (this: ConcurrentDictionary<'TKey, 'TValue>, key: 'TKey, dflt: 'TValue) =
             match this.TryFind key with
             | Some v -> v
             | None -> dflt
 
+    
     type System.Collections.Concurrent.ConcurrentQueue<'T> with
         member this.TryDequeue () =
             let value = ref (Unchecked.defaultof<'T>)
             if this.TryDequeue (value) then Some !value
             else None
 
+    
     type System.Collections.Generic.HashSet<'T> with
         member this.LockedContains key =
             lock this (fun () -> this.Contains key)
@@ -217,17 +235,22 @@ module internal CollectionExtensions =
         member this.LockedAdd key =
             lock this (fun () -> this.Add key)
 
-    type System.Collections.Generic.IReadOnlyDictionary<'TKey, 'TValue> with
-        member this.TryFindReadOnly key =
+    
+    [<Extension>]
+    type IReadOnlyDictionaryExtensions() =
+        [<Extension>]
+        static member TryFindReadOnly (this: IReadOnlyDictionary<'TKey, 'TValue>, key: 'TKey) =
             let value = ref (Unchecked.defaultof<'TValue>)
             if this.TryGetValue (key, value) then Some !value
             else None
 
+    
     type System.Collections.Generic.Queue<'T> with
         member this.TryPeek =
             if this.Count > 0 then Some (this.Peek())
             else None
 
+    
     // allow access to common collections without having to open System.Collections
     type IReadOnlyDictionary<'TKey, 'TValue> = System.Collections.Generic.IReadOnlyDictionary<'TKey, 'TValue>
     type IReadOnlyCollection<'T> = System.Collections.Generic.IReadOnlyCollection<'T>

@@ -121,10 +121,13 @@ type internal PosIter32 =
 
 /// Memory that can be accessed via a Span<'T>.
 [<RequireQualifiedAccess>]
-type internal SpanSrc<'T> =
+type SpanSrc<'T> =
+    /// Span factory for native memory.
     | Native of ptr:nativeint * length:int
+    /// Span factor for managed memory.
     | Managed of memory:Memory<'T>
-        
+     
+    /// Create a `Span<'T>` for accessing the memory.
     member inline this.Span =
         match this with
         | Native (ptr, length) -> Span<'T> (Util.toVoidPtr ptr, length)

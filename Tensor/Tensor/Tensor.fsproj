@@ -63,9 +63,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="../../Utils/Utils.fs" Link="Utils/Utils.fs"/>
-    <Compile Include="../../Utils/DiskMap.fs" Link="Utils/DiskMap.fs"/>
-    <Compile Include="../../Utils/NativeLib.fs" Link="Utils/NativeLib.fs"/>
+    <Compile Include="../../Utils/Utils.fs" Link="Utils/Utils.fs" />
+    <Compile Include="../../Utils/DiskMap.fs" Link="Utils/DiskMap.fs" />
+    <Compile Include="../../Utils/NativeLib.fs" Link="Utils/NativeLib.fs" />
     <Compile Include="HDF5.fs" />
     <Compile Include="Sgn.fs" />
     <Compile Include="ScalarPrimitives.fs" />
@@ -83,6 +83,7 @@
     <Compile Include="Host/VectorOps.fs" />
     <Compile Include="Host/HostBackend.fs" />
     <Compile Include="Host/HostFrontend.fs" />
+    <Compile Include="Host\ManagedHostFrontend.fs" />
     <Compile Include="Cuda/CudaCfg.fs" />
     <Compile Include="Cuda/CudaUtils.fs" />
     <Compile Include="Cuda/CudaBLAS.fs" />    
