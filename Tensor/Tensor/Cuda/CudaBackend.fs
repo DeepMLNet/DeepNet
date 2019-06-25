@@ -545,17 +545,20 @@ and [<CustomPickler>] TensorCudaDevice (context: CudaContext, owner: bool) =
     static let mutable devices: WeakReference<TensorCudaDevice> option [] = 
         Array.create TensorCudaDevice.count None
 
-    static let devCount =
-        try CudaContext.GetDeviceCount()
-        with _ -> 0
+    static let syncRoot = obj ()
         
-    static let devInfo = [
-        let cnt =
+    /// <summary>Number of CUDA-capable devices.</summary>    
+    static member count =
+        lock syncRoot (fun () ->
             try CudaContext.GetDeviceCount()
-            with _ -> 0            
-        for i in 0 .. cnt-1 do
-            yield CudaContext.GetDeviceInfo i
-    ]        
+            with _ -> 0)
+        
+    /// <summary>Device properties for all available CUDA-capable devices.</summary>        
+    static member info = 
+        lock syncRoot (fun () -> [      
+            for i in 0 .. TensorCudaDevice.count-1 do
+                yield CudaContext.GetDeviceInfo i
+        ])       
     
     /// <summary>TensorCudaDevices for each CUDA-capable device.</summary>
     static member private Devices = devices
@@ -629,12 +632,6 @@ and [<CustomPickler>] TensorCudaDevice (context: CudaContext, owner: bool) =
     /// <returns>A tensor device associated with the specified CUDA context.</returns>
     static member forContext (ctx: CudaContext) =
         TensorCudaDevice (ctx, false) :> ITensorDevice
-
-    /// <summary>Number of CUDA-capable devices.</summary>
-    static member count = devCount
-
-    /// <summary>Device properties for all available CUDA-capable devices.</summary>
-    static member info = devInfo
 
     /// <summary>Returns a tensor device for the specified CUDA-capable device.</summary>
     /// <param name="idx">The index of the CUDA device.</param>
