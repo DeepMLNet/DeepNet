@@ -53,7 +53,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="HDF.PInvoke.NETStandard" Version="1.10.501" />
+    <PackageReference Include="HDF.PInvoke.NETStandard" Version="1.10.502" />
     <PackageReference Include="ManagedCuda.NETStandard" Version="9.1.300" />
     <PackageReference Include="ManagedCuda-CUBLAS.NETStandard" Version="9.1.300" />
     <PackageReference Include="ManagedCuda-NVRTC.NETStandard" Version="9.1.300" />
