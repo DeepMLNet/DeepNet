@@ -136,7 +136,7 @@ type LoopTests (output: ITestOutputHelper) =
         
         expr, varEnv
 
-    [<Fact>]
+    [<TraceCompareFact>]
     let ``Trace compare: Complicated loop 1`` () =   
         requireEqualTraces output ``Complicated loop 1 Expr``
 
@@ -204,7 +204,7 @@ type LoopTests (output: ITestOutputHelper) =
     let ``Evaluate derivative of complicated loop 1`` () =   
         runOnAllDevs output ``Derivative of complicated loop 1`` 
 
-    [<Fact>]
+    [<TraceCompareFact>]
     let ``Trace compare: Derivative of complicated loop 1`` () =   
         requireEqualTraces output ``Derivative of complicated loop 1 Expr``
 
