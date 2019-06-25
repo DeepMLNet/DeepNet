@@ -550,7 +550,10 @@ and [<CustomPickler>] TensorCudaDevice (context: CudaContext, owner: bool) =
         with _ -> 0
         
     static let devInfo = [
-        for i in 0 .. devCount-1 do
+        let cnt =
+            try CudaContext.GetDeviceCount()
+            with _ -> 0            
+        for i in 0 .. cnt-1 do
             yield CudaContext.GetDeviceInfo i
     ]        
     
