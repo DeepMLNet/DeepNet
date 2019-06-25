@@ -26,6 +26,21 @@ type ITensorCudaStorage =
 
 
 
+/// <summary>Provides access to nVidia CUDA GPUs.</summary>
+module TensorCudaDevice =
+    
+    /// <summary>Number of CUDA-capable devices.</summary>    
+    let count =
+        try CudaContext.GetDeviceCount()
+        with _ -> 0
+        
+    /// <summary>Device properties for all available CUDA-capable devices.</summary>        
+    let info = [      
+        for i in 0 .. count-1 do
+            yield CudaContext.GetDeviceInfo i
+    ]
+
+
 /// Tensor storage on a CUDA device.
 [<CustomPickler>]
 type TensorCudaStorage<'T when 'T: (new: unit -> 'T) and 'T: struct and 'T :> System.ValueType> 
@@ -545,21 +560,6 @@ and [<CustomPickler>] TensorCudaDevice (context: CudaContext, owner: bool) =
     static let mutable devices: WeakReference<TensorCudaDevice> option [] = 
         Array.create TensorCudaDevice.count None
 
-    static let syncRoot = obj ()
-        
-    /// <summary>Number of CUDA-capable devices.</summary>    
-    static member count =
-        lock syncRoot (fun () ->
-            try CudaContext.GetDeviceCount()
-            with _ -> 0)
-        
-    /// <summary>Device properties for all available CUDA-capable devices.</summary>        
-    static member info = 
-        lock syncRoot (fun () -> [      
-            for i in 0 .. TensorCudaDevice.count-1 do
-                yield CudaContext.GetDeviceInfo i
-        ])       
-    
     /// <summary>TensorCudaDevices for each CUDA-capable device.</summary>
     static member private Devices = devices
 
