@@ -72,7 +72,7 @@ type CurveDataset (output: ITestOutputHelper) =
                 idx (batch.Biotac |> Tensor.shape) (batch.Pos |> Tensor.shape)
             batch.Biotac |> Tensor.shape |> List.head |> should equal batchSize
 
-    [<Fact>]
+    [<CudaFact>]
     [<Trait("Category", "Skip_CI")>]
     member this.``To CUDA GPU`` () =
         let dsCuda = dataset |> Dataset.transfer CudaTensor.Dev

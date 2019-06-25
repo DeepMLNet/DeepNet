@@ -1,4 +1,4 @@
-﻿module TestUtils
+module TestUtils
 
 open System.IO
 open Xunit
@@ -20,6 +20,13 @@ let allDevs = [
     yield "Host", HostTensor.Dev
     if TensorCudaDevice.count > 0 then yield "Cuda", CudaTensor.Dev
 ]
+
+
+type TraceCompareFactAttribute() as this =
+    inherit FactAttribute()
+    do
+        if List.length allDevs < 2 then
+            this.Skip <- "Require at least two devices for trace compare tests."
 
 
 let dumpExpr (output: ITestOutputHelper) (expr: UExpr) =

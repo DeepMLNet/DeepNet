@@ -21,20 +21,21 @@ type OwnedNativeMemory (size: nativeint) =
         if size > 0n then size
         else 1n
         
-    let ptr = Marshal.AllocHGlobal size
-    do GC.AddMemoryPressure (int64 size)
+    let mutable ptr = 0n
+    do
+        ptr <- Marshal.AllocHGlobal size
+        GC.AddMemoryPressure (int64 size)
     
-    let mutable disposed = false
     let checkDisposed () =
-        if disposed then
+        if ptr = 0n then
             raise (ObjectDisposedException("OwnedNativeMemory"))
             
     interface IDisposable with
         member this.Dispose() =
-            if not disposed then
+            if ptr <> 0n then
                 GC.RemoveMemoryPressure (int64 size)
                 Marshal.FreeHGlobal ptr
-                disposed <- true            
+                ptr <- 0n            
     
     override this.Finalize() =
         (this :> IDisposable).Dispose()
@@ -50,11 +51,11 @@ type OwnedNativeMemory (size: nativeint) =
         size
         
     /// True if memory is disposed.
-    member this.Disposed = disposed
+    member this.Disposed = ptr = 0n
     
     /// Pretty string.
     member this.Pretty =
-        let disposedStr = if disposed then ", disposed" else ""
+        let disposedStr = if this.Disposed then ", disposed" else ""
         sprintf "%d (%d bytes%s)" this.Ptr this.Size disposedStr
     override this.ToString() = this.Pretty
     
@@ -101,7 +102,7 @@ type ITensorHostStorage =
 /// Host tensor storage using managed memory.
 type TensorManagedStorage<'T> (memory: Memory<'T>) =
     
-    /// Creates a new, zeroed managed storages using a .NET array.
+    /// Creates a new, zeroed managed storage using a .NET array.
     new (nElems: int64) =
         let ary = Array.zeroCreate (int nElems)
         let mem = Memory<'T> ary

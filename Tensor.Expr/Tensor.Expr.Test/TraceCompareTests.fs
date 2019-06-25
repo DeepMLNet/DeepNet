@@ -1,4 +1,6 @@
 ﻿namespace global
+open System
+
 #nowarn "25"
 
 open Xunit
@@ -13,123 +15,123 @@ open TestUtils
 
 
 type TraceCompareTests (output: ITestOutputHelper) =
-    let printfn format = Printf.kprintf (fun msg -> output.WriteLine(msg)) format 
+    let printfn format = Printf.kprintf (fun msg -> output.WriteLine(msg)) format
 
     let realTypes = [typeof<single>; typeof<double>]
 
-    [<CudaFact>]
+    [<TraceCompareFact>]
     let ``matrix-matrix dot`` () =   
         requireEqualTracesWithRandomDataAndTypes 
             output realTypes
             [[6L; 3L]; [3L; 2L]] 
             (fun [a; b] ->  a .* b)
 
-    [<CudaFact>]
+    [<TraceCompareFact>]
     let ``matrix-vector dot`` () =   
         requireEqualTracesWithRandomDataAndTypes 
             output realTypes
             [[6L; 3L]; [3L]] 
             (fun [a; b] -> a .* b)
 
-    [<CudaFact>]
+    [<TraceCompareFact>]
     let ``batched matrix-matrix dot`` () =   
         requireEqualTracesWithRandomDataAndTypes 
             output realTypes
             [[7L; 5L; 6L; 3L]; [7L; 5L; 3L; 2L]] 
             (fun [a; b] -> a .* b)
 
-    [<CudaFact>]    
+    [<TraceCompareFact>]    
     let ``batched matrix-matrix dot with broadcasting`` () =   
         requireEqualTracesWithRandomDataAndTypes 
             output realTypes
             [[7L; 5L; 6L; 3L]; [7L; -1L; 3L; 2L]] 
             (fun [a; b] -> a .* b)
 
-    [<CudaFact>]    
+    [<TraceCompareFact>]    
     let ``batched build diagonal`` () =
         requireEqualTracesWithRandomDataAndTypes 
             output realTypes
             [[7L; 5L; 3L]] 
             (fun [a] -> UExpr.diagMat a)
 
-    [<CudaFact>]    
+    [<TraceCompareFact>]    
     let ``batched extract diagonal`` () =
         requireEqualTracesWithRandomDataAndTypes 
             output realTypes
             [[7L; 5L; 4L; 4L]] 
             (fun [a] -> UExpr.diag a)
 
-    [<CudaFact>]    
+    [<TraceCompareFact>]    
     let ``matrix inverse`` () =
         requireEqualTracesWithRandomDataAndTypes 
             output realTypes
             [[3L; 3L]] 
             (fun [a] -> UExpr.invert a)
 
-    [<CudaFact>]    
+    [<TraceCompareFact>]    
     let ``transposed matrix inverse`` () =
         requireEqualTracesWithRandomDataAndTypes 
             output realTypes
             [[5L; 5L]] 
             (fun [a] -> UExpr.invert a.T)
 
-    [<CudaFact>]  
+    [<TraceCompareFact>]  
     let ``batched matrix inverse`` () =
         requireEqualTracesWithRandomDataAndTypes 
             output realTypes
             [[7L; 3L; 4L; 4L]] 
             (fun [a] -> UExpr.invert a)
 
-    [<CudaFact>] 
+    [<TraceCompareFact>] 
     let ``sum`` () =
         requireEqualTracesWithRandomDataAndTypes 
             output realTypes
             [[7L; 3L; 4L; 5L]] 
             (fun [a] -> UExpr.sum a)
 
-    [<CudaFact>]
+    [<TraceCompareFact>]
     let ``sum axis 1`` () =
         requireEqualTracesWithRandomDataAndTypes 
             output realTypes
             [[7L; 3L; 4L; 5L]] 
             (fun [a] -> UExpr.sumAxis 1 a)
 
-    [<CudaFact>]
+    [<TraceCompareFact>]
     let ``sum axis 2`` () =
         requireEqualTracesWithRandomDataAndTypes 
             output realTypes
             [[7L; 3L; 4L; 5L]] 
             (fun [a] -> a |> UExpr.sumAxis 3 |> UExpr.sumAxis 0)
 
-    [<CudaFact>]    
+    [<TraceCompareFact>]    
     let ``large sum axis`` () =
         requireEqualTracesWithRandomDataAndTypes 
             output realTypes
             [[7L; 200L]] 
             (fun [a] -> a |> UExpr.sumAxis 0)
 
-    [<CudaFact>]    
+    [<TraceCompareFact>]    
     let ``product`` () =
         requireEqualTracesWithRandomDataAndTypes 
             output [typeof<double>]
             [[7L; 3L; 4L; 5L]] 
             (fun [a] -> UExpr.product a)
 
-    [<CudaFact>]
+    [<TraceCompareFact>]
     let ``product axis 1`` () =
         requireEqualTracesWithRandomDataAndTypes 
             output realTypes
             [[7L; 3L; 4L; 5L]] 
             (fun [a] -> UExpr.productAxis 1 a)
 
-    [<CudaFact>]
+    [<TraceCompareFact>]
     let ``max, min elemwise`` () =
         requireEqualTracesWithRandomDataAndTypes 
             output realTypes
             [[3L; 3L]; [3L; 3L]; [3L; 3L]] 
             (fun [a; b; c]  -> UExpr.minElemwise (UExpr.maxElemwise a b) c)
 
-    [<CudaFact>]    
+    [<TraceCompareFact>]    
     let ``max, min elemwise derivative`` () =
         requireEqualTracesWithRandomDataAndTypesMultiChannel 
             output realTypes
@@ -144,14 +146,14 @@ type TraceCompareTests (output: ITestOutputHelper) =
                     Ch.Custom "dc", dexpr.Wrt (extractVar c)
                 ] |> MultiChannelExpr.bundle)
 
-    [<CudaFact>]   
+    [<TraceCompareFact>]   
     let ``max, min reduction`` () =
         requireEqualTracesWithRandomDataAndTypes 
             output realTypes
             [[4L; 5L; 3L]] 
             (fun [a]  -> a |> UExpr.maxAxis 2 |> UExpr.minAxis 1)
 
-    [<Fact>]    
+    [<TraceCompareFact>]    
     let ``max, min reduction derivative`` () =
         requireEqualTracesWithRandomDataAndTypesMultiChannel 
             output realTypes
@@ -164,42 +166,42 @@ type TraceCompareTests (output: ITestOutputHelper) =
                     Ch.Custom "da", dexpr.Wrt (extractVar a)
                 ] |> MultiChannelExpr.bundle)
 
-    [<CudaFact>]
+    [<TraceCompareFact>]
     let ``argMax reduction`` () =
         requireEqualTracesWithRandomDataAndTypes 
             output realTypes
             [[4L; 5L; 3L]] 
             (fun [a]  -> a |> UExpr.argMaxAxis 1)
 
-    [<CudaFact>]  
+    [<TraceCompareFact>]  
     let ``argMin reduction`` () =
         requireEqualTracesWithRandomDataAndTypes 
             output realTypes
             [[4L; 5L; 3L]] 
             (fun [a]  -> a |> UExpr.argMinAxis 2)
 
-    [<CudaFact>]   
+    [<TraceCompareFact>]   
     let ``comparison`` () =
         requireEqualTracesWithRandomDataAndTypes 
             output realTypes
             [[3L; 3L]; [3L; 3L]] 
             (fun [a; b] -> a >>== b)
 
-    [<CudaFact>]  
+    [<TraceCompareFact>]  
     let ``comparison, logics`` () =
         requireEqualTracesWithRandomDataAndTypes 
             output realTypes
             [[3L; 3L]; [3L; 3L]; [3L; 3L]] 
             (fun [a; b; c] -> a >>== b &&&& ~~~~(b <<<< c))
 
-    [<CudaFact>]    
+    [<TraceCompareFact>]    
     let ``comparison, logics, conditionals`` () =
         requireEqualTracesWithRandomDataAndTypes 
             output realTypes
             [[5L; 5L]; [5L; 5L]; [5L; 5L]; [5L; 5L]] 
             (fun [a; b; c; d] -> UExpr.ifThenElse ((a <<== b) &&&& (b >>>> c)) (d) (a)) 
 
-    [<CudaFact>]    
+    [<TraceCompareFact>]    
     let ``Gather 1`` () =
         requireEqualTraces output (fun ctx ->
             let a = Var<single> (ctx / "a", [Size.fix 4L; Size.fix 3L])
@@ -217,7 +219,7 @@ type TraceCompareTests (output: ITestOutputHelper) =
                 |> VarEnv.add i1 (Tensor.transfer ctx.Dev i1v)
             expr.Untyped, varEnv)
 
-    [<CudaFact>]    
+    [<TraceCompareFact>]    
     let ``Gather 2`` () =
         requireEqualTraces output (fun ctx ->
             let a = Var<single> (ctx / "a", [Size.fix 4L; Size.fix 3L])
@@ -232,7 +234,7 @@ type TraceCompareTests (output: ITestOutputHelper) =
                 |> VarEnv.add i0 (Tensor.transfer ctx.Dev i0v)
             expr.Untyped, varEnv)
 
-    [<CudaFact>]    
+    [<TraceCompareFact>]    
     let ``Scatter 1`` () =
         requireEqualTraces output (fun ctx ->
             let a = Var<single> (ctx / "a", [Size.fix 4L; Size.fix 3L])
@@ -248,7 +250,7 @@ type TraceCompareTests (output: ITestOutputHelper) =
                 |> VarEnv.add i0 (Tensor.transfer ctx.Dev i0v)
             expr.Untyped, varEnv)
 
-    [<CudaFact>]    
+    [<TraceCompareFact>]    
     let ``Scatter 2`` () =
         requireEqualTraces output (fun ctx ->
             let a = Var<single> (ctx / "a", [Size.fix 4L; Size.fix 3L])
@@ -267,7 +269,7 @@ type TraceCompareTests (output: ITestOutputHelper) =
                 |> VarEnv.add i1 (Tensor.transfer ctx.Dev i1v)
             expr.Untyped, varEnv)
 
-    [<CudaFact>]    
+    [<TraceCompareFact>]    
     let ``Counting`` () =
         requireEqualTraces output (fun ctx ->
             let expr = Expr<_>.counting ctx.Dev (Size.fix 100L)

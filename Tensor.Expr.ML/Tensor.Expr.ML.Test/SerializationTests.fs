@@ -16,13 +16,6 @@ open MBrace.FsPickler
 open MBrace.FsPickler.Json
 
 
-/// Test that only runs when CUDA is available.
-type CudaFactAttribute() as this =
-    inherit FactAttribute()
-    do
-        if TensorCudaDevice.count = 0 then
-            this.Skip <- "TensorCudaDevice.count = 0"
-
 
 type SerializationTests (output: ITestOutputHelper) =
     let printfn format = Printf.kprintf (fun msg -> output.WriteLine(msg)) format 

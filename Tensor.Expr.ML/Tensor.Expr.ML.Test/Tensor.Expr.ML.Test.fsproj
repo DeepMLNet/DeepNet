@@ -19,6 +19,7 @@
   <ItemGroup>
     <Compile Include="..\..\Utils\Utils.fs" Link="Utils/Utils.fs" />
     <Compile Include="..\..\Utils\TestUtils.fs" Link="Utils/TestUtils.fs" />
+    <Compile Include="..\..\Utils\CudaTestUtils.fs" Link="Utils/CudaTestUtils.fs" />    
     <Compile Include="DatasetTests.fs" />
     <Compile Include="NormalizationTests.fs" />
     <Compile Include="LinearRegression.fs" />

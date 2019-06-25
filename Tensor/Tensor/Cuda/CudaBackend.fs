@@ -619,12 +619,12 @@ and [<CustomPickler>] TensorCudaDevice (context: CudaContext, owner: bool) =
         TensorCudaDevice (ctx, false) :> ITensorDevice
 
     /// <summary>Number of CUDA-capable devices.</summary>
-    static member count = 
+    static member val count = 
         try CudaContext.GetDeviceCount()
         with _ -> 0
 
     /// <summary>Device properties for all available CUDA-capable devices.</summary>
-    static member info = [
+    static member val info = [
         for i in 0..TensorCudaDevice.count-1 do
             yield CudaContext.GetDeviceInfo i
     ]

@@ -102,13 +102,13 @@ type NeuralNetOnMNIST (output: ITestOutputHelper) =
         getMnist HostTensor.Dev None |> ignore
         printfn "MNIST load time: %A" sw.Elapsed
 
-    [<Fact>]
+    [<CudaFact>]
     let ``MNIST transfers to GPU`` () =
         let sw = Stopwatch.StartNew()
         getMnist CudaTensor.Dev None |> ignore
         printfn "MNIST load time: %A" sw.Elapsed
 
-    [<Fact>]
+    [<CudaFact>]
     [<Trait("Category", "Skip_CI")>]
     let ``Neural net compiles for GPU`` () =
         let sw = Stopwatch.StartNew()
@@ -122,7 +122,7 @@ type NeuralNetOnMNIST (output: ITestOutputHelper) =
         finalLoss |> should lessThan (initialLoss - 0.001f)
         printfn "Model build and train time: %A" sw.Elapsed
 
-    [<Fact>]
+    [<CudaFact>]
     [<Trait("Category", "Skip_CI")>]
     let ``Loss decreases during training on GPU`` () =
         let sw = Stopwatch.StartNew()

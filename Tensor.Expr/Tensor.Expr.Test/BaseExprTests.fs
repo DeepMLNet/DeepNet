@@ -4,9 +4,13 @@ open Xunit
 open Xunit.Abstractions
 open FsUnit.Xunit
 
-
 open Tensor
 open Tensor.Expr
+
+
+module AsmTags =    
+    [<assembly: CollectionBehavior(DisableTestParallelization = true)>]
+    do ()
 
 
 type BaseExprTests (output: ITestOutputHelper) =
